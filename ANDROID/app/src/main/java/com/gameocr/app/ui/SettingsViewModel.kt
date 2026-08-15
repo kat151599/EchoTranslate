@@ -32,7 +32,6 @@ import com.gameocr.app.data.TranslationPresetTransfer
 import com.gameocr.app.data.TranslatorEngine
 import com.gameocr.app.download.ModelDownloadManager
 import com.gameocr.app.download.ModelDownloadSpec
-import com.gameocr.app.glossary.TranslationGlossaryRepository
 import com.gameocr.app.llm.LlmModelInstaller
 import com.gameocr.app.llm.LlmModelKind
 import com.gameocr.app.ocr.OrientationModelInstaller
@@ -60,7 +59,6 @@ class SettingsViewModel @Inject constructor(
     private val routingTranslator: RoutingTranslator,
     private val llmInstaller: LlmModelInstaller,
     private val overlayFontManager: OverlayFontManager,
-    private val glossaryRepository: TranslationGlossaryRepository,
     private val modelDownloadManager: ModelDownloadManager,
 ) : ViewModel() {
 
@@ -79,7 +77,6 @@ class SettingsViewModel @Inject constructor(
                 output = it,
                 settings = settings,
                 resolveFontFile = overlayFontManager::transferFileFor,
-                glossaryTerms = glossaryRepository.listAll(),
             )
         }
     }
@@ -110,7 +107,6 @@ class SettingsViewModel @Inject constructor(
                     importedPresetCount = imported.importedCount,
                     overwrittenPresetNames = imported.overwrittenNames,
                     importedFontCount = 0,
-                    importedGlossaryTermCount = 0,
                     legacyPresetOnly = true,
                     skippedSettingFieldCount = 0,
                 )
@@ -118,8 +114,6 @@ class SettingsViewModel @Inject constructor(
 
             val importedSettings = requireNotNull(preview.settings)
             val beforeSettings = repo.get()
-            val beforeGlossary = glossaryRepository.listAll()
-            var glossaryCommitted = false
             var settingsCommitted = false
             try {
                 stagedFonts.forEach { commits += overlayFontManager.commitTransferredFont(it) }
@@ -132,8 +126,6 @@ class SettingsViewModel @Inject constructor(
                     imported = importedSettings,
                     availableFonts = availableFonts,
                 )
-                val importedGlossaryCount = glossaryRepository.importTerms(preview.glossaryTerms)
-                glossaryCommitted = true
                 repo.update { merged.settings }
                 settingsCommitted = true
                 commits.forEach(overlayFontManager::finishTransferredFont)
@@ -142,17 +134,12 @@ class SettingsViewModel @Inject constructor(
                     importedPresetCount = merged.presetResult.importedCount,
                     overwrittenPresetNames = merged.presetResult.overwrittenNames,
                     importedFontCount = installedFonts.size,
-                    importedGlossaryTermCount = importedGlossaryCount,
                     legacyPresetOnly = false,
                     skippedSettingFieldCount = preview.skippedSettingFields.size,
                 )
             } catch (error: Throwable) {
                 if (settingsCommitted) {
                     runCatching { repo.update { beforeSettings } }.exceptionOrNull()?.let(error::addSuppressed)
-                }
-                if (glossaryCommitted) {
-                    runCatching { glossaryRepository.restoreTerms(beforeGlossary) }
-                        .exceptionOrNull()?.let(error::addSuppressed)
                 }
                 commits.asReversed().forEach { commit ->
                     runCatching { overlayFontManager.rollbackTransferredFont(commit) }
@@ -535,20 +522,6 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun saveTranslationOutputDirection(direction: com.gameocr.app.data.TranslationOutputDirection) {
         repo.update { it.copy(translationOutputDirection = direction) }
-    }
-
-    suspend fun saveGlossarySettings(
-        enabled: Boolean,
-        detectionMode: com.gameocr.app.data.ForegroundAppDetectionMode,
-        sendAppName: Boolean,
-    ) {
-        repo.update {
-            it.copy(
-                translationGlossaryEnabled = enabled,
-                foregroundAppDetectionMode = detectionMode,
-                sendAppNameToTranslator = sendAppName,
-            )
-        }
     }
 
     /** 重置悬浮窗口位置 / 大小到默认（X=Y=-1 居中，W/H 回默认）。 */

@@ -92,7 +92,6 @@ private enum class Route {
     Main,
     Onboarding,
     Settings,
-    Glossary,
     Logs,
     LegalNotices,
 }
@@ -176,10 +175,8 @@ private fun AppRoot(
             )
             Route.Settings -> SettingsScreen(
                 onBack = { routeName = Route.Main.name },
-                onOpenGlossary = { routeName = Route.Glossary.name },
                 listState = settingsListState,
             )
-            Route.Glossary -> GlossaryScreen(onBack = { routeName = Route.Settings.name })
             Route.Logs -> LogScreen(onBack = { routeName = Route.Main.name })
             Route.LegalNotices -> LegalNoticesScreen(onBack = { routeName = Route.Main.name })
         }

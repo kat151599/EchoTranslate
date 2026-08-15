@@ -73,9 +73,6 @@ import com.gameocr.app.data.TranslationPresetCatalog
 import com.gameocr.app.data.translationLanguageCodesConflict
 import com.gameocr.app.data.needsRawBitmap
 import com.gameocr.app.data.Languages
-import com.gameocr.app.glossary.GlossaryTermCategory
-import com.gameocr.app.glossary.GlossaryTermEntity
-import com.gameocr.app.glossary.TranslationGlossaryRepository
 import com.gameocr.app.ocr.BitmapPreprocessor
 import com.gameocr.app.ocr.MangaOcrEngine
 import com.gameocr.app.ocr.MangaDelayedMaskDebugSessionManager
@@ -111,14 +108,11 @@ import com.gameocr.app.overlay.RegionPickerOverlay
 import com.gameocr.app.overlay.TranslationBlockCopyOverlay
 import com.gameocr.app.overlay.TranslationCardOverlay
 import com.gameocr.app.overlay.TranslationCorrectionDraft
-import com.gameocr.app.overlay.TranslationCorrectionOverlay
-import com.gameocr.app.overlay.TranslationCorrectionRequest
 import com.gameocr.app.ui.MainActivity
 import com.gameocr.app.translate.BatchTranslationProgressState
 import com.gameocr.app.translate.BatchTranslationUpdate
 import com.gameocr.app.translate.CrossLineTranslationUnit
 import com.gameocr.app.translate.TranslationException
-import com.gameocr.app.translate.TranslationMemoryService
 import com.gameocr.app.translate.Translator
 import com.gameocr.app.translate.RoutingTranslator
 import com.gameocr.app.translate.individualTranslationUnits
@@ -213,8 +207,6 @@ class CaptureService : Service() {
     // 用于路由层判断"manga-ocr 模型是否已下载"——未下载时 (VERTICAL_RTL, ja) 不会被路由到 manga
     @Inject lateinit var mangaOcrModelInstaller: MangaOcrModelInstaller
     @Inject lateinit var mangaOcrEngine: MangaOcrEngine
-    @Inject lateinit var translationMemoryService: TranslationMemoryService
-    @Inject lateinit var translationGlossaryRepository: TranslationGlossaryRepository
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mainScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -233,7 +225,6 @@ class CaptureService : Service() {
     private var translationCard: TranslationCardOverlay? = null
     private var translationBlockCopyOverlay: TranslationBlockCopyOverlay? = null
     private var historyCorrectionOverlay: HistoryCorrectionOverlay? = null
-    private var translationCorrectionOverlay: TranslationCorrectionOverlay? = null
 
     private var loopJob: Job? = null
     private var translationRenderJob: Job? = null
@@ -359,7 +350,6 @@ class CaptureService : Service() {
             settingsRepository = settingsRepository,
             ioScope = scope,
             onTranslationBlockDetailRequested = ::showTranslationBlockCopyPanel,
-            onTranslationCorrectionRequested = ::showTranslationCorrection,
             onFloatingWindowDismissed = {},
             onTranslationOverlayShown = { floatingButton?.bringToFront() },
         )
@@ -930,100 +920,7 @@ class CaptureService : Service() {
                     sourceText = source,
                     translation = translation,
                     settings = settings,
-                    onCorrectTranslation = {
-                        showTranslationCorrection(
-                            TranslationCorrectionRequest(source, translation)
-                        )
-                    },
                 )
-            }
-        }
-    }
-
-    private fun showTranslationCorrection(request: TranslationCorrectionRequest) {
-        scope.launch {
-            val settings = settingsRepository.get()
-            val memoryScope = translationMemoryService.currentScope(settings)
-            withContext(Dispatchers.Main) {
-                translationBlockCopyOverlay?.dismiss()
-                val editor = translationCorrectionOverlay
-                    ?: TranslationCorrectionOverlay(this@CaptureService).also {
-                        translationCorrectionOverlay = it
-                    }
-                editor.show(
-                    request = request,
-                    scope = memoryScope,
-                    onSave = { draft ->
-                        overlay?.applyTranslationCorrection(draft)
-                        translationCard?.applyTranslationCorrection(draft)
-                        persistTranslationCorrection(
-                            draft = draft,
-                            settings = settings,
-                            memoryScope = memoryScope,
-                        )
-                    },
-                )
-            }
-        }
-    }
-
-    private fun persistTranslationCorrection(
-        draft: TranslationCorrectionDraft,
-        settings: Settings,
-        memoryScope: com.gameocr.app.translate.TranslationMemoryScope?,
-    ) {
-        scope.launch {
-            val result = runCatching {
-                var memorySaved = false
-                var glossarySaved = false
-                if (memoryScope != null && draft.rememberTranslation) {
-                    translationMemoryService.remember(
-                        observedSource = draft.observedSource,
-                        correctedSource = draft.correctedSource,
-                        correctedTranslation = draft.correctedTranslation,
-                        settings = settings,
-                        scope = memoryScope,
-                    )
-                    memorySaved = true
-                }
-                draft.glossary?.let { glossary ->
-                    translationGlossaryRepository.upsert(
-                        GlossaryTermEntity(
-                            scopePackage = memoryScope?.packageName.orEmpty(),
-                            appLabel = memoryScope?.appLabel.orEmpty(),
-                            sourceLang = settings.sourceLang,
-                            targetLang = settings.targetLang,
-                            sourceTerm = glossary.sourceTerm,
-                            targetTerm = glossary.targetTerm,
-                            category = GlossaryTermCategory.TERM,
-                        )
-                    )
-                    glossarySaved = true
-                }
-                when {
-                    memorySaved && glossarySaved -> getString(
-                        R.string.translation_correction_saved_memory_and_glossary,
-                        memoryScope?.appLabel.orEmpty(),
-                    )
-                    glossarySaved -> getString(
-                        R.string.translation_correction_saved_glossary,
-                    )
-                    memorySaved -> getString(
-                        R.string.translation_correction_saved_memory,
-                        memoryScope?.appLabel.orEmpty(),
-                    )
-                    else -> getString(R.string.translation_correction_saved_current)
-                }
-            }
-            withContext(Dispatchers.Main) {
-                val message = result.getOrElse { error ->
-                    Timber.w(error, "Failed to persist translation correction")
-                    getString(
-                        R.string.translation_correction_save_failed,
-                        error.message ?: error.javaClass.simpleName,
-                    )
-                }
-                Toast.makeText(this@CaptureService, message, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -3762,8 +3659,6 @@ class CaptureService : Service() {
         translationCard = null
         translationBlockCopyOverlay?.dismiss()
         translationBlockCopyOverlay = null
-        translationCorrectionOverlay?.dismiss()
-        translationCorrectionOverlay = null
         screenshotter?.release()
         screenshotter = null
         projection?.stop()

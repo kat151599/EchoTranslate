@@ -1,18 +1,13 @@
 package com.gameocr.app.di
 
 import android.content.Context
-import androidx.room.Room
 import com.gameocr.app.BuildConfig
 import com.gameocr.app.data.AndroidKeystoreSettingsSecretCipher
 import com.gameocr.app.data.SettingsSecretCipher
-import com.gameocr.app.glossary.TranslationGlossaryDao
-import com.gameocr.app.glossary.TranslationGlossaryDatabase
 import com.gameocr.app.ocr.OcrEngine
 import com.gameocr.app.ocr.RoutingOcrEngine
 import com.gameocr.app.translate.RoutingTranslator
 import com.gameocr.app.translate.TranslationCache
-import com.gameocr.app.translate.TranslationMemoryDao
-import com.gameocr.app.translate.TranslationMemoryDatabase
 import com.gameocr.app.translate.Translator
 import dagger.Binds
 import dagger.Module
@@ -63,36 +58,6 @@ object AppModule {
     @Provides
     @Singleton
     fun provideTranslationCache(): TranslationCache = TranslationCache(capacity = 256)
-
-    @Provides
-    @Singleton
-    fun provideTranslationGlossaryDatabase(
-        @ApplicationContext context: Context,
-    ): TranslationGlossaryDatabase = Room.databaseBuilder(
-        context,
-        TranslationGlossaryDatabase::class.java,
-        "translation-glossary.db",
-    ).build()
-
-    @Provides
-    fun provideTranslationGlossaryDao(
-        database: TranslationGlossaryDatabase,
-    ): TranslationGlossaryDao = database.glossaryDao()
-
-    @Provides
-    @Singleton
-    fun provideTranslationMemoryDatabase(
-        @ApplicationContext context: Context,
-    ): TranslationMemoryDatabase = Room.databaseBuilder(
-        context,
-        TranslationMemoryDatabase::class.java,
-        "translation-memory.db",
-    ).build()
-
-    @Provides
-    fun provideTranslationMemoryDao(
-        database: TranslationMemoryDatabase,
-    ): TranslationMemoryDao = database.translationMemoryDao()
 
 }
 

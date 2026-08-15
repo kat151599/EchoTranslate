@@ -137,11 +137,8 @@ dependencies {
     implementation(libs.mlkit.text.recognition.chinese)
     implementation(libs.mlkit.text.recognition.korean)
 
-    // DataStore / Room
+    // DataStore
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    ksp(libs.androidx.room.compiler)
 
     // 物理动画：悬浮球松手吸边用 SpringAnimation
     implementation(libs.androidx.dynamicanimation)

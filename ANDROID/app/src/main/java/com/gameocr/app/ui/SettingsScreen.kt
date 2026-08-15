@@ -202,7 +202,6 @@ import com.gameocr.app.data.swappedTranslationLanguagePair
 import com.gameocr.app.data.resolveTranslationOutputSettings
 import com.gameocr.app.data.manualOverlayLayoutControlsEnabled
 import com.gameocr.app.data.settingsSearchEntryId
-import com.gameocr.app.glossary.supportsTranslationPromptContext
 import com.gameocr.app.llm.LlmModelKind
 import com.gameocr.app.overlay.StyledTranslationTextView
 import com.gameocr.app.overlay.MenuItemRegistry
@@ -297,7 +296,6 @@ private fun openExternalBrowser(context: Context, url: String) {
 fun SettingsScreen(
     modifier: Modifier = Modifier,
     onBack: () -> Unit,
-    onOpenGlossary: () -> Unit,
     listState: LazyListState,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -579,7 +577,6 @@ fun SettingsScreen(
     var translationOutputDirection by remember {
         mutableStateOf(com.gameocr.app.data.TranslationOutputDirection.LEFT_TO_RIGHT)
     }
-    var translationGlossaryEnabled by remember { mutableStateOf(true) }
     var foregroundAppDetectionMode by remember {
         mutableStateOf(com.gameocr.app.data.ForegroundAppDetectionMode.AUTO)
     }
@@ -790,7 +787,6 @@ fun SettingsScreen(
         remotePcApiKey = s.remotePcApiKey
         remotePcSessionId = s.remotePcSessionId
         remotePcImageQuality = s.remotePcImageQuality.toString()
-        translationGlossaryEnabled = s.translationGlossaryEnabled
         foregroundAppDetectionMode = s.foregroundAppDetectionMode
         sendAppNameToTranslator = s.sendAppNameToTranslator
         deeplKey = s.deeplApiKey
@@ -970,7 +966,6 @@ fun SettingsScreen(
                     R.string.settings_bundle_exported_format,
                     result.presetCount,
                     result.fontCount,
-                    result.glossaryTermCount,
                 )
             }.onFailure { error ->
                 presetMessage = context.getString(
@@ -1040,7 +1035,6 @@ fun SettingsScreen(
                             plan.importedCount,
                             overwritten,
                             importPreview.fonts.size,
-                            importPreview.glossaryTerms.size,
                             importPreview.skippedSettingFields.size,
                             importPreview.protectedLocalFieldCount,
                         )
@@ -1065,7 +1059,6 @@ fun SettingsScreen(
                                     result.importedPresetCount,
                                     result.overwrittenPresetNames.size,
                                     result.importedFontCount,
-                                    result.importedGlossaryTermCount,
                                     result.skippedSettingFieldCount,
                                 )
                             }
@@ -1220,7 +1213,6 @@ fun SettingsScreen(
         translationOutputFollowRecognition = translationOutputFollowRecognition,
         translationOutputLayout = translationOutputLayout,
         translationOutputDirection = translationOutputDirection,
-        translationGlossaryEnabled = translationGlossaryEnabled,
         sendAppNameToTranslator = sendAppNameToTranslator,
         dbnetProbThresh = dbnetProb,
         dbnetBoxScoreThresh = dbnetScore,
@@ -2446,7 +2438,6 @@ fun SettingsScreen(
                 translationOutputLayout = output.layout
                 translationOutputDirection = output.direction
             }
-            translationGlossaryEnabled = s.translationGlossaryEnabled
             foregroundAppDetectionMode = s.foregroundAppDetectionMode
             sendAppNameToTranslator = s.sendAppNameToTranslator
             cleartextHostsText = s.cleartextAllowedHosts.joinToString("\n")
@@ -3505,60 +3496,18 @@ fun SettingsScreen(
                     onCrossLineContextTranslationEnabledChange = {
                         crossLineContextTranslationEnabled = it
                     },
-                    glossaryEnabled = translationGlossaryEnabled,
-                    onGlossaryEnabledChange = { enabled ->
-                        translationGlossaryEnabled = enabled
-                        scope.launch {
-                            viewModel.saveGlossarySettings(
-                                enabled,
-                                foregroundAppDetectionMode,
-                                sendAppNameToTranslator,
-                            )
-                        }
-                    },
                     foregroundAppDetectionMode = foregroundAppDetectionMode,
-                    onForegroundAppDetectionModeChange = { mode ->
-                        foregroundAppDetectionMode = mode
-                        scope.launch {
-                            viewModel.saveGlossarySettings(
-                                translationGlossaryEnabled,
-                                mode,
-                                sendAppNameToTranslator,
-                            )
-                        }
-                    },
-                    sendAppName = sendAppNameToTranslator,
-                    onSendAppNameChange = { enabled ->
-                        sendAppNameToTranslator = enabled
-                        scope.launch {
-                            viewModel.saveGlossarySettings(
-                                translationGlossaryEnabled,
-                                foregroundAppDetectionMode,
-                                enabled,
-                            )
-                        }
-                    },
+                    onForegroundAppDetectionModeChange = { foregroundAppDetectionMode = it },
                     usageAccessGranted = usageAccessGranted,
                     onOpenUsageAccess = {
-                        val packageIntent = Intent(
-                            AndroidSettings.ACTION_USAGE_ACCESS_SETTINGS
-                        ).apply {
+                        val packageIntent = Intent(AndroidSettings.ACTION_USAGE_ACCESS_SETTINGS).apply {
                             data = Uri.parse(usageAccessPackageUri(context.packageName))
                         }
                         runCatching { context.startActivity(packageIntent) }
                             .recoverCatching {
-                                context.startActivity(
-                                    Intent(AndroidSettings.ACTION_USAGE_ACCESS_SETTINGS)
-                                )
-                            }.onFailure {
-                                Toast.makeText(
-                                    context,
-                                    R.string.settings_usage_access_unavailable,
-                                    Toast.LENGTH_SHORT,
-                                ).show()
+                                context.startActivity(Intent(AndroidSettings.ACTION_USAGE_ACCESS_SETTINGS))
                             }
                     },
-                    onOpenGlossary = onOpenGlossary,
                     retryEmptyTranslation = retryEmptyTranslation,
                     onRetryEmptyTranslationChange = { retryEmptyTranslation = it },
                 )
@@ -5321,15 +5270,10 @@ private fun TranslationAssistanceSettings(
     onStreamingChange: (Boolean) -> Unit,
     crossLineContextTranslationEnabled: Boolean,
     onCrossLineContextTranslationEnabledChange: (Boolean) -> Unit,
-    glossaryEnabled: Boolean,
-    onGlossaryEnabledChange: (Boolean) -> Unit,
     foregroundAppDetectionMode: com.gameocr.app.data.ForegroundAppDetectionMode,
     onForegroundAppDetectionModeChange: (com.gameocr.app.data.ForegroundAppDetectionMode) -> Unit,
-    sendAppName: Boolean,
-    onSendAppNameChange: (Boolean) -> Unit,
     usageAccessGranted: Boolean,
     onOpenUsageAccess: () -> Unit,
-    onOpenGlossary: () -> Unit,
     retryEmptyTranslation: Boolean,
     onRetryEmptyTranslationChange: (Boolean) -> Unit,
 ) {
@@ -5356,23 +5300,6 @@ private fun TranslationAssistanceSettings(
         onChange = onRetryEmptyTranslationChange,
     )
     }
-    if (supportsTranslationPromptContext(translatorEngine)) {
-        SettingsSearchTarget(searchTargetRegistry, R.string.settings_glossary_enabled) {
-        SwitchRow(
-            label = stringResource(R.string.settings_glossary_enabled),
-            checked = glossaryEnabled,
-            helpText = stringResource(R.string.settings_glossary_enabled_summary),
-            onChange = onGlossaryEnabledChange,
-        )
-        }
-        SettingsSearchTarget(searchTargetRegistry, R.string.settings_send_app_name) {
-        SwitchRow(
-            label = stringResource(R.string.settings_send_app_name),
-            checked = sendAppName,
-            helpText = stringResource(R.string.settings_send_app_name_summary),
-            onChange = onSendAppNameChange,
-        )
-        }
         SettingsSearchTarget(searchTargetRegistry, R.string.settings_foreground_app_detection) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
@@ -5410,25 +5337,6 @@ private fun TranslationAssistanceSettings(
             onClick = onOpenUsageAccess,
         )
         }
-        SettingsSearchTarget(searchTargetRegistry, R.string.settings_manage_glossary) {
-        SettingsLinkCell(
-            label = stringResource(R.string.settings_manage_glossary),
-            onClick = onOpenGlossary,
-        )
-        }
-    } else {
-        Text(
-            text = stringResource(R.string.settings_translation_context_unsupported),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        SettingsSearchTarget(searchTargetRegistry, R.string.settings_manage_glossary) {
-        SettingsLinkCell(
-            label = stringResource(R.string.settings_manage_glossary),
-            onClick = onOpenGlossary,
-        )
-        }
-    }
     HorizontalDivider()
 }
 
@@ -6097,11 +6005,9 @@ private val SEARCH_TARGET_TARGET_LANGUAGE = intArrayOf(R.string.settings_search_
 private val SEARCH_TARGET_TRANSLATION_ASSISTANCE = intArrayOf(
     R.string.settings_search_item_streaming,
     R.string.settings_search_item_empty_translation_retry,
-    R.string.settings_glossary_enabled,
     R.string.settings_foreground_app_detection,
     R.string.settings_send_app_name,
     R.string.settings_grant_usage_access,
-    R.string.settings_manage_glossary,
 )
 private val SEARCH_TARGET_PROMPTS = intArrayOf(
     R.string.settings_search_item_prompt,
@@ -6400,11 +6306,9 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_dictionary_prompt, listOf("dictionary", "词典", "划词", "word select", "phonetic", "音标", "释义", "definition", "prompt")),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_streaming, listOf("streaming", "流式")),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_cross_line_context, listOf("cross context", "cross line", "上下文", "跨上下文", "段落")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_glossary_enabled, listOf("name consistency", "term memory", "译名一致性", "人名", "专名")),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_send_app_name, listOf("send app name", "prompt app context", "发送应用名称", "模型应用名称")),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_foreground_app_detection, listOf("app detection", "foreground app", "accessibility", "usage access", "应用识别", "前台应用")),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_grant_usage_access, listOf("usage permission", "usage access", "permission", "使用情况权限", "使用情况访问", "授权")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_manage_glossary, listOf("translation library", "glossary", "terminology", "translation memory", "翻译库", "术语库", "翻译记忆", "专业名词")),
     SearchEntry(
         SectionKeys.TEXT_ORIENTATION,
         R.string.settings_text_orientation_section_title,
