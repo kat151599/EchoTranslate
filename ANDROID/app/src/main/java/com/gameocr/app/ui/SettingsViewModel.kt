@@ -51,12 +51,6 @@ import com.gameocr.app.translate.RoutingTranslator
 import com.gameocr.app.translate.TestResult
 import com.gameocr.app.tts.ttsHttpHostOrNull
 import com.gameocr.app.tts.ttsApiHttpHostOrNull
-import com.gameocr.app.tts.VoiceDesignPromptGenerator
-import com.gameocr.app.tts.MiniMaxManagedVoice
-import com.gameocr.app.tts.MiniMaxVoiceCloneRequest
-import com.gameocr.app.tts.MiniMaxVoiceCreationResult
-import com.gameocr.app.tts.MiniMaxVoiceDesignRequest
-import com.gameocr.app.tts.MiniMaxVoiceManager
 import androidx.work.WorkInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -79,8 +73,6 @@ class SettingsViewModel @Inject constructor(
     private val overlayFontManager: OverlayFontManager,
     private val glossaryRepository: TranslationGlossaryRepository,
     private val modelDownloadManager: ModelDownloadManager,
-    private val voiceDesignPromptGenerator: VoiceDesignPromptGenerator,
-    private val miniMaxVoiceManager: MiniMaxVoiceManager,
 ) : ViewModel() {
 
     val modelDownloadWorkInfos: Flow<List<WorkInfo>> = modelDownloadManager.workInfos
@@ -104,6 +96,7 @@ class SettingsViewModel @Inject constructor(
     suspend fun getDownloadedMlKitLanguageModels(): Set<String> =
         routingTranslator.getDownloadedMlKitLanguageModels()
 
+    /* TTS/MiniMax settings operations removed.
     internal suspend fun loadMiniMaxManagedVoices(
         baseUrl: String,
         apiKey: String,
@@ -149,6 +142,7 @@ class SettingsViewModel @Inject constructor(
         outputLanguageTag,
     )
 
+    */
     suspend fun exportSettingsBundle(
         uri: Uri,
         settings: Settings,

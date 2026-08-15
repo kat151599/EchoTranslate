@@ -97,7 +97,6 @@ import com.gameocr.app.ocr.shouldRerunLowQualityChinesePaddleOcr
 import com.gameocr.app.ocr.sortTextBlocksForReading
 import com.gameocr.app.data.resolveTranslationOutputSettings
 import com.gameocr.app.data.FloatingSkill
-import com.gameocr.app.tts.ttsFailureMessage
 import com.gameocr.app.overlay.FloatingButtonManager
 import com.gameocr.app.overlay.FloatingMenuTourPrefs
 import com.gameocr.app.overlay.AdaptiveOverlayStyle
@@ -114,7 +113,6 @@ import com.gameocr.app.overlay.TranslationCardOverlay
 import com.gameocr.app.overlay.TranslationCorrectionDraft
 import com.gameocr.app.overlay.TranslationCorrectionOverlay
 import com.gameocr.app.overlay.TranslationCorrectionRequest
-import com.gameocr.app.overlay.TtsPlaybackAction
 import com.gameocr.app.overlay.WordSelectOverlay
 import com.gameocr.app.ui.MainActivity
 import com.gameocr.app.translate.BatchTranslationProgressState
@@ -134,7 +132,6 @@ import com.gameocr.app.translate.WordResult
 import com.gameocr.app.translate.RemotePcTranslator
 import com.gameocr.app.translate.WordSelectTranslationCoordinator
 import com.gameocr.app.translate.WordSelectTranslationStage
-import com.gameocr.app.tts.TtsEngine
 import com.gameocr.app.util.InferenceTiming
 import com.gameocr.app.util.VerticalDiagnosticLog
 import com.gameocr.app.util.physicalDisplaySize
@@ -220,7 +217,6 @@ class CaptureService : Service() {
     // 用于路由层判断"manga-ocr 模型是否已下载"——未下载时 (VERTICAL_RTL, ja) 不会被路由到 manga
     @Inject lateinit var mangaOcrModelInstaller: MangaOcrModelInstaller
     @Inject lateinit var mangaOcrEngine: MangaOcrEngine
-    @Inject lateinit var ttsEngine: TtsEngine
     @Inject lateinit var translationMemoryService: TranslationMemoryService
     @Inject lateinit var translationGlossaryRepository: TranslationGlossaryRepository
 
@@ -370,7 +366,7 @@ class CaptureService : Service() {
             ioScope = scope,
             onTranslationBlockDetailRequested = ::showTranslationBlockCopyPanel,
             onTranslationCorrectionRequested = ::showTranslationCorrection,
-            onFloatingWindowDismissed = { ttsEngine.stop() },
+            onFloatingWindowDismissed = {},
             onTranslationOverlayShown = { floatingButton?.bringToFront() },
         )
         floatingButton = FloatingButtonManager(
@@ -751,28 +747,10 @@ class CaptureService : Service() {
             logWordSelectPerf("screenshot_ready", "frame=${full.width}x${full.height}")
             restoreCaptureChromeOnce(showLoading = false)
             val settings = settingsRepository.get()
-            val sourceSpeech = wordSelectTtsAction(
-                settings = settings.copy(targetLang = settings.sourceLang),
-                diagId = diagId,
-                role = "source",
-                playbackId = "word-select:$diagId:source",
-            )
-            val translationSpeech = wordSelectTtsAction(
-                settings = settings,
-                diagId = diagId,
-                role = "translation",
-                playbackId = "word-select:$diagId:translation",
-            )
-            val dictionarySpeech = wordSelectTtsAction(
-                settings = settings,
-                diagId = diagId,
-                role = "dictionary",
-                playbackId = "word-select:$diagId:dictionary",
-            )
             val card = withContext(Dispatchers.Main) {
                 (translationCard ?: TranslationCardOverlay(
                     context = this@CaptureService,
-                    onDismissed = { ttsEngine.stop() },
+                    onDismissed = {},
                     onShown = { floatingButton?.bringToFront() },
                 ).also {
                     translationCard = it
@@ -783,9 +761,6 @@ class CaptureService : Service() {
                         wordResult = null,
                         settings = settings,
                         loading = true,
-                        onSpeakSource = sourceSpeech,
-                        onSpeakTranslation = translationSpeech,
-                        onSpeakDictionary = dictionarySpeech,
                         onCorrectTranslation = { source, translation ->
                             showTranslationCorrection(
                                 TranslationCorrectionRequest(source, translation)
@@ -1288,13 +1263,12 @@ class CaptureService : Service() {
     private fun showTranslationBlockCopyPanel(source: String, translation: String) {
         scope.launch {
             val settings = settingsRepository.get()
-            val diagId = captureSequence.incrementAndGet()
             mainScope.launch {
                 translationCard?.dismiss()
                 val copyOverlay = translationBlockCopyOverlay
                     ?: TranslationBlockCopyOverlay(
                         context = this@CaptureService,
-                        onDismissed = { ttsEngine.stop() },
+                        onDismissed = {},
                     ).also {
                         translationBlockCopyOverlay = it
                     }
@@ -1302,18 +1276,6 @@ class CaptureService : Service() {
                     sourceText = source,
                     translation = translation,
                     settings = settings,
-                    onSpeakSourceSelection = wordSelectTtsAction(
-                        settings = settings.copy(targetLang = settings.sourceLang),
-                        diagId = diagId,
-                        role = "block_source_selection",
-                        playbackId = "translation-block:$diagId:source",
-                    ),
-                    onSpeakTranslationSelection = wordSelectTtsAction(
-                        settings = settings,
-                        diagId = diagId,
-                        role = "block_translation_selection",
-                        playbackId = "translation-block:$diagId:translation",
-                    ),
                     onCorrectTranslation = {
                         showTranslationCorrection(
                             TranslationCorrectionRequest(source, translation)
@@ -3916,6 +3878,7 @@ class CaptureService : Service() {
         VerticalDiagnosticLog.w(t, "capture#$diagId $message")
     }
 
+    /* TTS removed from CaptureService.
     private fun wordSelectTtsAction(
         settings: Settings,
         diagId: Long,
@@ -3971,6 +3934,7 @@ class CaptureService : Service() {
             }
     }
 
+    */
     private fun logBlankLikeFrame(diagId: Long, label: String, stats: BitmapFrameStats) {
         if (!stats.blankLike) return
         logVerticalDiag(
@@ -4141,12 +4105,12 @@ class CaptureService : Service() {
                 allowWrap = effectiveOverlaySettings.overlayAllowWrap
                 avoidCollision = effectiveOverlaySettings.overlayAvoidCollision
                 translationBlockInteractionMode = settings.translationBlockInteractionMode
-                translationBlockSelectionSpeechAction = wordSelectTtsAction(
+                translationBlockSelectionSpeechAction = null /* wordSelectTtsAction(
                     settings = settings,
                     diagId = captureSequence.get(),
                     role = "block_translation_direct_selection",
                     playbackId = "translation-block:${captureSequence.get()}:direct-selection",
-                )
+                ) */
                 floatingWindowContentMode = settings.floatingWindowContentMode
                 customBorderStyle = settings.customBorderStyle
                 overlayTypeface = typeface
@@ -4213,7 +4177,6 @@ class CaptureService : Service() {
         translationBlockCopyOverlay = null
         translationCorrectionOverlay?.dismiss()
         translationCorrectionOverlay = null
-        ttsEngine.stop()
         screenshotter?.release()
         screenshotter = null
         projection?.stop()
