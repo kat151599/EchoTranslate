@@ -3872,63 +3872,6 @@ class CaptureService : Service() {
         VerticalDiagnosticLog.w(t, "capture#$diagId $message")
     }
 
-    /* TTS removed from CaptureService.
-    private fun wordSelectTtsAction(
-        settings: Settings,
-        diagId: Long,
-        role: String,
-        playbackId: String,
-    ): TtsPlaybackAction? {
-        if (!settings.ttsEnabled) return null
-        fun dispatch(text: String, toggle: Boolean) {
-            mainScope.launch {
-                speakWordSelectText(
-                    text = text,
-                    settings = settings,
-                    diagId = diagId,
-                    role = role,
-                    playbackId = playbackId,
-                    toggle = toggle,
-                )
-            }
-        }
-        return TtsPlaybackAction(
-            playbackId = playbackId,
-            playbackState = ttsEngine.playbackState,
-            onToggle = { text -> dispatch(text, true) },
-            onStart = { text -> dispatch(text, false) },
-        )
-    }
-
-    private suspend fun speakWordSelectText(
-        text: String,
-        settings: Settings,
-        diagId: Long,
-        role: String,
-        playbackId: String,
-        toggle: Boolean,
-    ) {
-        if (!settings.ttsEnabled) return
-        runCatching {
-            if (toggle) {
-                ttsEngine.toggle(text, settings, playbackId)
-            } else {
-                ttsEngine.speak(text, settings, playbackId)
-            }
-        }
-            .onFailure { error ->
-                if (error is CancellationException) throw error
-                Timber.w(error, "Word-select %s TTS failed", role)
-                logVerticalDiag(error, diagId, "wordSelect $role tts failed")
-                logRepository.warn(
-                    LogRepository.Category.TRANSLATE,
-                    "TTS failed: ${error.javaClass.simpleName}: ${error.message.orEmpty().take(160)}"
-                )
-                overlay?.showErrorHint(ttsFailureMessage(error), durationMs = 6000L)
-            }
-    }
-
-    */
     private fun logBlankLikeFrame(diagId: Long, label: String, stats: BitmapFrameStats) {
         if (!stats.blankLike) return
         logVerticalDiag(

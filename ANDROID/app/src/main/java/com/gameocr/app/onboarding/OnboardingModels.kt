@@ -11,7 +11,6 @@ import com.gameocr.app.data.Settings
 import com.gameocr.app.data.TranslationOutputDirection
 import com.gameocr.app.data.TranslationOutputLayout
 import com.gameocr.app.data.TranslatorEngine
-import com.gameocr.app.data.TtsProvider
 import java.net.URI
 
 enum class OnboardingStep {

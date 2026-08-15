@@ -68,53 +68,6 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun load(): Settings = repo.get()
 
-    /* TTS/MiniMax settings operations removed.
-    internal suspend fun loadMiniMaxManagedVoices(
-        baseUrl: String,
-        apiKey: String,
-    ): List<MiniMaxManagedVoice> = miniMaxVoiceManager.loadVoices(baseUrl, apiKey)
-
-    internal suspend fun cloneMiniMaxVoice(
-        request: MiniMaxVoiceCloneRequest,
-    ): MiniMaxVoiceCreationResult = miniMaxVoiceManager.cloneVoice(request)
-
-    internal suspend fun designMiniMaxVoice(
-        request: MiniMaxVoiceDesignRequest,
-    ): MiniMaxVoiceCreationResult = miniMaxVoiceManager.designVoice(request)
-
-    internal suspend fun deleteMiniMaxVoice(
-        baseUrl: String,
-        apiKey: String,
-        voice: MiniMaxManagedVoice,
-    ) = miniMaxVoiceManager.deleteVoice(baseUrl, apiKey, voice)
-
-    suspend fun generateMimoVoiceDesign(
-        draft: String,
-        settings: Settings,
-        outputLanguageTag: String,
-    ): String = voiceDesignPromptGenerator.generate(draft, settings, outputLanguageTag)
-
-    suspend fun generateMiniMaxVoiceDescription(
-        draft: String,
-        settings: Settings,
-        outputLanguageTag: String,
-    ): String = voiceDesignPromptGenerator.generateMiniMaxDescription(
-        draft,
-        settings,
-        outputLanguageTag,
-    )
-
-    suspend fun polishMimoStyleInstruction(
-        draft: String,
-        settings: Settings,
-        outputLanguageTag: String,
-    ): String = voiceDesignPromptGenerator.polishStyleInstruction(
-        draft,
-        settings,
-        outputLanguageTag,
-    )
-
-    */
     suspend fun exportSettingsBundle(
         uri: Uri,
         settings: Settings,

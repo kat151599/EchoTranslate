@@ -6075,7 +6075,6 @@ private fun overlayThemeColors(
 /** 搜索可用的 section key 常量。和 [SETTING_ITEMS] 的 sectionKey 对齐。 */
 private object SectionKeys {
     const val TRANSLATE = "translate"
-    const val TTS = "tts"
     const val PRESETS = "presets"
     const val OCR = "ocr"
     const val TEXT_ORIENTATION = "text_orientation"
@@ -6095,7 +6094,6 @@ internal val SETTINGS_SECTION_KEYS_IN_ORDER = listOf(
     SectionKeys.THEME_MODE,
     SectionKeys.PRESETS,
     SectionKeys.TRANSLATE,
-    SectionKeys.TTS,
     SectionKeys.OCR,
     SectionKeys.TEXT_ORIENTATION,
     SectionKeys.OVERLAY,
@@ -6147,12 +6145,6 @@ private val SEARCH_TARGET_TRANSLATION_ASSISTANCE = intArrayOf(
     R.string.settings_send_app_name,
     R.string.settings_grant_usage_access,
     R.string.settings_manage_glossary,
-)
-private val SEARCH_TARGET_TTS = intArrayOf(
-    R.string.settings_section_tts,
-    R.string.settings_search_item_tts_enable,
-    R.string.settings_search_item_tts_provider,
-    R.string.settings_search_item_tts_http,
 )
 private val SEARCH_TARGET_PROMPTS = intArrayOf(
     R.string.settings_search_item_prompt,
@@ -6253,7 +6245,6 @@ internal val SETTINGS_SEARCH_TARGET_RES_IDS: Set<Int> = listOf(
     SEARCH_TARGET_SOURCE_LANGUAGE,
     SEARCH_TARGET_TARGET_LANGUAGE,
     SEARCH_TARGET_TRANSLATION_ASSISTANCE,
-    SEARCH_TARGET_TTS,
     SEARCH_TARGET_PROMPTS,
     SEARCH_TARGET_OCR_ENGINE,
     SEARCH_TARGET_ORIENTATION_DETECTION,
@@ -6410,30 +6401,6 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
         R.string.settings_section_translator,
         R.string.settings_search_item_empty_translation_retry,
         SETTINGS_SEARCH_EMPTY_TRANSLATION_RETRY_KEYWORDS,
-    ),
-    SearchEntry(
-        SectionKeys.TTS,
-        R.string.settings_section_tts,
-        R.string.settings_section_tts,
-        listOf("tts", "text to speech", "voice output", "语音", "朗读"),
-    ),
-    SearchEntry(
-        SectionKeys.TTS,
-        R.string.settings_section_tts,
-        R.string.settings_search_item_tts_enable,
-        listOf("tts", "text to speech", "speak", "voice output", "read aloud", "语音", "朗读", "播报"),
-    ),
-    SearchEntry(
-        SectionKeys.TTS,
-        R.string.settings_section_tts,
-        R.string.settings_search_item_tts_provider,
-        listOf("system tts", "android tts", "generic http", "luna", "pc", "volcengine", "aliyun", "火山", "阿里", "音色", "情绪"),
-    ),
-    SearchEntry(
-        SectionKeys.TTS,
-        R.string.settings_section_tts,
-        R.string.settings_search_item_tts_http,
-        listOf("tts url", "tts token", "http tts", "gateway", "adapter", "base url", "json base64", "binary audio", "本地网关", "适配器"),
     ),
     SearchEntry(SectionKeys.PRESETS, R.string.settings_section_translation_presets, R.string.settings_section_translation_presets, listOf("preset", "presets", "profile", "mode", "系统预设方案", "翻译预设", "预设", "模式")),
     SearchEntry(SectionKeys.PRESETS, R.string.settings_section_translation_presets, R.string.settings_search_item_preset_transfer, SETTINGS_SEARCH_TRANSFER_KEYWORDS),
