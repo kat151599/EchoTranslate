@@ -30,13 +30,6 @@ import com.gameocr.app.data.TranslationPresetCatalog
 import com.gameocr.app.data.TranslationPresetImportResult
 import com.gameocr.app.data.TranslationPresetTransfer
 import com.gameocr.app.data.TranslatorEngine
-import com.gameocr.app.data.TtsHttpResponseMode
-import com.gameocr.app.data.TtsProvider
-import com.gameocr.app.data.VolcengineTtsResource
-import com.gameocr.app.data.MiniMaxTtsModel
-import com.gameocr.app.data.MimoTtsModel
-import com.gameocr.app.data.MAX_TTS_PLAYBACK_GAIN_DB
-import com.gameocr.app.data.MIN_TTS_PLAYBACK_GAIN_DB
 import com.gameocr.app.download.ModelDownloadManager
 import com.gameocr.app.download.ModelDownloadSpec
 import com.gameocr.app.glossary.TranslationGlossaryRepository
@@ -265,39 +258,6 @@ class SettingsViewModel @Inject constructor(
         ocrRedBoxShowTranslation: Boolean,
         streaming: Boolean,
         retryEmptyTranslation: Boolean,
-        ttsEnabled: Boolean,
-        ttsProvider: TtsProvider,
-        ttsVoice: String,
-        ttsEmotion: String,
-        ttsSpeed: Float,
-        ttsPitch: Float,
-        ttsGainDb: Int,
-        ttsHttpBaseUrl: String,
-        ttsHttpBearerToken: String,
-        ttsHttpResponseMode: TtsHttpResponseMode,
-        ttsVolcengineResource: VolcengineTtsResource,
-        ttsVolcengineBaseUrl: String,
-        ttsVolcengineApiKey: String,
-        ttsVolcengineSpeaker: String,
-        ttsVolcengineModel: String,
-        ttsVolcengineContext: String,
-        ttsVolcenginePitch: Int,
-        ttsVolcengineToneFidelity: Boolean,
-        ttsMiniMaxModel: MiniMaxTtsModel,
-        ttsMiniMaxBaseUrl: String,
-        ttsMiniMaxApiKey: String,
-        ttsMiniMaxVoice: String,
-        ttsMiniMaxEmotion: String,
-        ttsMiniMaxSpeed: Float,
-        ttsMiniMaxPitch: Int,
-        ttsMimoModel: MimoTtsModel,
-        ttsMimoBaseUrl: String,
-        ttsMimoApiKey: String,
-        ttsMimoVoice: String,
-        ttsMimoInstruction: String,
-        ttsMimoVoiceDesignPrompt: String,
-        ttsMimoVoiceCloneInstruction: String,
-        ttsMimoVoiceSampleUri: String,
         renderMode: RenderMode,
         translationBlockInteractionMode: TranslationBlockInteractionMode,
         placement: OverlayPlacement,
@@ -386,44 +346,6 @@ class SettingsViewModel @Inject constructor(
                 ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
                 streamingTranslate = streaming,
                 retryEmptyTranslation = retryEmptyTranslation,
-                ttsEnabled = ttsEnabled,
-                ttsProvider = ttsProvider,
-                ttsVoice = ttsVoice.trim(),
-                ttsEmotion = ttsEmotion.trim(),
-                ttsSpeed = ttsSpeed.coerceIn(0.25f, 4.0f),
-                ttsPitch = ttsPitch.coerceIn(0.25f, 4.0f),
-                ttsGainDb = ttsGainDb.coerceIn(
-                    MIN_TTS_PLAYBACK_GAIN_DB,
-                    MAX_TTS_PLAYBACK_GAIN_DB,
-                ),
-                ttsHttpBaseUrl = ttsHttpBaseUrl.trim(),
-                ttsHttpBearerToken = ttsHttpBearerToken.trim(),
-                ttsHttpResponseMode = ttsHttpResponseMode,
-                ttsVolcengineResource = ttsVolcengineResource,
-                ttsVolcengineBaseUrl = ttsVolcengineBaseUrl.trim(),
-                ttsVolcengineApiKey = ttsVolcengineApiKey.trim(),
-                ttsVolcengineSpeaker = ttsVolcengineSpeaker.trim()
-                    .ifBlank { "zh_female_vv_uranus_bigtts" },
-                ttsVolcengineModel = ttsVolcengineModel.trim()
-                    .ifBlank { "seed-tts-2.0-standard" },
-                ttsVolcengineContext = ttsVolcengineContext.trim(),
-                ttsVolcenginePitch = ttsVolcenginePitch.coerceIn(-12, 12),
-                ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
-                ttsMiniMaxModel = ttsMiniMaxModel,
-                ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl.trim(),
-                ttsMiniMaxApiKey = ttsMiniMaxApiKey.trim(),
-                ttsMiniMaxVoice = ttsMiniMaxVoice.trim().ifBlank { "male-qn-qingse" },
-                ttsMiniMaxEmotion = ttsMiniMaxEmotion.trim(),
-                ttsMiniMaxSpeed = ttsMiniMaxSpeed.coerceIn(0.5f, 2.0f),
-                ttsMiniMaxPitch = ttsMiniMaxPitch.coerceIn(-12, 12),
-                ttsMimoModel = ttsMimoModel,
-                ttsMimoBaseUrl = ttsMimoBaseUrl.trim(),
-                ttsMimoApiKey = ttsMimoApiKey.trim(),
-                ttsMimoVoice = ttsMimoVoice.trim().ifBlank { "mimo_default" },
-                ttsMimoInstruction = ttsMimoInstruction.trim(),
-                ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt.trim(),
-                ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction.trim(),
-                ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri.trim(),
                 renderMode = renderMode,
                 translationBlockInteractionMode = translationBlockInteractionMode,
                 overlayPlacement = placement,

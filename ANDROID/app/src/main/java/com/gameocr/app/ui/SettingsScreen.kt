@@ -197,18 +197,8 @@ import com.gameocr.app.data.TranslationPresetImportPlan
 import com.gameocr.app.data.TranslationBlockInteractionMode
 import com.gameocr.app.data.TranslationPresetTransfer
 import com.gameocr.app.data.TranslatorEngine
-import com.gameocr.app.data.TtsHttpResponseMode
-import com.gameocr.app.data.TtsProvider
-import com.gameocr.app.data.VolcengineTtsResource
 import com.gameocr.app.data.translationLanguageCodesConflict
 import com.gameocr.app.data.swappedTranslationLanguagePair
-import com.gameocr.app.data.MiniMaxTtsModel
-import com.gameocr.app.data.MimoTtsModel
-import com.gameocr.app.data.DEFAULT_MIMO_TTS_BASE_URL
-import com.gameocr.app.data.DEFAULT_MINIMAX_TTS_BASE_URL
-import com.gameocr.app.data.DEFAULT_VOLCENGINE_TTS_BASE_URL
-import com.gameocr.app.data.MAX_TTS_PLAYBACK_GAIN_DB
-import com.gameocr.app.data.MIN_TTS_PLAYBACK_GAIN_DB
 import com.gameocr.app.data.resolveTranslationOutputSettings
 import com.gameocr.app.data.manualOverlayLayoutControlsEnabled
 import com.gameocr.app.data.settingsSearchEntryId
@@ -312,7 +302,6 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val defaultTtsTestText = stringResource(R.string.settings_tts_test_text_default)
     val scope = rememberCoroutineScope()
     val modelDownloadWorkInfos by viewModel.modelDownloadWorkInfos.collectAsState(initial = emptyList())
     val unfinishedModelDownloads = modelDownloadWorkInfos.filterNot { it.state.isFinished }
@@ -482,52 +471,6 @@ fun SettingsScreen(
     var ocrRedBoxShowTranslation by remember { mutableStateOf(false) }
     var streaming by remember { mutableStateOf(true) }
     var retryEmptyTranslation by remember { mutableStateOf(false) }
-    var ttsEnabled by remember { mutableStateOf(false) }
-    var ttsProvider by remember { mutableStateOf(TtsProvider.SYSTEM) }
-    var ttsVoice by remember { mutableStateOf("") }
-    var ttsTestText by remember(defaultTtsTestText) { mutableStateOf(defaultTtsTestText) }
-    var ttsTestRunning by remember { mutableStateOf(false) }
-    var ttsTestMessage by remember { mutableStateOf<String?>(null) }
-    var ttsTestSuccess by remember { mutableStateOf(false) }
-    var ttsTestGeneration by remember { mutableStateOf(0L) }
-    var ttsEmotion by remember { mutableStateOf("") }
-    var ttsSpeed by remember { mutableStateOf(1.0f) }
-    var ttsPitch by remember { mutableStateOf(1.0f) }
-    var ttsGainDb by remember { mutableStateOf(0) }
-    var ttsHttpBaseUrl by remember { mutableStateOf("") }
-    var ttsHttpBearerToken by remember { mutableStateOf("") }
-    var ttsHttpResponseMode by remember { mutableStateOf(TtsHttpResponseMode.BINARY_AUDIO) }
-    var ttsVolcengineResource by remember {
-        mutableStateOf(VolcengineTtsResource.PRESET_VOICE_2_0)
-    }
-    var ttsVolcengineBaseUrl by remember { mutableStateOf(DEFAULT_VOLCENGINE_TTS_BASE_URL) }
-    var ttsVolcengineApiKey by remember { mutableStateOf("") }
-    var ttsVolcengineSpeaker by remember { mutableStateOf("zh_female_vv_uranus_bigtts") }
-    var ttsVolcengineModel by remember { mutableStateOf("seed-tts-2.0-standard") }
-    var ttsVolcengineContext by remember { mutableStateOf("") }
-    var ttsVolcenginePitch by remember { mutableStateOf(0) }
-    var ttsVolcengineToneFidelity by remember { mutableStateOf(false) }
-    var ttsMiniMaxModel by remember { mutableStateOf(MiniMaxTtsModel.SPEECH_2_8_HD) }
-    var ttsMiniMaxBaseUrl by remember { mutableStateOf(DEFAULT_MINIMAX_TTS_BASE_URL) }
-    var ttsMiniMaxApiKey by remember { mutableStateOf("") }
-    var ttsMiniMaxVoice by remember { mutableStateOf("male-qn-qingse") }
-    var ttsMiniMaxEmotion by remember { mutableStateOf("") }
-    var ttsMiniMaxSpeed by remember { mutableStateOf(1.0f) }
-    var ttsMiniMaxPitch by remember { mutableStateOf(0) }
-    var ttsMimoModel by remember { mutableStateOf(MimoTtsModel.PRESET) }
-    var ttsMimoBaseUrl by remember { mutableStateOf(DEFAULT_MIMO_TTS_BASE_URL) }
-    var ttsMimoApiKey by remember { mutableStateOf("") }
-    var ttsMimoVoice by remember { mutableStateOf("mimo_default") }
-    var ttsMimoInstruction by remember { mutableStateOf("") }
-    var ttsMimoVoiceDesignPrompt by remember { mutableStateOf("") }
-    var ttsMimoVoiceCloneInstruction by remember { mutableStateOf("") }
-    var ttsMimoVoiceSampleUri by remember { mutableStateOf("") }
-    var ttsMimoPresetStyleGenerating by remember { mutableStateOf(false) }
-    var ttsMimoPresetStyleMessage by remember { mutableStateOf<String?>(null) }
-    var ttsMimoCloneStyleGenerating by remember { mutableStateOf(false) }
-    var ttsMimoCloneStyleMessage by remember { mutableStateOf<String?>(null) }
-    var ttsMimoVoiceDesignGenerating by remember { mutableStateOf(false) }
-    var ttsMimoVoiceDesignMessage by remember { mutableStateOf<String?>(null) }
     var renderMode by remember { mutableStateOf(RenderMode.BLOCKS) }
     var translationBlockInteractionMode by remember {
         mutableStateOf(TranslationBlockInteractionMode.COPY_BUTTON)
@@ -1210,39 +1153,6 @@ fun SettingsScreen(
         overlayFonts = overlayFontEntries,
         streamingTranslate = streaming,
         retryEmptyTranslation = retryEmptyTranslation,
-        ttsEnabled = ttsEnabled,
-        ttsProvider = ttsProvider,
-        ttsVoice = ttsVoice,
-        ttsEmotion = ttsEmotion,
-        ttsSpeed = ttsSpeed,
-        ttsPitch = ttsPitch,
-        ttsGainDb = ttsGainDb,
-        ttsHttpBaseUrl = ttsHttpBaseUrl,
-        ttsHttpBearerToken = ttsHttpBearerToken,
-        ttsHttpResponseMode = ttsHttpResponseMode,
-        ttsVolcengineResource = ttsVolcengineResource,
-        ttsVolcengineBaseUrl = ttsVolcengineBaseUrl,
-        ttsVolcengineApiKey = ttsVolcengineApiKey,
-        ttsVolcengineSpeaker = ttsVolcengineSpeaker,
-        ttsVolcengineModel = ttsVolcengineModel,
-        ttsVolcengineContext = ttsVolcengineContext,
-        ttsVolcenginePitch = ttsVolcenginePitch,
-        ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
-        ttsMiniMaxModel = ttsMiniMaxModel,
-        ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl,
-        ttsMiniMaxApiKey = ttsMiniMaxApiKey,
-        ttsMiniMaxVoice = ttsMiniMaxVoice,
-        ttsMiniMaxEmotion = ttsMiniMaxEmotion,
-        ttsMiniMaxSpeed = ttsMiniMaxSpeed,
-        ttsMiniMaxPitch = ttsMiniMaxPitch,
-        ttsMimoModel = ttsMimoModel,
-        ttsMimoBaseUrl = ttsMimoBaseUrl,
-        ttsMimoApiKey = ttsMimoApiKey,
-        ttsMimoVoice = ttsMimoVoice,
-        ttsMimoInstruction = ttsMimoInstruction,
-        ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt,
-        ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction,
-        ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri,
         renderMode = renderMode,
         translationBlockInteractionMode = translationBlockInteractionMode,
         overlayPlacement = placement,
@@ -1422,39 +1332,6 @@ fun SettingsScreen(
             ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
             streaming = streaming,
             retryEmptyTranslation = retryEmptyTranslation,
-            ttsEnabled = ttsEnabled,
-            ttsProvider = ttsProvider,
-            ttsVoice = ttsVoice,
-            ttsEmotion = ttsEmotion,
-            ttsSpeed = ttsSpeed,
-            ttsPitch = ttsPitch,
-            ttsGainDb = ttsGainDb,
-            ttsHttpBaseUrl = ttsHttpBaseUrl,
-            ttsHttpBearerToken = ttsHttpBearerToken,
-            ttsHttpResponseMode = ttsHttpResponseMode,
-            ttsVolcengineResource = ttsVolcengineResource,
-            ttsVolcengineBaseUrl = ttsVolcengineBaseUrl,
-            ttsVolcengineApiKey = ttsVolcengineApiKey,
-            ttsVolcengineSpeaker = ttsVolcengineSpeaker,
-            ttsVolcengineModel = ttsVolcengineModel,
-            ttsVolcengineContext = ttsVolcengineContext,
-            ttsVolcenginePitch = ttsVolcenginePitch,
-            ttsVolcengineToneFidelity = ttsVolcengineToneFidelity,
-            ttsMiniMaxModel = ttsMiniMaxModel,
-            ttsMiniMaxBaseUrl = ttsMiniMaxBaseUrl,
-            ttsMiniMaxApiKey = ttsMiniMaxApiKey,
-            ttsMiniMaxVoice = ttsMiniMaxVoice,
-            ttsMiniMaxEmotion = ttsMiniMaxEmotion,
-            ttsMiniMaxSpeed = ttsMiniMaxSpeed,
-            ttsMiniMaxPitch = ttsMiniMaxPitch,
-            ttsMimoModel = ttsMimoModel,
-            ttsMimoBaseUrl = ttsMimoBaseUrl,
-            ttsMimoApiKey = ttsMimoApiKey,
-            ttsMimoVoice = ttsMimoVoice,
-            ttsMimoInstruction = ttsMimoInstruction,
-            ttsMimoVoiceDesignPrompt = ttsMimoVoiceDesignPrompt,
-            ttsMimoVoiceCloneInstruction = ttsMimoVoiceCloneInstruction,
-            ttsMimoVoiceSampleUri = ttsMimoVoiceSampleUri,
             renderMode = renderMode,
             translationBlockInteractionMode = translationBlockInteractionMode,
             placement = placement,
@@ -2502,39 +2379,6 @@ fun SettingsScreen(
             ocrRedBoxShowTranslation = s.ocrRedBoxShowTranslation
             streaming = s.streamingTranslate
             retryEmptyTranslation = s.retryEmptyTranslation
-            ttsEnabled = s.ttsEnabled
-            ttsProvider = s.ttsProvider
-            ttsVoice = s.ttsVoice
-            ttsEmotion = s.ttsEmotion
-            ttsSpeed = s.ttsSpeed
-            ttsPitch = s.ttsPitch
-            ttsGainDb = s.ttsGainDb
-            ttsHttpBaseUrl = s.ttsHttpBaseUrl
-            ttsHttpBearerToken = s.ttsHttpBearerToken
-            ttsHttpResponseMode = s.ttsHttpResponseMode
-            ttsVolcengineResource = s.ttsVolcengineResource
-            ttsVolcengineBaseUrl = s.ttsVolcengineBaseUrl
-            ttsVolcengineApiKey = s.ttsVolcengineApiKey
-            ttsVolcengineSpeaker = s.ttsVolcengineSpeaker
-            ttsVolcengineModel = s.ttsVolcengineModel
-            ttsVolcengineContext = s.ttsVolcengineContext
-            ttsVolcenginePitch = s.ttsVolcenginePitch
-            ttsVolcengineToneFidelity = s.ttsVolcengineToneFidelity
-            ttsMiniMaxModel = s.ttsMiniMaxModel
-            ttsMiniMaxBaseUrl = s.ttsMiniMaxBaseUrl
-            ttsMiniMaxApiKey = s.ttsMiniMaxApiKey
-            ttsMiniMaxVoice = s.ttsMiniMaxVoice
-            ttsMiniMaxEmotion = s.ttsMiniMaxEmotion
-            ttsMiniMaxSpeed = s.ttsMiniMaxSpeed
-            ttsMiniMaxPitch = s.ttsMiniMaxPitch
-            ttsMimoModel = s.ttsMimoModel
-            ttsMimoBaseUrl = s.ttsMimoBaseUrl
-            ttsMimoApiKey = s.ttsMimoApiKey
-            ttsMimoVoice = s.ttsMimoVoice
-            ttsMimoInstruction = s.ttsMimoInstruction
-            ttsMimoVoiceDesignPrompt = s.ttsMimoVoiceDesignPrompt
-            ttsMimoVoiceCloneInstruction = s.ttsMimoVoiceCloneInstruction
-            ttsMimoVoiceSampleUri = s.ttsMimoVoiceSampleUri
             renderMode = s.renderMode
             translationBlockInteractionMode = s.translationBlockInteractionMode
             floatingWindowContentMode = s.floatingWindowContentMode
@@ -2624,33 +2468,6 @@ fun SettingsScreen(
 
     // paddleStatus 独立异步加载：file.exists() / file.length() 走 IO 线程，避免阻塞首帧。
     val settingsLoaded = initialSettings != null
-    /* TTS UI removed.
-    LaunchedEffect(
-        settingsLoaded,
-        ttsEnabled,
-        ttsProvider,
-        targetLang,
-        systemTtsVoiceRefreshRequest,
-    ) {
-        if (
-            !settingsLoaded ||
-            !shouldLoadSystemTtsVoices(ttsEnabled, ttsProvider == TtsProvider.SYSTEM)
-        ) {
-            return@LaunchedEffect
-        }
-        systemTtsVoicesLoading = true
-        systemTtsVoicesError = null
-        try {
-            systemTtsVoices = viewModel.loadSystemTtsVoices(targetLang)
-        } catch (error: CancellationException) {
-            throw error
-        } catch (error: Throwable) {
-            systemTtsVoicesError = error.message ?: error.javaClass.simpleName
-        } finally {
-            systemTtsVoicesLoading = false
-        }
-    }
-    */
     val modelDownloadStateKey = modelDownloadWorkInfos.map { it.id to it.state }
     val modelDownloadStageKey = unfinishedModelDownloads.map { info ->
         ModelDownloadSpec.decode(
