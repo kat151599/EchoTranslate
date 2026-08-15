@@ -1777,18 +1777,6 @@
     <string name="onboarding_cloud_error_api_key">Enter an API key, or use Skip and configure it later.</string>
     <string name="onboarding_cloud_error_model">Enter a model name.</string>
 
-    <string name="onboarding_tts_title">How should translations be read aloud?</string>
-    <string name="onboarding_tts_body">TTS is independent of the translation method. System speech can use voice data installed on the device; HTTP and online providers need additional setup later.</string>
-    <string name="onboarding_tts_disabled">Do not enable TTS</string>
-    <string name="onboarding_tts_disabled_desc">Do not show TTS playback controls.</string>
-    <string name="onboarding_tts_system">System speech (offline recommended)</string>
-    <string name="onboarding_tts_system_desc">Uses an Android TTS engine. With offline voice data installed, it needs neither a network connection nor a provider API key.</string>
-    <string name="onboarding_tts_http">Local / custom HTTP</string>
-    <string name="onboarding_tts_http_desc">Uses a PC, LAN service, or custom gateway. Configure its endpoint in Settings after setup.</string>
-    <string name="onboarding_tts_volcengine">Volcengine</string>
-    <string name="onboarding_tts_minimax">MiniMax</string>
-    <string name="onboarding_tts_mimo">MiMo</string>
-    <string name="onboarding_tts_online_desc">Uses the provider API. Add its credentials and voice options in TTS Settings after setup.</string>
 
     <string name="onboarding_summary_title">Ready to translate</string>
     <string name="onboarding_summary_body">Review the baseline below. Saving only changes related translation and display settings.</string>

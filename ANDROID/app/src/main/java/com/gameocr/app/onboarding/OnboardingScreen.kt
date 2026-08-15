@@ -559,7 +559,6 @@ private fun OnboardingPageSurface(
                             draft,
                             onDraftChange,
                         )
-                        OnboardingStep.TTS -> TtsPage(draft, onDraftChange)
                         OnboardingStep.SUMMARY -> SummaryPage(draft)
                     }
                     HorizontalDivider()
@@ -1161,42 +1160,6 @@ private fun CloudConfigPage(
 }
 
 @Composable
-private fun TtsPage(
-    draft: OnboardingDraft,
-    onDraftChange: (OnboardingDraft) -> Unit,
-) {
-    PageHeading(
-        icon = Icons.Default.RecordVoiceOver,
-        title = stringResource(R.string.onboarding_tts_title),
-        body = stringResource(R.string.onboarding_tts_body),
-    )
-    OnboardingTtsChoice.entries.forEach { choice ->
-        val titleRes = when (choice) {
-            OnboardingTtsChoice.DISABLED -> R.string.onboarding_tts_disabled
-            OnboardingTtsChoice.SYSTEM -> R.string.onboarding_tts_system
-            OnboardingTtsChoice.GENERIC_HTTP -> R.string.onboarding_tts_http
-            OnboardingTtsChoice.VOLCENGINE -> R.string.onboarding_tts_volcengine
-            OnboardingTtsChoice.MINIMAX -> R.string.onboarding_tts_minimax
-            OnboardingTtsChoice.MIMO -> R.string.onboarding_tts_mimo
-        }
-        val descriptionRes = when (choice) {
-            OnboardingTtsChoice.DISABLED -> R.string.onboarding_tts_disabled_desc
-            OnboardingTtsChoice.SYSTEM -> R.string.onboarding_tts_system_desc
-            OnboardingTtsChoice.GENERIC_HTTP -> R.string.onboarding_tts_http_desc
-            OnboardingTtsChoice.VOLCENGINE -> R.string.onboarding_tts_online_desc
-            OnboardingTtsChoice.MINIMAX -> R.string.onboarding_tts_online_desc
-            OnboardingTtsChoice.MIMO -> R.string.onboarding_tts_online_desc
-        }
-        ChoiceCard(
-            selected = draft.ttsChoice == choice,
-            title = stringResource(titleRes),
-            description = stringResource(descriptionRes),
-            onClick = { onDraftChange(draft.copy(ttsChoice = choice)) },
-        )
-    }
-}
-
-@Composable
 private fun SummaryPage(draft: OnboardingDraft) {
     val context = androidx.compose.ui.platform.LocalContext.current
     PageHeading(
@@ -1249,19 +1212,6 @@ private fun SummaryPage(draft: OnboardingDraft) {
         } else {
             draft.cloudProvider.displayName
         },
-    )
-    SummaryRow(
-        stringResource(R.string.onboarding_summary_tts),
-        stringResource(
-            when (draft.ttsChoice) {
-                OnboardingTtsChoice.DISABLED -> R.string.onboarding_tts_disabled
-                OnboardingTtsChoice.SYSTEM -> R.string.onboarding_tts_system
-                OnboardingTtsChoice.GENERIC_HTTP -> R.string.onboarding_tts_http
-                OnboardingTtsChoice.VOLCENGINE -> R.string.onboarding_tts_volcengine
-                OnboardingTtsChoice.MINIMAX -> R.string.onboarding_tts_minimax
-                OnboardingTtsChoice.MIMO -> R.string.onboarding_tts_mimo
-            }
-        ),
     )
     if (draft.usage == OnboardingUsage.MANGA) {
         Text(

@@ -26,7 +26,6 @@ enum class OnboardingStep {
     OFFLINE_LANGUAGE_DOWNLOAD,
     MANGA_OFFLINE_DOWNLOAD,
     CLOUD_CONFIG,
-    TTS,
     SUMMARY,
 }
 
@@ -50,15 +49,6 @@ enum class OnboardingMangaDirection {
 enum class OnboardingTranslationMethod {
     OFFLINE,
     CLOUD_LLM,
-}
-
-enum class OnboardingTtsChoice(val provider: TtsProvider?) {
-    DISABLED(null),
-    SYSTEM(TtsProvider.SYSTEM),
-    GENERIC_HTTP(TtsProvider.GENERIC_HTTP),
-    VOLCENGINE(TtsProvider.VOLCENGINE),
-    MINIMAX(TtsProvider.MINIMAX),
-    MIMO(TtsProvider.MIMO),
 }
 
 enum class CloudApiProtocol {
@@ -132,7 +122,6 @@ data class OnboardingDraft(
     val cloudBaseUrl: String = CloudProvider.DEEPSEEK.baseUrl,
     val cloudApiKey: String = "",
     val cloudModel: String = CloudProvider.DEEPSEEK.model,
-    val ttsChoice: OnboardingTtsChoice = OnboardingTtsChoice.DISABLED,
 )
 
 object OnboardingPolicy {
@@ -155,7 +144,6 @@ object OnboardingPolicy {
         } else if (draft.usage == OnboardingUsage.MANGA) {
             add(OnboardingStep.MANGA_OFFLINE_DOWNLOAD)
         }
-        add(OnboardingStep.TTS)
         add(OnboardingStep.SUMMARY)
     }
 
@@ -282,13 +270,6 @@ object OnboardingPolicy {
             cloudBaseUrl = baseUrl,
             cloudApiKey = apiKey,
             cloudModel = model,
-            ttsChoice = if (!settings.ttsEnabled) {
-                OnboardingTtsChoice.DISABLED
-            } else {
-                OnboardingTtsChoice.entries.firstOrNull {
-                    it.provider == settings.ttsProvider
-                } ?: OnboardingTtsChoice.SYSTEM
-            },
         )
     }
 
@@ -336,8 +317,6 @@ object OnboardingPolicy {
             } else {
                 settings.paddleModelVersion
             },
-            ttsEnabled = draft.ttsChoice != OnboardingTtsChoice.DISABLED,
-            ttsProvider = draft.ttsChoice.provider ?: settings.ttsProvider,
         )
         if (draft.translationMethod == OnboardingTranslationMethod.CLOUD_LLM) {
             next = if (draft.cloudProvider.protocol == CloudApiProtocol.ANTHROPIC) {

@@ -1761,18 +1761,6 @@
     <string name="onboarding_cloud_error_api_key">请输入 API Key，或点“跳过”稍后再配置。</string>
     <string name="onboarding_cloud_error_model">请输入模型名称。</string>
 
-    <string name="onboarding_tts_title">希望用什么方式朗读译文？</string>
-    <string name="onboarding_tts_body">TTS 与翻译方式相互独立。系统朗读可使用设备上已安装的语音数据；HTTP 和在线服务商需要稍后继续配置。</string>
-    <string name="onboarding_tts_disabled">暂不启用 TTS</string>
-    <string name="onboarding_tts_disabled_desc">不显示 TTS 朗读控件。</string>
-    <string name="onboarding_tts_system">系统朗读（离线推荐）</string>
-    <string name="onboarding_tts_system_desc">使用 Android TTS 引擎；已安装离线语音数据时，无需联网或服务商 API Key。</string>
-    <string name="onboarding_tts_http">本地 / 自定义 HTTP</string>
-    <string name="onboarding_tts_http_desc">使用电脑、局域网服务或自定义网关；完成引导后在设置中填写地址。</string>
-    <string name="onboarding_tts_volcengine">火山引擎</string>
-    <string name="onboarding_tts_minimax">MiniMax</string>
-    <string name="onboarding_tts_mimo">MiMo</string>
-    <string name="onboarding_tts_online_desc">使用服务商 API；完成引导后需在 TTS 设置中填写凭据和音色参数。</string>
 
     <string name="onboarding_summary_title">准备完成</string>
     <string name="onboarding_summary_body">请确认下面的初始设置。保存只会修改与本次引导有关的翻译和展示选项。</string>
