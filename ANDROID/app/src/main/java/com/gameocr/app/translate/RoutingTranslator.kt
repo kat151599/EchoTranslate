@@ -2,7 +2,6 @@ package com.gameocr.app.translate
 
 import android.graphics.Bitmap
 import com.gameocr.app.data.Settings
-import com.gameocr.app.glossary.TranslationContextResolver
 import com.gameocr.app.ocr.TextBlock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,18 +16,13 @@ import timber.log.Timber
 @Singleton
 class RoutingTranslator @Inject constructor(
     private val remotePc: RemotePcTranslator,
-    private val translationContextResolver: TranslationContextResolver,
-    private val translationMemory: TranslationMemoryService,
 ) : Translator {
     override suspend fun translate(source: String, settings: Settings): String? {
-        translationMemory.recall(source, settings)?.let { memory ->
-            return normalizePlain(memory.correctedTranslation, settings)
-        }
         if (shouldPassthroughNumericTranslation(source)) {
             logNumericPassthrough(stage = "translate", count = 1, total = 1)
             return source
         }
-        val enriched = translationContextResolver.enrich(source, settings)
+        val enriched = settings
         return normalizeText(
             text = engineFor(enriched).translate(source, enriched),
             settings = enriched,
@@ -38,16 +32,12 @@ class RoutingTranslator @Inject constructor(
 
     override fun translateStream(source: String, settings: Settings): Flow<String> =
         flow {
-            translationMemory.recall(source, settings)?.let { memory ->
-                emit(memory.correctedTranslation)
-                return@flow
-            }
             if (shouldPassthroughNumericTranslation(source)) {
                 logNumericPassthrough(stage = "stream", count = 1, total = 1)
                 emit(source)
                 return@flow
             }
-            val enriched = translationContextResolver.enrich(source, settings)
+            val enriched = settings
             emitAll(engineFor(enriched).translateStream(source, enriched))
         }
             .map { ChineseScriptNormalizer.normalizeForTarget(it, settings.targetLang) }
@@ -104,20 +94,12 @@ class RoutingTranslator @Inject constructor(
         onUpdate: (BatchTranslationUpdate) -> Unit,
     ): List<String?> {
         if (sources.isEmpty()) return emptyList()
-        val memoryMatches = translationMemory.recallBatch(sources, settings)
         val mergedResults = MutableList<String?>(sources.size) { null }
         val pendingIndexes = mutableListOf<Int>()
         val pendingSources = mutableListOf<String>()
         sources.forEachIndexed { index, source ->
-            val memory = memoryMatches.getOrNull(index)
-            if (memory == null) {
-                pendingIndexes += index
-                pendingSources += source
-            } else {
-                val recalled = normalizePlain(memory.correctedTranslation, settings)
-                mergedResults[index] = recalled
-                onUpdate(BatchTranslationUpdate(index = index, text = recalled, elapsedMs = 0L))
-            }
+            pendingIndexes += index
+            pendingSources += source
         }
         if (pendingSources.isEmpty()) return mergedResults
 
@@ -138,10 +120,7 @@ class RoutingTranslator @Inject constructor(
             return mergedResults
         }
 
-        val enriched = translationContextResolver.enrich(
-            passthroughPlan.translatableSources.joinToString("\n"),
-            settings,
-        )
+        val enriched = settings
         val rawResults = engineFor(enriched).translateBatchIncremental(
             passthroughPlan.translatableSources,
             enriched,
@@ -185,19 +164,11 @@ class RoutingTranslator @Inject constructor(
             results = engineFor(settings).ocrAndTranslate(bitmap, settings),
             settings = settings
         )
-        val memoryMatches = translationMemory.recallBatch(
-            sources = normalized.map { it.first.text },
-            settings = settings,
-        )
-        return normalized.mapIndexed { index, pair ->
-            val memory = memoryMatches.getOrNull(index)
-            if (memory == null) pair
-            else pair.first to normalizePlain(memory.correctedTranslation, settings)
-        }
+        return normalized
     }
 
     override suspend fun translateWord(source: String, settings: Settings): WordResult? {
-        val enriched = translationContextResolver.enrich(source, settings)
+        val enriched = settings
         return engineFor(enriched).translateWord(source, enriched)
             ?.let { normalizeWordResult(it, enriched) }
     }
