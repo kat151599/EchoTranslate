@@ -209,7 +209,6 @@ import com.gameocr.app.data.DEFAULT_MINIMAX_TTS_BASE_URL
 import com.gameocr.app.data.DEFAULT_VOLCENGINE_TTS_BASE_URL
 import com.gameocr.app.data.MAX_TTS_PLAYBACK_GAIN_DB
 import com.gameocr.app.data.MIN_TTS_PLAYBACK_GAIN_DB
-import com.gameocr.app.tts.ttsPresetSummaryLabelRes
 import com.gameocr.app.data.resolveTranslationOutputSettings
 import com.gameocr.app.data.manualOverlayLayoutControlsEnabled
 import com.gameocr.app.data.settingsSearchEntryId
@@ -7399,7 +7398,6 @@ internal fun translationPresetSummary(preset: TranslationPreset): String {
         presetLlmLabel(preset),
         Languages.nameOf(context, preset.sourceLang),
         Languages.nameOf(context, preset.targetLang),
-        stringResource(ttsPresetSummaryLabelRes(preset.ttsEnabled, preset.ttsProvider)),
     )
 }
 
