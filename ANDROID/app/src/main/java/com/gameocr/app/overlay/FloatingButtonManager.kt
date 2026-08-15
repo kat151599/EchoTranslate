@@ -695,9 +695,9 @@ class FloatingButtonManager(
     }
 
     private fun skillIconRes(): Int = when (skill) {
-        FloatingSkill.FULL_SCREEN -> R.drawable.ic_overlay_button
-        FloatingSkill.WORD_SELECT -> R.drawable.ic_overlay_button
-        FloatingSkill.LOOP -> R.drawable.ic_overlay_button_loop
+        FloatingSkill.FULL_SCREEN,
+        FloatingSkill.WORD_SELECT,
+        FloatingSkill.LOOP -> R.drawable.floating_bubble_logo
     }
 
     private fun updateAccessibilityDescription() {
