@@ -65,6 +65,7 @@ class FloatingButtonManager(
     @Volatile var onMenuPresetSwitch: () -> Unit = {}
     @Volatile var onMenuRetranslateHistory: () -> Unit = {}
     @Volatile var onMenuDeleteHistory: () -> Unit = {}
+    @Volatile var onMenuSuggestHistoryCorrection: () -> Unit = {}
     @Volatile var onMenuRestartCapture: () -> Unit = {}
     /** 吸附边缘开关（用户在 Settings 里可关）。关时松手保持原位 + 不藏半边。 */
     @Volatile var snapToEdgeEnabled: Boolean = true
@@ -201,6 +202,16 @@ class FloatingButtonManager(
     }
 
     fun isShown(): Boolean = view != null
+
+    /** Re-attach last so full-screen translation overlays cannot cover the ball's touch window. */
+    fun bringToFront() {
+        val currentView = view ?: return
+        val currentParams = layoutParams ?: return
+        runCatching {
+            wm.removeViewImmediate(currentView)
+            wm.addView(currentView, currentParams)
+        }.onFailure { android.util.Log.w(TAG_MENU, "Failed to raise floating ball", it) }
+    }
 
     fun requestFirstUseTour() {
         if (tourStage != TourStage.NONE) {
@@ -1158,7 +1169,7 @@ class FloatingButtonManager(
         }
 
         val allItems = MenuItemRegistry.build(
-            ids = menuItemOrder,
+            ids = menuItemOrder.filter { it in FloatingMenu.ARC_MENU_ITEM_IDS },
             currentSkill = skill,
             callbacks = MenuItemRegistry.Callbacks(
                 onSwitchToLoop = { dismissArcMenu(); onSwitchToLoop() },
@@ -1172,6 +1183,11 @@ class FloatingButtonManager(
                 onSwitchToWordSelect = { dismissArcMenu(); onSwitchSkill(FloatingSkill.WORD_SELECT) }
             )
         ) + listOf(
+            MenuItem(
+                R.drawable.ic_menu_word_select,
+                R.drawable.bg_arc_menu_item,
+                R.string.menu_suggest_history_correction,
+            ) { dismissArcMenu(); onMenuSuggestHistoryCorrection() },
             MenuItem(
                 R.drawable.ic_menu_restart,
                 R.drawable.bg_arc_menu_item,

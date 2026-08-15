@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.MultipartBody
@@ -174,6 +175,43 @@ class RemotePcTranslator @Inject constructor(
         }
     }
 
+    suspend fun submitHistoryCorrection(
+        historyId: Long,
+        source: String,
+        translation: String,
+        clientRequestId: String,
+        settings: Settings,
+    ): RemoteHistoryCorrection {
+        val base = normalizedBaseUrl(settings.remotePcBaseUrl)
+            ?: throw TranslationException("PC server URL is empty or invalid")
+        val requestBody = json.encodeToString(
+            RemoteHistoryCorrectionRequest(
+                historyId = historyId,
+                proposedSourceText = source,
+                proposedTranslation = translation,
+                clientRequestId = clientRequestId,
+            ),
+        ).toRequestBody("application/json".toMediaType())
+        val request = Request.Builder()
+            .url("$base/v1/history/corrections")
+            .post(requestBody)
+            .header("X-GameOCR-Remote-PC", "1")
+            .applyAuth(settings)
+            .build()
+        return withContext(Dispatchers.IO) {
+            client.withApiTimeout(settings.apiTimeoutSeconds).newCall(request).execute().use { response ->
+                val raw = response.body?.string().orEmpty()
+                if (!response.isSuccessful) {
+                    throw TranslationException("PC server HTTP ${response.code}: ${raw.take(300)}")
+                }
+                runCatching { json.decodeFromString<RemoteHistoryCorrection>(raw) }
+                    .getOrElse {
+                        throw TranslationException("PC server response parse failed: ${raw.take(300)}", it)
+                    }
+            }
+        }
+    }
+
     private suspend fun executeHistoryRequest(request: Request, settings: Settings): RemoteHistoryTranslation =
         withContext(Dispatchers.IO) {
             client.withApiTimeout(settings.apiTimeoutSeconds).newCall(request).execute().use { response ->
@@ -216,5 +254,19 @@ class RemotePcTranslator @Inject constructor(
         @SerialName("history_id") val historyId: Long,
         val source: String,
         val translation: String,
+    )
+
+    @Serializable
+    private data class RemoteHistoryCorrectionRequest(
+        @SerialName("history_id") val historyId: Long,
+        @SerialName("proposed_source_text") val proposedSourceText: String,
+        @SerialName("proposed_translation") val proposedTranslation: String,
+        @SerialName("client_request_id") val clientRequestId: String,
+    )
+
+    @Serializable
+    data class RemoteHistoryCorrection(
+        val id: Long,
+        val status: String,
     )
 }

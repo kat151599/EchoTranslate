@@ -263,6 +263,7 @@
     <string name="settings_app_lang_follow_system">Follow system</string>
     <string name="settings_app_lang_zh">简体中文</string>
     <string name="settings_app_lang_en">English</string>
+    <string name="settings_app_lang_ru">Русский</string>
     <string name="settings_app_lang_hint">Takes effect immediately. You can also change it in system Settings → Apps → Language.</string>
     <string name="settings_baidu_image_limit_hint">Image limits: longest side ≤ 4096px / shortest side ≥ 15px, aspect ratio 1:4–4:1, base64 &lt; 4MB. The 2× upscale preprocess doubles image size — narrow or huge capture regions easily hit error 216202.</string>
     <string name="settings_section_theme_mode">Theme</string>
@@ -983,6 +984,15 @@
     <string name="menu_restart_capture">Restart capture</string>
     <string name="menu_retranslate_history">Regenerate translation</string>
     <string name="menu_delete_history">Remove from context</string>
+    <string name="menu_suggest_history_correction">Предложить правку</string>
+    <string name="history_correction_missing_id">Для этой фразы нет history_id</string>
+    <string name="history_correction_title">Предложить правку</string>
+    <string name="history_correction_source">Оригинал:</string>
+    <string name="history_correction_translation">Перевод:</string>
+    <string name="history_correction_cancel">Отмена</string>
+    <string name="history_correction_submit">Отправить</string>
+    <string name="history_correction_sent">Правка отправлена на подтверждение</string>
+    <string name="history_correction_failed">Не удалось отправить правку: %1$s</string>
     <string name="history_action_no_blocks">No current phrases linked to history</string>
     <string name="history_action_failed">History action failed: %1$s</string>
     <string name="loop_countdown_hint">Starting auto-translate…</string>

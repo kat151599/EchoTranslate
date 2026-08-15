@@ -102,6 +102,7 @@ class FloatingMenuOrderTest {
             onOpenMain = {},
             onOpenSettings = {},
             onPresetSwitch = {},
+            onRestartCapture = {},
             onSwitchToFullScreen = {},
             onSwitchToWordSelect = {},
         )
@@ -169,6 +170,7 @@ class FloatingMenuOrderTest {
         val callbacks = MenuItemRegistry.Callbacks(
             onSwitchToLoop = {}, onRegion = {}, onLanguagePair = {}, onOpenMain = {},
             onOpenSettings = {}, onPresetSwitch = {}, onSwitchToFullScreen = {},
+            onRestartCapture = {},
             onSwitchToWordSelect = {},
         )
         data class Case(val id: MenuItemId, val expectedLabel: Int)

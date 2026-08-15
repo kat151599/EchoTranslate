@@ -105,6 +105,7 @@ import com.gameocr.app.overlay.AdaptiveOverlayStyleAnalyzer
 import com.gameocr.app.overlay.AdaptiveTextLayoutPhase
 import com.gameocr.app.overlay.LanguageQuickSwitchOverlay
 import com.gameocr.app.overlay.HistoryBlockPickerOverlay
+import com.gameocr.app.overlay.HistoryCorrectionOverlay
 import com.gameocr.app.overlay.OverlayManager
 import com.gameocr.app.overlay.PresetQuickSwitchOverlay
 import com.gameocr.app.overlay.RegionPickerOverlay
@@ -240,6 +241,7 @@ class CaptureService : Service() {
     private var wordSelect: WordSelectOverlay? = null
     private var translationCard: TranslationCardOverlay? = null
     private var translationBlockCopyOverlay: TranslationBlockCopyOverlay? = null
+    private var historyCorrectionOverlay: HistoryCorrectionOverlay? = null
     private var translationCorrectionOverlay: TranslationCorrectionOverlay? = null
 
     private var loopJob: Job? = null
@@ -369,6 +371,7 @@ class CaptureService : Service() {
             onTranslationBlockDetailRequested = ::showTranslationBlockCopyPanel,
             onTranslationCorrectionRequested = ::showTranslationCorrection,
             onFloatingWindowDismissed = { ttsEngine.stop() },
+            onTranslationOverlayShown = { floatingButton?.bringToFront() },
         )
         floatingButton = FloatingButtonManager(
             this,
@@ -397,6 +400,7 @@ class CaptureService : Service() {
             it.onMenuPresetSwitch = { showPresetQuickSwitchOverlay() }
             it.onMenuRetranslateHistory = { selectHistoryBlock(::retranslateHistoryBlock) }
             it.onMenuDeleteHistory = { selectHistoryBlock(::deleteHistoryBlock) }
+            it.onMenuSuggestHistoryCorrection = { selectDisplayedBlockForCorrection() }
             it.onMenuRestartCapture = {
                 restartWithMediaProjectionOnDestroy = true
                 stopSelf()
@@ -768,6 +772,7 @@ class CaptureService : Service() {
                 (translationCard ?: TranslationCardOverlay(
                     context = this@CaptureService,
                     onDismissed = { ttsEngine.stop() },
+                    onShown = { floatingButton?.bringToFront() },
                 ).also {
                     translationCard = it
                 }).also {
@@ -1099,6 +1104,58 @@ class CaptureService : Service() {
             else -> {
                 val picker = historyBlockPicker ?: HistoryBlockPickerOverlay(this).also { historyBlockPicker = it }
                 picker.show(items, action)
+            }
+        }
+    }
+
+    private fun selectDisplayedBlockForCorrection() {
+        val items = overlay?.currentDisplayedTranslationBlocks().orEmpty()
+        when (items.size) {
+            0 -> overlay?.showInfoHint(getString(R.string.history_action_no_blocks))
+            1 -> showHistoryCorrectionEditor(items.single())
+            else -> {
+                val picker = historyBlockPicker ?: HistoryBlockPickerOverlay(this).also { historyBlockPicker = it }
+                picker.showDisplayed(items, ::showHistoryCorrectionEditor)
+            }
+        }
+    }
+
+    private fun showHistoryCorrectionEditor(block: OverlayManager.DisplayedTranslationBlock) {
+        val historyId = block.historyId ?: run {
+            overlay?.showInfoHint(getString(R.string.history_correction_missing_id))
+            return
+        }
+        val editor = historyCorrectionOverlay ?: HistoryCorrectionOverlay(this).also {
+            historyCorrectionOverlay = it
+        }
+        editor.show(block) { source, translation, requestId, completed ->
+            scope.launch {
+                val settings = settingsRepository.get()
+                runCatching {
+                    remotePcTranslator.submitHistoryCorrection(
+                        historyId = historyId,
+                        source = source,
+                        translation = translation,
+                        clientRequestId = requestId,
+                        settings = settings,
+                    )
+                }.onSuccess { result ->
+                    mainScope.launch {
+                        if (result.status == "pending") {
+                            overlay?.replaceDisplayedBlock(block.overlayIndex, source, translation)
+                            overlay?.showInfoHint(getString(R.string.history_correction_sent))
+                            completed(Result.success(Unit))
+                        } else {
+                            completed(Result.failure(TranslationException("Unexpected status: ${result.status}")))
+                            overlay?.showErrorHint(getString(R.string.history_correction_failed, result.status))
+                        }
+                    }
+                }.onFailure { error ->
+                    mainScope.launch {
+                        completed(Result.failure(error))
+                        overlay?.showErrorHint(getString(R.string.history_correction_failed, shortError(error)))
+                    }
+                }
             }
         }
     }
@@ -4164,6 +4221,7 @@ class CaptureService : Service() {
 
     override fun onDestroy() {
         historyBlockPicker?.dismiss()
+        historyCorrectionOverlay?.dismiss()
         historyBlockPicker = null
         cleanupCapture()
         // 释放端侧 LLM 权重。runBlocking 在 onDestroy 是可接受的——cleanUp 内部是同步 JNI 调用，

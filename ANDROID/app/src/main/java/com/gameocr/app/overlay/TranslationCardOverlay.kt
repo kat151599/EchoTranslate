@@ -61,6 +61,7 @@ private data class TranslationCardWindowArea(
 class TranslationCardOverlay(
     private val context: Context,
     private val onDismissed: () -> Unit = {},
+    private val onShown: () -> Unit = {},
 ) {
 
     private val overlayType: Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -587,6 +588,7 @@ class TranslationCardOverlay(
             dialog = cardDialog
             rootView = backdrop
             ViewCompat.requestApplyInsets(backdrop)
+            onShown()
         }.onFailure {
             runCatching { pendingDialog?.dismiss() }
             VerticalDiagnosticLog.w(it, "Failed to show translation card overlay dialog")

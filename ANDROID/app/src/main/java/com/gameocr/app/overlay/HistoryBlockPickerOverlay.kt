@@ -25,6 +25,22 @@ class HistoryBlockPickerOverlay(private val context: Context) {
     }
 
     fun show(items: List<OverlayManager.HistoryBlock>, onSelected: (OverlayManager.HistoryBlock) -> Unit) {
+        showItems(items, { it.source }, { it.translation }, onSelected)
+    }
+
+    fun showDisplayed(
+        items: List<OverlayManager.DisplayedTranslationBlock>,
+        onSelected: (OverlayManager.DisplayedTranslationBlock) -> Unit,
+    ) {
+        showItems(items, { it.source }, { it.translation }, onSelected)
+    }
+
+    private fun <T> showItems(
+        items: List<T>,
+        sourceOf: (T) -> String,
+        translationOf: (T) -> String,
+        onSelected: (T) -> Unit,
+    ) {
         dismiss()
         val density = context.resources.displayMetrics.density
         fun dp(value: Int) = (value * density).toInt()
@@ -41,14 +57,14 @@ class HistoryBlockPickerOverlay(private val context: Context) {
                 orientation = LinearLayout.VERTICAL
                 setPadding(dp(10), dp(9), dp(10), dp(9))
                 addView(TextView(context).apply {
-                    text = item.source
+                    text = sourceOf(item)
                     setTextColor(Color.WHITE)
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
                 })
-                if (item.translation.isNotBlank()) addView(TextView(context).apply {
-                    text = item.translation
+                if (translationOf(item).isNotBlank()) addView(TextView(context).apply {
+                    text = translationOf(item)
                     setTextColor(0xffbdc1c6.toInt())
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                     maxLines = 1

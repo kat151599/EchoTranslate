@@ -871,35 +871,20 @@ object FloatingMenu {
 
     fun coercePageSize(value: Int): Int = value.coerceIn(MIN_PAGE_SIZE, MAX_PAGE_SIZE)
 
-    /**
-     * 全部已知 MenuItemId 的稳定顺序（用于读 Settings 时补齐遗漏 + 默认值）。
-     * 任何不在此列表的 id（未来新增引脚 / 引入第三方 plugin）都视为未知 silently 跳过。
-     */
-    val ALL_ORDER: List<MenuItemId> = listOf(
+    /** IDs currently exposed in the Arc Menu. Kept separate from [MenuItemId] for old DataStore values. */
+    val ARC_MENU_ITEM_IDS: List<MenuItemId> = listOf(
         MenuItemId.LOOP,
         MenuItemId.REGION,
-        MenuItemId.LANGUAGE_PAIR,
-        MenuItemId.PRESET_SWITCH,
-        MenuItemId.SETTINGS,
-        MenuItemId.HOME,
         MenuItemId.RESTART_CAPTURE,
-        MenuItemId.FULL_SCREEN_SKILL
     )
 
-    /**
-     * 首次安装默认顺序：循环、选区、划词技能槽、返回主应用。
-     * 把「技能槽」放在「返回主应用」之前——拖球到菜单时手指先经过的位置留给「常用动作」，
-     * HOME 作为"离场"动作放最后符合直觉。
-     */
+    val ALL_ORDER: List<MenuItemId> = ARC_MENU_ITEM_IDS
+
+    /** Default Arc Menu order for a new installation. */
     val DEFAULT_ORDER: List<MenuItemId> = listOf(
         MenuItemId.LOOP,
         MenuItemId.REGION,
-        MenuItemId.FULL_SCREEN_SKILL,
-        MenuItemId.LANGUAGE_PAIR,
-        MenuItemId.PRESET_SWITCH,
-        MenuItemId.SETTINGS,
         MenuItemId.RESTART_CAPTURE,
-        MenuItemId.HOME
     )
 
     val LEGACY_DEFAULT_ORDER_BEFORE_PRESET_LANGUAGE_SWAP: List<MenuItemId> = listOf(

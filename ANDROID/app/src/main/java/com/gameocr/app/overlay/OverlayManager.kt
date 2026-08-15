@@ -68,6 +68,7 @@ class OverlayManager(
     private val onTranslationBlockDetailRequested: (source: String, translation: String) -> Unit = { _, _ -> },
     private val onTranslationCorrectionRequested: (TranslationCorrectionRequest) -> Unit = {},
     private val onFloatingWindowDismissed: () -> Unit = {},
+    private val onTranslationOverlayShown: () -> Unit = {},
     @Volatile var textSizeSp: Int = 14,
     @Volatile var alpha: Float = 0.85f,
     @Volatile var regionOffset: android.graphics.Point = android.graphics.Point(0, 0),
@@ -125,6 +126,13 @@ class OverlayManager(
     data class HistoryBlock(
         val overlayIndex: Int,
         val historyId: Long,
+        val source: String,
+        val translation: String,
+    )
+
+    data class DisplayedTranslationBlock(
+        val overlayIndex: Int,
+        val historyId: Long?,
         val source: String,
         val translation: String,
     )
@@ -445,6 +453,7 @@ class OverlayManager(
         } else {
             floatingWindow.show(content, onDismiss = ::handleFloatingWindowUserDismiss)
         }
+        onTranslationOverlayShown()
     }
 
     /**
@@ -474,6 +483,7 @@ class OverlayManager(
         } else {
             floatingWindow.show(content, onDismiss = ::handleFloatingWindowUserDismiss)
         }
+        onTranslationOverlayShown()
     }
 
     /** 流式：更新第 [index] 段译文。需先调过 [prepareFloatingWindow]。 */
@@ -1111,7 +1121,10 @@ class OverlayManager(
             runCatching { wm.addView(root, params) }
         }
         addResult
-            .onSuccess { VerticalDiagnosticLog.i("${diagPrefix}overlay window added host=$host") }
+            .onSuccess {
+                VerticalDiagnosticLog.i("${diagPrefix}overlay window added host=$host")
+                onTranslationOverlayShown()
+            }
             .onFailure { VerticalDiagnosticLog.w(it, "${diagPrefix}overlay window add failed host=$host") }
         blocksView = root
     }
@@ -1558,6 +1571,11 @@ class OverlayManager(
         content.historyId?.let { HistoryBlock(index, it, content.source, content.translation) }
     }
 
+    fun currentDisplayedTranslationBlocks(): List<DisplayedTranslationBlock> =
+        blockContents.map { (index, content) ->
+            DisplayedTranslationBlock(index, content.historyId, content.source, content.translation)
+        }
+
     fun removeHistoryBlock(index: Int) {
         blockContents.remove(index)
         blockStreamingUpdateCounts.remove(index)
@@ -1582,6 +1600,18 @@ class OverlayManager(
         if (blockViews.containsKey(index)) updateBlockText(index, text) else {
             blockContents[index]?.translation = text
             updateFloatingWindowText(index, text)
+        }
+    }
+
+    fun replaceDisplayedBlock(index: Int, source: String, translation: String) {
+        val content = blockContents[index] ?: return
+        content.source = source
+        content.translation = translation
+        if (blockViews.containsKey(index)) {
+            updateBlockText(index, translation)
+        } else {
+            lastFloatingPairs?.getOrNull(index)?.let { lastFloatingPairs!![index] = source to translation }
+            updateFloatingWindowText(index, translation)
         }
     }
 

@@ -3894,6 +3894,7 @@ fun SettingsScreen(
             // 灰显 + 禁用 chip 让用户一眼明白 + 不能误操作。
             }
 
+            if (false) {
             item(key = SectionKeys.TTS) {
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TTS) {
                     SectionCard(title = stringResource(R.string.settings_section_tts)) {
@@ -4166,6 +4167,7 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
             }
 
             if (translatorEngine != TranslatorEngine.REMOTE_PC) {
@@ -9097,6 +9099,7 @@ private val APP_LANGUAGE_OPTIONS: List<AppLanguageOption> = listOf(
     AppLanguageOption("", R.string.settings_app_lang_follow_system),
     AppLanguageOption("zh-CN", R.string.settings_app_lang_zh),
     AppLanguageOption("en", R.string.settings_app_lang_en),
+    AppLanguageOption("ru", R.string.settings_app_lang_ru),
     // 未来扩展：zh-TW（繁中）/ mn（蒙）/ ug（维）等只需在此追加
 )
 

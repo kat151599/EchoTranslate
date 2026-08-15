@@ -963,6 +963,7 @@ class SettingsRepository @Inject constructor(
                     .map { it.trim() }
                     .filter { it.isNotEmpty() }
                     .mapNotNull { tok -> runCatching { MenuItemId.valueOf(tok) }.getOrNull() }
+                    .filter { it in FloatingMenu.ARC_MENU_ITEM_IDS }
                     .distinct()
                 if (parsed.isEmpty()) return@run default.floatingMenuItemOrder
                 // 补齐缺失的已知 id
