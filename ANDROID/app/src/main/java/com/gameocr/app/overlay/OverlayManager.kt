@@ -90,7 +90,6 @@ class OverlayManager(
         FloatingWindowContentMode.SRC_AND_DST,
     @Volatile var translationBlockInteractionMode: TranslationBlockInteractionMode =
         TranslationBlockInteractionMode.COPY_BUTTON,
-    @Volatile var translationBlockSelectionSpeechAction: TtsPlaybackAction? = null,
     /** CUSTOM 主题的边框样式（仅 CUSTOM 主题生效）。CaptureService 同步。 */
     @Volatile var customBorderStyle: BorderStyle = BorderStyle.SOLID,
     @Volatile var overlayTypeface: Typeface? = null,
@@ -603,10 +602,6 @@ class OverlayManager(
                     lastFloatingPairs ?: pairs,
                     floatingWindowContentMode,
                 )
-            },
-            speechLabel = context.getString(R.string.word_card_speak_selection),
-            selectionSpeechAction = {
-                translationBlockSelectionSpeechAction?.onStart
             },
             correctionLabel = context.getString(R.string.translation_correction_action),
             selectionCorrectionAction = {
@@ -1257,9 +1252,7 @@ class OverlayManager(
             (view as TextView).apply {
                 setTextIsSelectable(true)
                 if (plan.enableSelectedTextSpeech) {
-                    enableSelectionSpeech(
-                        label = context.getString(R.string.word_card_speak_selection),
-                        isEnabled = { translationBlockSelectionSpeechAction != null },
+                    enableSelectionCorrection(
                         correctionLabel = context.getString(R.string.translation_correction_action),
                         correctionAction = {
                             blockContents[index]
@@ -1280,9 +1273,6 @@ class OverlayManager(
                                         )
                                     }
                                 }
-                        },
-                        onSpeak = { selectedText ->
-                            translationBlockSelectionSpeechAction?.onStart?.invoke(selectedText)
                         },
                     )
                 }

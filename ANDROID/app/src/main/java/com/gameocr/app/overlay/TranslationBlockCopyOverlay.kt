@@ -79,8 +79,6 @@ class TranslationBlockCopyOverlay(
         sourceText: String,
         translation: String,
         settings: Settings,
-        onSpeakSourceSelection: TtsPlaybackAction? = null,
-        onSpeakTranslationSelection: TtsPlaybackAction? = null,
         onCorrectTranslation: (() -> Unit)? = null,
     ) {
         dismiss()
@@ -162,11 +160,6 @@ class TranslationBlockCopyOverlay(
                 labelRes = R.string.translation_block_copy_panel_source,
                 color = palette.accent,
                 density = density,
-                speechContentDescription = context.getString(R.string.word_card_speak_source),
-                speechAction = onSpeakSourceSelection?.takeIf {
-                    shouldShowTranslationCardSpeechButton(true, sourceText)
-                },
-                speechText = sourceText,
             )
         )
         scrollContent.addView(TextView(context).apply {
@@ -175,12 +168,6 @@ class TranslationBlockCopyOverlay(
             setTextSize(TypedValue.COMPLEX_UNIT_SP, sourceSpec.textSizeSp)
             setLineSpacing(2f, 1.08f)
             setTextIsSelectable(true)
-            onSpeakSourceSelection?.let { action ->
-                enableSelectionSpeech(
-                    label = context.getString(R.string.word_card_speak_selection),
-                    onSpeak = action.onStart,
-                )
-            }
             setPadding(0, (4 * density).toInt(), 0, (10 * density).toInt())
         })
         scrollContent.addView(divider(density, palette.muted))
@@ -189,11 +176,6 @@ class TranslationBlockCopyOverlay(
                 labelRes = R.string.translation_block_copy_panel_translation,
                 color = palette.accent,
                 density = density,
-                speechContentDescription = context.getString(R.string.word_card_speak_translation),
-                speechAction = onSpeakTranslationSelection?.takeIf {
-                    shouldShowTranslationCardSpeechButton(true, translation)
-                },
-                speechText = translation,
             )
         )
         scrollContent.addView(StyledTranslationTextView(context).apply {
@@ -202,10 +184,8 @@ class TranslationBlockCopyOverlay(
             setTextSize(TypedValue.COMPLEX_UNIT_SP, translationSpec.textSizeSp)
             setLineSpacing(2f, 1.08f)
             setTextIsSelectable(true)
-            if (onSpeakTranslationSelection != null || onCorrectTranslation != null) {
-                enableSelectionSpeech(
-                    label = context.getString(R.string.word_card_speak_selection),
-                    isEnabled = { onSpeakTranslationSelection != null },
+            if (onCorrectTranslation != null) {
+                enableSelectionCorrection(
                     correctionLabel = context.getString(R.string.translation_correction_action),
                     correctionAction = {
                         onCorrectTranslation?.takeIf {
@@ -215,9 +195,6 @@ class TranslationBlockCopyOverlay(
                                 translation = translation,
                             )
                         }
-                    },
-                    onSpeak = { selected ->
-                        onSpeakTranslationSelection?.onStart?.invoke(selected)
                     },
                 )
             }
@@ -412,9 +389,6 @@ class TranslationBlockCopyOverlay(
         labelRes: Int,
         color: Int,
         density: Float,
-        speechContentDescription: String,
-        speechAction: TtsPlaybackAction?,
-        speechText: String,
     ): LinearLayout = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
@@ -422,41 +396,6 @@ class TranslationBlockCopyOverlay(
             sectionLabel(labelRes, color),
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
         )
-        speechAction?.let { action ->
-            addView(
-                buildSpeakButton(color, density, speechContentDescription, action) {
-                    action.onToggle(speechText)
-                }
-            )
-        }
-    }
-
-    private fun buildSpeakButton(
-        color: Int,
-        density: Float,
-        contentDescription: String,
-        action: TtsPlaybackAction,
-        onClick: () -> Unit,
-    ): ImageButton = ImageButton(context).apply {
-        setImageResource(R.drawable.ic_volume_up)
-        imageTintList = ColorStateList.valueOf(color)
-        val metrics = translationCardSpeechButtonMetrics(density)
-        layoutParams = LinearLayout.LayoutParams(metrics.sizePx, metrics.sizePx)
-        setPadding(metrics.paddingPx, metrics.paddingPx, metrics.paddingPx, metrics.paddingPx)
-        val backgroundValue = TypedValue()
-        if (
-            context.theme.resolveAttribute(
-                android.R.attr.selectableItemBackgroundBorderless,
-                backgroundValue,
-                true,
-            )
-        ) {
-            setBackgroundResource(backgroundValue.resourceId)
-        } else {
-            setBackgroundColor(Color.TRANSPARENT)
-        }
-        bindTtsPlaybackState(action, contentDescription)
-        setOnClickListener { onClick() }
     }
 
     private fun divider(density: Float, color: Int): View = View(context).apply {

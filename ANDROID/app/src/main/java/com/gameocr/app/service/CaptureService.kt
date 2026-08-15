@@ -4099,12 +4099,6 @@ class CaptureService : Service() {
                 allowWrap = effectiveOverlaySettings.overlayAllowWrap
                 avoidCollision = effectiveOverlaySettings.overlayAvoidCollision
                 translationBlockInteractionMode = settings.translationBlockInteractionMode
-                translationBlockSelectionSpeechAction = null /* wordSelectTtsAction(
-                    settings = settings,
-                    diagId = captureSequence.get(),
-                    role = "block_translation_direct_selection",
-                    playbackId = "translation-block:${captureSequence.get()}:direct-selection",
-                ) */
                 floatingWindowContentMode = settings.floatingWindowContentMode
                 customBorderStyle = settings.customBorderStyle
                 overlayTypeface = typeface

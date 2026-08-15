@@ -228,9 +228,7 @@ import com.gameocr.app.tts.miniMaxTtsEndpointUrlOrNull
 import com.gameocr.app.tts.mimoTtsEndpointUrlOrNull
 import com.gameocr.app.tts.canGenerateVoiceDesignPrompt
 import com.gameocr.app.tts.canPolishMimoStyleInstruction
-import com.gameocr.app.tts.normalizedTtsPlaybackGainDb
 import com.gameocr.app.tts.shouldResetTtsTestFeedback
-import com.gameocr.app.tts.supportsTtsPlaybackGain
 import com.gameocr.app.tts.volcengineTtsEndpointUrlOrNull
 import com.gameocr.app.tts.ttsPresetSummaryLabelRes
 import com.gameocr.app.tts.ttsTestMayIncurCharges
@@ -6443,27 +6441,6 @@ private fun TtsSettings(
                     )
                 }
             }
-        }
-        if (supportsTtsPlaybackGain(provider)) {
-            val normalizedGainDb = normalizedTtsPlaybackGainDb(gainDb)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(R.string.settings_tts_gain_format, normalizedGainDb),
-                    style = MaterialTheme.typography.labelLarge,
-                )
-                SettingHelpTooltip(text = stringResource(R.string.settings_tts_gain_hint))
-            }
-            Slider(
-                value = normalizedGainDb.toFloat(),
-                onValueChange = { onGainDbChange(it.roundToInt()) },
-                valueRange = MIN_TTS_PLAYBACK_GAIN_DB.toFloat()..
-                    MAX_TTS_PLAYBACK_GAIN_DB.toFloat(),
-                steps = MAX_TTS_PLAYBACK_GAIN_DB - MIN_TTS_PLAYBACK_GAIN_DB - 1,
-            )
         }
         HorizontalDivider()
         if (ttsTestMayIncurCharges(provider)) {
