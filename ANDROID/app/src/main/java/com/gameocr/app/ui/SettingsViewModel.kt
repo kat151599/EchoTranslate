@@ -40,7 +40,6 @@ import com.gameocr.app.data.MIN_TTS_PLAYBACK_GAIN_DB
 import com.gameocr.app.download.ModelDownloadManager
 import com.gameocr.app.download.ModelDownloadSpec
 import com.gameocr.app.glossary.TranslationGlossaryRepository
-import com.gameocr.app.llm.LlamaEngineHolder
 import com.gameocr.app.llm.LlmModelInstaller
 import com.gameocr.app.llm.LlmModelKind
 import com.gameocr.app.ocr.OrientationModelInstaller
@@ -69,7 +68,6 @@ class SettingsViewModel @Inject constructor(
     private val orientationModelInstaller: OrientationModelInstaller,
     private val routingTranslator: RoutingTranslator,
     private val llmInstaller: LlmModelInstaller,
-    private val llamaEngineHolder: LlamaEngineHolder,
     private val overlayFontManager: OverlayFontManager,
     private val glossaryRepository: TranslationGlossaryRepository,
     private val modelDownloadManager: ModelDownloadManager,
@@ -881,7 +879,7 @@ class SettingsViewModel @Inject constructor(
 
     // —— 端侧 LLM 翻译 ——
 
-    fun llmDeviceCapable(): Boolean = llamaEngineHolder.isDeviceCapable()
+    fun llmDeviceCapable(): Boolean = false
 
     data class LlmModelUiState(
         val status: String,

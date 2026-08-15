@@ -211,7 +211,6 @@ class CaptureService : Service() {
     @Inject lateinit var shizukuCapabilities: ShizukuCapabilities
     @Inject lateinit var logRepository: LogRepository
     // 端侧 LLM 翻译共享层。设置里切走 LOCAL_* 引擎或 Service 销毁时主动 unload 释放 ~500 MB 内存。
-    @Inject lateinit var llamaEngineHolder: com.gameocr.app.llm.LlamaEngineHolder
     // 文本方向自动判别 + 路由。仅在 settings.textOrientationAutoDetect = true 时启用。
     @Inject lateinit var orientationCoordinator: OrientationCoordinator
     // 用于路由层判断"manga-ocr 模型是否已下载"——未下载时 (VERTICAL_RTL, ja) 不会被路由到 manga
@@ -243,7 +242,6 @@ class CaptureService : Service() {
     private var loopJob: Job? = null
     private var translationRenderJob: Job? = null
     private var ocrWarmupJob: Job? = null
-    private var localLlmWarmupJob: Job? = null
     private var previousLoopFingerprint: LoopFrameFingerprint? = null
     private var previousLoopOcrText: String? = null
     private var loopFrameStabilityState = LoopFrameStabilityState()
@@ -441,11 +439,6 @@ class CaptureService : Service() {
             settingsRepository.settings.collect { s ->
                 applyOverlayConfig(s, syncFloatingWindowLock = true)
                 // 端侧 LLM 引擎切走时主动释放权重：避免 500MB+ 模型常驻内存抢 Bitmap / OCR 模型空间。
-                val wasLocal = lastEngine?.name?.startsWith("LOCAL_") == true
-                val isLocal = s.translatorEngine.name.startsWith("LOCAL_")
-                if (wasLocal && !isLocal) {
-                    scope.launch { runCatching { llamaEngineHolder.unload() } }
-                }
                 lastEngine = s.translatorEngine
             }
         }
@@ -4154,8 +4147,6 @@ class CaptureService : Service() {
         loopJob = null
         ocrWarmupJob?.cancel()
         ocrWarmupJob = null
-        localLlmWarmupJob?.cancel()
-        localLlmWarmupJob = null
         resetLoopFrameHistory()
         resetLoopRuntimeState()
         settingsCollectJob?.cancel()
@@ -4191,9 +4182,6 @@ class CaptureService : Service() {
         cleanupCapture()
         // 释放端侧 LLM 权重。runBlocking 在 onDestroy 是可接受的——cleanUp 内部是同步 JNI 调用，
         // 几十毫秒级；不阻塞主线程没意义，等 Mutex 拿到锁就立刻返回。
-        runCatching {
-            kotlinx.coroutines.runBlocking { llamaEngineHolder.unload() }
-        }.onFailure { Timber.w(it, "llamaEngineHolder.unload on destroy") }
         scope.cancel()
         mainScope.cancel()
         CaptureServiceState.setRunning(false)

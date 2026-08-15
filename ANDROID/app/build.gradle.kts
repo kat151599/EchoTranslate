@@ -11,24 +11,6 @@ hilt {
     enableAggregatingTask = true
 }
 
-val localLlmGenerationThreads = providers
-    .gradleProperty("localLlmGenerationThreads")
-    .orElse("6")
-    .get()
-    .toInt()
-require(localLlmGenerationThreads == 4 || localLlmGenerationThreads == 6) {
-    "localLlmGenerationThreads must be 4 or 6 for the controlled TG/PP A/B test"
-}
-
-val localLlmBatchSize = providers
-    .gradleProperty("localLlmBatchSize")
-    .orElse("4")
-    .get()
-    .toInt()
-require(localLlmBatchSize in setOf(1, 2, 4, 8)) {
-    "localLlmBatchSize must be one of 1, 2, 4, or 8"
-}
-
 android {
     namespace = "com.gameocr.app"
     compileSdk = 35
@@ -42,9 +24,7 @@ android {
 
         // Controlled local-LLM A/B switch. PP remains device-policy selected (6 on the
         // target 8-core phone); TG can be rebuilt as 4 or 6 without source changes.
-        buildConfigField("int", "LOCAL_LLM_GENERATION_THREADS", localLlmGenerationThreads.toString())
         // Independent llama.cpp sequences decoded together. B1 remains the serial baseline.
-        buildConfigField("int", "LOCAL_LLM_BATCH_SIZE", localLlmBatchSize.toString())
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -182,7 +162,6 @@ dependencies {
     implementation(libs.onnxruntime.android)
 
     // Remote-PC build: lightweight API compatibility shim only; no llama.cpp/native runtime.
-    implementation(project(":llama-android"))
 
     // Test
     testImplementation(libs.junit)

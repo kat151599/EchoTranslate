@@ -130,7 +130,6 @@ import com.gameocr.app.gallery.GalleryTaskStatus
 import com.gameocr.app.gallery.GalleryTranslationTaskEntity
 import com.gameocr.app.gallery.GalleryTranslationRepository
 import com.gameocr.app.gallery.GalleryTranslationWorkPolicy
-import com.gameocr.app.llm.LlamaEngineHolder
 import com.gameocr.app.ocr.MangaOcrModelInstaller
 import com.gameocr.app.ocr.OrientationModelInstaller
 import com.gameocr.app.ocr.PaddleModelInstaller
@@ -2306,7 +2305,6 @@ class MainViewModel @Inject constructor(
     galleryTranslationRepository: GalleryTranslationRepository,
     private val shizukuManager: ShizukuManager,
     private val shizukuCapabilities: ShizukuCapabilities,
-    private val llamaEngineHolder: LlamaEngineHolder,
     private val paddleModelInstaller: PaddleModelInstaller,
     private val mangaOcrModelInstaller: MangaOcrModelInstaller,
     private val orientationModelInstaller: OrientationModelInstaller,
@@ -2389,8 +2387,8 @@ class MainViewModel @Inject constructor(
     private fun modelIssuesFor(preset: TranslationPreset): List<TranslationPresetModelIssue> =
         translationPresetModelIssues(
             preset = preset,
-            localLlmDeviceCapable = llamaEngineHolder.isDeviceCapable(),
-            llmModelReady = llamaEngineHolder::isModelInstalled,
+            localLlmDeviceCapable = false,
+            llmModelReady = { false },
             paddleModelReady = { version ->
                 paddleModelInstaller.checkInstalled(version) != null
             },
