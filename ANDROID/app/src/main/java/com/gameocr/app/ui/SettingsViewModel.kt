@@ -51,18 +51,12 @@ import com.gameocr.app.translate.RoutingTranslator
 import com.gameocr.app.translate.TestResult
 import com.gameocr.app.tts.ttsHttpHostOrNull
 import com.gameocr.app.tts.ttsApiHttpHostOrNull
-import com.gameocr.app.tts.SystemTtsEngine
-import com.gameocr.app.tts.SystemTtsVoiceOption
-import com.gameocr.app.tts.settingsForTtsTest
-import com.gameocr.app.tts.TtsEngine
-import com.gameocr.app.tts.HttpTtsEngine
 import com.gameocr.app.tts.VoiceDesignPromptGenerator
 import com.gameocr.app.tts.MiniMaxManagedVoice
 import com.gameocr.app.tts.MiniMaxVoiceCloneRequest
 import com.gameocr.app.tts.MiniMaxVoiceCreationResult
 import com.gameocr.app.tts.MiniMaxVoiceDesignRequest
 import com.gameocr.app.tts.MiniMaxVoiceManager
-import com.gameocr.app.tts.decodeMiniMaxTrialAudio
 import androidx.work.WorkInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -85,9 +79,6 @@ class SettingsViewModel @Inject constructor(
     private val overlayFontManager: OverlayFontManager,
     private val glossaryRepository: TranslationGlossaryRepository,
     private val modelDownloadManager: ModelDownloadManager,
-    private val systemTtsEngine: SystemTtsEngine,
-    private val ttsEngine: TtsEngine,
-    private val httpTtsEngine: HttpTtsEngine,
     private val voiceDesignPromptGenerator: VoiceDesignPromptGenerator,
     private val miniMaxVoiceManager: MiniMaxVoiceManager,
 ) : ViewModel() {
@@ -113,17 +104,6 @@ class SettingsViewModel @Inject constructor(
     suspend fun getDownloadedMlKitLanguageModels(): Set<String> =
         routingTranslator.getDownloadedMlKitLanguageModels()
 
-    suspend fun loadSystemTtsVoices(preferredLanguageTag: String): List<SystemTtsVoiceOption> =
-        systemTtsEngine.availableVoices(preferredLanguageTag)
-
-    suspend fun testTts(text: String, settings: Settings) {
-        require(text.isNotBlank()) { "TTS test text is blank" }
-        ttsEngine.stop()
-        ttsEngine.speak(text, settingsForTtsTest(text, settings))
-    }
-
-    fun stopTts() = ttsEngine.stop()
-
     internal suspend fun loadMiniMaxManagedVoices(
         baseUrl: String,
         apiKey: String,
@@ -136,16 +116,6 @@ class SettingsViewModel @Inject constructor(
     internal suspend fun designMiniMaxVoice(
         request: MiniMaxVoiceDesignRequest,
     ): MiniMaxVoiceCreationResult = miniMaxVoiceManager.designVoice(request)
-
-    internal suspend fun playMiniMaxTrialAudio(audioHex: String, gainDb: Int) {
-        val payload = decodeMiniMaxTrialAudio(audioHex)
-        ttsEngine.stop()
-        httpTtsEngine.playAudio(
-            payload = payload,
-            playbackId = "minimax-voice-design-trial",
-            gainDb = gainDb,
-        )
-    }
 
     internal suspend fun deleteMiniMaxVoice(
         baseUrl: String,

@@ -1838,6 +1838,7 @@ fun SettingsScreen(
 
     val currentTranslationPresetHash = currentTranslationPresetHash()
     val matchingTranslationPresetId = currentMatchingTranslationPresetId(currentTranslationPresetHash)
+    // TTS UI removed.
     LaunchedEffect(
         initialSettings,
         activeTranslationPresetId,
@@ -2703,6 +2704,7 @@ fun SettingsScreen(
             )
         }
     }
+    /* TTS UI removed.
     LaunchedEffect(
         settingsLoaded,
         ttsEnabled,
@@ -2728,6 +2730,7 @@ fun SettingsScreen(
             systemTtsVoicesLoading = false
         }
     }
+    */
     val modelDownloadStateKey = modelDownloadWorkInfos.map { it.id to it.state }
     val modelDownloadStageKey = unfinishedModelDownloads.map { info ->
         ModelDownloadSpec.decode(
@@ -3894,6 +3897,7 @@ fun SettingsScreen(
             // 灰显 + 禁用 chip 让用户一眼明白 + 不能误操作。
             }
 
+            /* TTS UI removed.
             if (false) {
             item(key = SectionKeys.TTS) {
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TTS) {
@@ -4170,6 +4174,7 @@ fun SettingsScreen(
             }
             }
 
+            */
             if (translatorEngine != TranslatorEngine.REMOTE_PC) {
             item(key = SectionKeys.OCR) {
             val ocrSectionDisabled = translatorEngine == TranslatorEngine.YOUDAO_PICTRANS

@@ -20,7 +20,7 @@ import com.gameocr.app.translate.GoogleMlKitTranslationClientFactory
 import com.gameocr.app.translate.GoogleMlKitDownloadedLanguageProvider
 import com.gameocr.app.translate.MlKitDownloadedLanguageProvider
 import com.gameocr.app.translate.MlKitTranslationClientFactory
-import com.gameocr.app.tts.RoutingTtsEngine
+import com.gameocr.app.tts.NoOpTtsEngine
 import com.gameocr.app.tts.TtsEngine
 import dagger.Binds
 import dagger.Module
@@ -142,7 +142,7 @@ abstract class EngineBindings {
 
     @Binds
     @Singleton
-    abstract fun bindTtsEngine(impl: RoutingTtsEngine): TtsEngine
+    abstract fun bindTtsEngine(impl: NoOpTtsEngine): TtsEngine
 
     @Binds
     @Singleton

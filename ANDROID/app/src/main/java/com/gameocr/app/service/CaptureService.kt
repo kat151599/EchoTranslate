@@ -380,7 +380,8 @@ class CaptureService : Service() {
             onSingleTap = {
                 when (floatingButton?.skill ?: FloatingSkill.FULL_SCREEN) {
                     FloatingSkill.FULL_SCREEN -> triggerOnce()
-                    FloatingSkill.WORD_SELECT -> triggerWordSelect()
+                    // LEGACY_COMPAT: remove after dependency cleanup. Old persisted value falls back.
+                    FloatingSkill.WORD_SELECT -> triggerOnce()
                     FloatingSkill.LOOP -> toggleLoopMode()
                 }
             },
@@ -1037,7 +1038,7 @@ class CaptureService : Service() {
         mainScope.launch { floatingButton?.applySkillIcon() }
         val msgRes = when (newSkill) {
             FloatingSkill.FULL_SCREEN -> R.string.toast_skill_switched_full_screen
-            FloatingSkill.WORD_SELECT -> R.string.toast_skill_switched_word_select
+            FloatingSkill.WORD_SELECT -> R.string.toast_skill_switched_full_screen
             FloatingSkill.LOOP -> R.string.toast_skill_switched_loop
         }
         mainScope.launch { overlay?.showInfoHint(getString(msgRes)) }

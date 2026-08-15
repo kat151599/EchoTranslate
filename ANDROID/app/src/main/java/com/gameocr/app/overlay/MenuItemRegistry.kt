@@ -22,11 +22,8 @@ object MenuItemRegistry {
         } else {
             FloatingSkill.LOOP
         }
-        MenuItemId.FULL_SCREEN_SKILL -> when (currentSkill) {
-            FloatingSkill.FULL_SCREEN -> FloatingSkill.WORD_SELECT
-            FloatingSkill.WORD_SELECT -> FloatingSkill.FULL_SCREEN
-            FloatingSkill.LOOP -> FloatingSkill.WORD_SELECT
-        }
+        // LEGACY_COMPAT: this obsolete slot never exposes Word Select.
+        MenuItemId.FULL_SCREEN_SKILL -> FloatingSkill.FULL_SCREEN
         else -> null
     }
 
