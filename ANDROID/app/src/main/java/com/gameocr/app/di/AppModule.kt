@@ -4,8 +4,6 @@ import android.content.Context
 import com.gameocr.app.BuildConfig
 import com.gameocr.app.data.AndroidKeystoreSettingsSecretCipher
 import com.gameocr.app.data.SettingsSecretCipher
-import com.gameocr.app.ocr.OcrEngine
-import com.gameocr.app.ocr.RoutingOcrEngine
 import com.gameocr.app.translate.RoutingTranslator
 import com.gameocr.app.translate.TranslationCache
 import com.gameocr.app.translate.Translator
@@ -64,10 +62,6 @@ object AppModule {
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class EngineBindings {
-
-    @Binds
-    @Singleton
-    abstract fun bindOcrEngine(impl: RoutingOcrEngine): OcrEngine
 
     @Binds
     @Singleton

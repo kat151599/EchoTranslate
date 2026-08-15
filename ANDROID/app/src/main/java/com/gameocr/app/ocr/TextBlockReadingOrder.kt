@@ -27,6 +27,20 @@ internal fun resolveTextBlockReadingOrientation(
     }
 }
 
+internal fun dominantLayoutOrientation(
+    orientations: List<TextOrientation?>,
+): TextOrientation? {
+    val counts = orientations
+        .filterNotNull()
+        .filter { it != TextOrientation.UNKNOWN }
+        .groupingBy { it }
+        .eachCount()
+    return counts.maxWithOrNull(
+        compareBy<Map.Entry<TextOrientation, Int>> { it.value }
+            .thenBy { it.key.ordinal },
+    )?.key
+}
+
 private fun sortHorizontal(blocks: List<TextBlock>, leftToRight: Boolean): List<TextBlock> {
     val avgHeight = blocks.map { it.boundingBox.rectHeight().coerceAtLeast(1) }.average().toFloat()
     val sameLineThreshold = (avgHeight * 0.65f).coerceAtLeast(8f)

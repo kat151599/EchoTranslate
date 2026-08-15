@@ -9,7 +9,7 @@ import java.security.MessageDigest
 const val DEFAULT_ANTHROPIC_BASE_URL = "https://api.deepseek.com/anthropic"
 const val DEFAULT_ANTHROPIC_MODEL = "deepseek-v4-flash"
 
-/** 用户配置：OCR / 翻译后端相关。 */
+/** 用户配置：capture、render 与 Remote PC 翻译相关。 */
 @Serializable
 data class Settings(
     val baseUrl: String = "https://api.deepseek.com/v1/",
@@ -22,7 +22,6 @@ data class Settings(
     val sourceLang: String = Languages.AUTO.code,
     val targetLang: String = "zh-CN",
     val promptTemplate: String = DEFAULT_PROMPT,
-    val ocrEngine: OcrEngineKind = OcrEngineKind.ML_KIT_AUTO,
     val captureLoopIntervalMs: Long = 2000L,
     val loopTriggerMode: LoopTriggerMode = LoopTriggerMode.WAIT_FOR_TEXT_COMPLETE,
     val loopTextStableDurationMs: Long = DEFAULT_LOOP_TEXT_STABLE_DURATION_MS,
@@ -31,14 +30,10 @@ data class Settings(
     val loopTextRegionMode: LoopTextRegionMode = LoopTextRegionMode.AUTO,
     val loopTranslateRegionOnly: Boolean = true,
     val developerOptionsEnabled: Boolean = false,
-    val ocrScreenshotSavingEnabled: Boolean = false,
     val disableTranslationCache: Boolean = false,
     val batchCumulativeCompletionTimeEnabled: Boolean = false,
     /** 兼容旧版持久化字段；界面以正向的“跨上下文翻译”开关展示。false 表示默认开启。 */
     val disableCrossLineContextTranslation: Boolean = false,
-    val ocrRedBoxModeEnabled: Boolean = false,
-    val ocrRedBoxShowSourceText: Boolean = true,
-    val ocrRedBoxShowTranslation: Boolean = false,
     val captureRegion: CaptureRegion? = null,
     /**
      * 保存 [captureRegion] 时的屏幕物理尺寸（px）。用于读取 region 时按当前屏幕尺寸自动 rescale，
@@ -70,7 +65,6 @@ data class Settings(
     val overlayOffsetX: Int = 0,
     /** 译文相对原文 boundingBox 的垂直额外偏移（px，叠加到 placement 计算结果之上）。 */
     val overlayOffsetY: Int = 0,
-    val preprocess: PreprocessOptions = PreprocessOptions(),
     /**
      * OCR 调用前 / 后自动判别文本方向（横排 / 竖排 / 一字母一行的 logo），按判别结果在路由层
      * 动态切换 OCR 引擎（比如发现是日漫竖排自动切到 manga-ocr，发现是繁中竖排自动切到百度
@@ -79,54 +73,35 @@ data class Settings(
      * Phase 1 实现为"OCR 后判别 → 不匹配则用更合适的引擎重跑"——横排场景零额外开销，竖排
      * 误用其它引擎时 OCR 跑 2 次。详见 [com.gameocr.app.ocr.OrientationCoordinator]。
      */
-    val textOrientationAutoDetect: Boolean = true,
     /**
      * 用户手动锁定文本方向，覆盖自动判别。null = 走自动 / 关闭时无意义。
      * 通常仅在自动判别频繁误判某帧时由用户临时锁定。
      */
-    val manualTextOrientation: com.gameocr.app.ocr.TextOrientation? = null,
     val translationOutputFollowRecognition: Boolean = true,
     val translationOutputLayout: TranslationOutputLayout = TranslationOutputLayout.FOLLOW_RECOGNITION,
     val translationOutputDirection: TranslationOutputDirection = TranslationOutputDirection.FOLLOW_RECOGNITION,
-    val baiduOcrApiKey: String = "",
-    val baiduOcrSecretKey: String = "",
     /** 百度 OCR 接口类型。默认含位置标准版，能让译文紧贴原文 boundingBox 渲染。 */
-    val baiduOcrEndpoint: BaiduOcrEndpoint = BaiduOcrEndpoint.GENERAL,
     /**
      * 百度 OCR 识别语种。默认 CHN_ENG（中英）等于不指定时的行为。
      * 注意：含位置版（general / accurate / webimage）实际不读取 language_type；
      * 想识别韩文 / 日文等小语种应当切到「标准版」或「高精度版」（无位置）。
     */
-    val baiduOcrLanguage: BaiduOcrLanguage = BaiduOcrLanguage.CHN_ENG,
     /** Umi-OCR HTTP image OCR endpoint, e.g. http://192.168.0.2:1224/api/ocr. */
-    val umiOcrBaseUrl: String = "",
     /** LunaTranslator HTTP image OCR endpoint, e.g. http://192.168.0.2:2333/api/ocr. */
-    val lunaOcrBaseUrl: String = "",
-    val paddleAiStudioToken: String = "",
-    val tencentSecretId: String = "",
-    val tencentSecretKey: String = "",
-    val tencentRegion: String = "ap-guangzhou",
     /** 腾讯云 OCR 接口类型。三种选择各自有独立配额、价格、识别能力。 */
-    val tencentOcrEndpoint: TencentOcrEndpoint = TencentOcrEndpoint.GENERAL_BASIC,
     /**
      * 腾讯云 OCR 识别语种。默认 auto 由后端按图片内容判断，多数场景体验最好。
      * GeneralAccurateOCR 只支持 auto / zh，RecognizeAgent 不读这个字段（引擎层会跳过）。
      */
-    val tencentOcrLanguage: TencentOcrLanguage = TencentOcrLanguage.AUTO,
-    val paddleModelVersion: PaddleModelVersion = PaddleModelVersion.V5_MOBILE,
-    val paddleDetectionProfile: PaddleDetectionProfile = PaddleDetectionProfile.FAST,
-    val paddleModelMirrorUrl: String = "",
     /**
      * manga-ocr 模型下载镜像 URL（可选）。l0wgear/manga-ocr-2025-onnx 没有公开 hf-mirror 代理
      * （实测 308 redirect 回 huggingface.co），用户可填自架镜像（如内网 NAS）。空 = 仅走 huggingface.co 原站。
      */
-    val mangaOcrModelMirrorUrl: String = "",
     /**
      * Uses verified bubble shapes for delayed text erasure, local repair, and translated layout.
      * Low-confidence regions always fall back to the existing adaptive rectangle renderer.
      */
     /** PaddleOCR doc-orientation ONNX model mirror. Empty = official HuggingFace source. */
-    val orientationModelMirrorUrl: String = "",
     val preferShizukuCapture: Boolean = false,
     val a11yVolumeTrigger: Boolean = false,
     val translatorEngine: TranslatorEngine = TranslatorEngine.REMOTE_PC,
@@ -237,7 +212,6 @@ data class Settings(
      */
     val pinnedLanguages: List<String> = emptyList(),
     /** ML Kit 端侧翻译最近使用的源语言，按最近使用顺序保存，最多四个。 */
-    val mlKitRecentSourceLanguages: List<String> = listOf("en", "zh-CN", "ja", "ko"),
     /**
      * 明文 HTTP 白名单 host 列表（仅 hostname / IP，不含 scheme / port / path）。
      * 默认严格模式仅放行私有/回环地址；这里追加的 host 也允许明文访问，用于无 HTTPS 的可信外网服务。
@@ -271,26 +245,21 @@ data class Settings(
      * 主线 PaddleOCR 默认 0.3；屏译降到 0.25 让漫画小气泡、淡色字、长竖排能稳定捕获。
      * 用户可在设置→OCR→"检测高级阈值"调到 0.15–0.4，过低引入噪声 box / 过高漏小字。
      */
-    val dbnetProbThresh: Float = 0.25f,
     /**
      * DBNet 连通域平均概率阈值。连通域内像素的 prob 均值低于此值视为噪声丢弃。
      * 主线默认 0.6；屏译降到 0.5 配合 [dbnetProbThresh] 一起放宽，捕获概率响应在边界的小字。
      */
-    val dbnetBoxScoreThresh: Float = 0.5f,
     /**
      * PaddleOCR DBNet 旋转矩形外扩比例。从二值连通域到最终 box 的 unclip 操作，
      * 越大 box 包得越宽。普通 PaddleOCR 保持 1.55，避免为了日漫 crop 需求改变通用 OCR 行为。
      */
-    val dbnetUnclipRatio: Float = 1.55f,
     /**
      * manga-ocr 专用 DBNet 外扩比例。manga-ocr 识别整气泡 crop，竖排/手绘字体更怕首尾字被裁；
      * 1.65 比 PaddleOCR 常见 1.5 默认值多一点裁剪余量，同时仍避免过度吞邻泡。
      */
     val mangaOcrDbnetUnclipRatio: Float = 1.65f,
     /** 兼容旧存档保留的退役字段；读取、保存和运行时始终强制为 0。 */
-    val bubbleClusterGap: Int = MangaOcrAdvancedSettingsPolicy.BUBBLE_CLUSTER_GAP,
     /** 兼容旧存档保留的退役字段；读取、保存和运行时始终强制为 0。 */
-    val mangaOcrCropPaddingPx: Int = MangaOcrAdvancedSettingsPolicy.CROP_PADDING_PX,
     /**
      * 端侧 LLM 下载源选择。默认 [LlmMirrorChoice.HF_MIRROR]——国内用户绝大多数直连可达：
      * - Hy-MT2 / Sakura 在此模式下走 hf-mirror.com。
@@ -379,8 +348,6 @@ data class TranslationPreset(
     val targetLang: String = "zh-CN",
     val promptTemplate: String = Settings.DEFAULT_PROMPT,
     val dictionaryPrompt: String = Settings.DEFAULT_DICTIONARY_PROMPT,
-    val ocrEngine: OcrEngineKind = OcrEngineKind.ML_KIT_AUTO,
-    val preprocess: PreprocessOptions = PreprocessOptions(),
     val renderMode: RenderMode = RenderMode.BLOCKS,
     val translationBlockInteractionMode: TranslationBlockInteractionMode =
         TranslationBlockInteractionMode.COPY_BUTTON,
@@ -408,20 +375,9 @@ data class TranslationPreset(
     val deeplProtocol: DeeplProtocol = DeeplProtocol.OFFICIAL,
     val deeplBaseUrl: String = "",
     val deeplBearerAuth: Boolean = false,
-    val baiduOcrEndpoint: BaiduOcrEndpoint = BaiduOcrEndpoint.GENERAL,
-    val baiduOcrLanguage: BaiduOcrLanguage = BaiduOcrLanguage.CHN_ENG,
-    val umiOcrBaseUrl: String = "",
-    val lunaOcrBaseUrl: String = "",
-    val tencentRegion: String = "ap-guangzhou",
-    val tencentOcrEndpoint: TencentOcrEndpoint = TencentOcrEndpoint.GENERAL_BASIC,
-    val tencentOcrLanguage: TencentOcrLanguage = TencentOcrLanguage.AUTO,
-    val paddleModelVersion: PaddleModelVersion = PaddleModelVersion.V5_MOBILE,
-    val paddleDetectionProfile: PaddleDetectionProfile = PaddleDetectionProfile.FAST,
     val apiTimeoutSeconds: Int = 30,
     val mergeAdjacentBlocks: Boolean = false,
     val mergeStrength: MergeStrength = MergeStrength.STANDARD,
-    val textOrientationAutoDetect: Boolean = true,
-    val manualTextOrientation: com.gameocr.app.ocr.TextOrientation? = null,
     val translationOutputFollowRecognition: Boolean = true,
     val translationOutputLayout: TranslationOutputLayout = TranslationOutputLayout.FOLLOW_RECOGNITION,
     val translationOutputDirection: TranslationOutputDirection = TranslationOutputDirection.FOLLOW_RECOGNITION,
@@ -429,12 +385,6 @@ data class TranslationPreset(
     val sendAppNameToTranslator: Boolean = false,
     val localLlmContextSize: Int = 2048,
     val localLlmMaxNewTokens: Int = 256,
-    val dbnetProbThresh: Float = 0.25f,
-    val dbnetBoxScoreThresh: Float = 0.5f,
-    val dbnetUnclipRatio: Float = 1.55f,
-    val mangaOcrDbnetUnclipRatio: Float = 1.65f,
-    val bubbleClusterGap: Int = MangaOcrAdvancedSettingsPolicy.BUBBLE_CLUSTER_GAP,
-    val mangaOcrCropPaddingPx: Int = MangaOcrAdvancedSettingsPolicy.CROP_PADDING_PX,
     val settingsHash: String = ""
 ) {
     fun applyTo(settings: Settings): Settings {
@@ -452,8 +402,6 @@ data class TranslationPreset(
         targetLang = targetLang,
         promptTemplate = promptTemplate,
         dictionaryPrompt = dictionaryPrompt,
-        ocrEngine = ocrEngine,
-        preprocess = preprocess,
         renderMode = renderMode,
         translationBlockInteractionMode = translationBlockInteractionMode,
         overlayPlacement = overlayPlacement,
@@ -481,20 +429,9 @@ data class TranslationPreset(
         deeplProtocol = deeplProtocol,
         deeplBaseUrl = deeplBaseUrl,
         deeplBearerAuth = deeplBearerAuth,
-        baiduOcrEndpoint = baiduOcrEndpoint,
-        baiduOcrLanguage = baiduOcrLanguage,
-        umiOcrBaseUrl = umiOcrBaseUrl,
-        lunaOcrBaseUrl = lunaOcrBaseUrl,
-        tencentRegion = tencentRegion,
-        tencentOcrEndpoint = tencentOcrEndpoint,
-        tencentOcrLanguage = tencentOcrLanguage,
-        paddleModelVersion = paddleModelVersion,
-        paddleDetectionProfile = paddleDetectionProfile,
         apiTimeoutSeconds = apiTimeoutSeconds,
         mergeAdjacentBlocks = mergeAdjacentBlocks,
         mergeStrength = mergeStrength,
-        textOrientationAutoDetect = textOrientationAutoDetect,
-        manualTextOrientation = manualTextOrientation,
         translationOutputFollowRecognition = output.followRecognition,
         translationOutputLayout = output.layout,
         translationOutputDirection = output.direction,
@@ -502,38 +439,14 @@ data class TranslationPreset(
         sendAppNameToTranslator = sendAppNameToTranslator,
         localLlmContextSize = localLlmContextSize,
         localLlmMaxNewTokens = localLlmMaxNewTokens,
-        dbnetProbThresh = dbnetProbThresh,
-        dbnetBoxScoreThresh = dbnetBoxScoreThresh,
-        dbnetUnclipRatio = dbnetUnclipRatio,
-        mangaOcrDbnetUnclipRatio = mangaOcrDbnetUnclipRatio,
-        bubbleClusterGap = MangaOcrAdvancedSettingsPolicy.BUBBLE_CLUSTER_GAP,
-        mangaOcrCropPaddingPx = MangaOcrAdvancedSettingsPolicy.CROP_PADDING_PX
         )
     }
 }
 
 object TranslationPresetCatalog {
-    const val BUILTIN_MANGA_JA_ZH: String = "builtin_manga_ja_zh"
-    const val BUILTIN_MANGA_JA_ZH_NAME: String = "Offline Manga OCR to Chinese"
     const val UNSAVED_DRAFT_ID: String = "custom_unsaved_translation_preset"
 
-    fun builtIns(): List<TranslationPreset> = listOf(
-        fromSettings(
-            id = BUILTIN_MANGA_JA_ZH,
-            name = BUILTIN_MANGA_JA_ZH_NAME,
-            shortName = "Manga",
-            settings = Settings().copy(
-                sourceLang = "ja",
-                targetLang = "zh-CN",
-                ocrEngine = OcrEngineKind.MANGA_OCR_JA,
-                translatorEngine = TranslatorEngine.REMOTE_PC,
-                overlayStyleMode = OverlayStyleMode.ADAPTIVE,
-                overlayTheme = OverlayTheme.CLASSIC_DARK,
-                mergeAdjacentBlocks = false,
-                mergeStrength = MergeStrength.AGGRESSIVE
-            )
-        )
-    )
+    fun builtIns(): List<TranslationPreset> = emptyList()
 
     fun all(custom: List<TranslationPreset>): List<TranslationPreset> =
         builtIns() + custom.filterNot { it.id in builtInIds }
@@ -564,8 +477,6 @@ object TranslationPresetCatalog {
             targetLang = settings.targetLang,
             promptTemplate = settings.promptTemplate,
             dictionaryPrompt = settings.dictionaryPrompt,
-            ocrEngine = settings.ocrEngine,
-            preprocess = settings.preprocess,
             renderMode = settings.renderMode,
             translationBlockInteractionMode = settings.translationBlockInteractionMode,
             overlayPlacement = settings.overlayPlacement,
@@ -592,20 +503,9 @@ object TranslationPresetCatalog {
             deeplProtocol = settings.deeplProtocol,
             deeplBaseUrl = settings.deeplBaseUrl,
             deeplBearerAuth = settings.deeplBearerAuth,
-            baiduOcrEndpoint = settings.baiduOcrEndpoint,
-            baiduOcrLanguage = settings.baiduOcrLanguage,
-            umiOcrBaseUrl = settings.umiOcrBaseUrl,
-            lunaOcrBaseUrl = settings.lunaOcrBaseUrl,
-            tencentRegion = settings.tencentRegion,
-            tencentOcrEndpoint = settings.tencentOcrEndpoint,
-            tencentOcrLanguage = settings.tencentOcrLanguage,
-            paddleModelVersion = settings.paddleModelVersion,
-            paddleDetectionProfile = settings.paddleDetectionProfile,
             apiTimeoutSeconds = settings.apiTimeoutSeconds,
             mergeAdjacentBlocks = settings.mergeAdjacentBlocks,
             mergeStrength = settings.mergeStrength,
-            textOrientationAutoDetect = settings.textOrientationAutoDetect,
-            manualTextOrientation = settings.manualTextOrientation,
             translationOutputFollowRecognition = output.followRecognition,
             translationOutputLayout = output.layout,
             translationOutputDirection = output.direction,
@@ -613,12 +513,6 @@ object TranslationPresetCatalog {
             sendAppNameToTranslator = settings.sendAppNameToTranslator,
             localLlmContextSize = settings.localLlmContextSize,
             localLlmMaxNewTokens = settings.localLlmMaxNewTokens,
-            dbnetProbThresh = settings.dbnetProbThresh,
-            dbnetBoxScoreThresh = settings.dbnetBoxScoreThresh,
-            dbnetUnclipRatio = settings.dbnetUnclipRatio,
-            mangaOcrDbnetUnclipRatio = settings.mangaOcrDbnetUnclipRatio,
-            bubbleClusterGap = MangaOcrAdvancedSettingsPolicy.BUBBLE_CLUSTER_GAP,
-            mangaOcrCropPaddingPx = MangaOcrAdvancedSettingsPolicy.CROP_PADDING_PX
         )
         return preset.copy(settingsHash = settingsHash(preset))
     }
@@ -644,12 +538,6 @@ object TranslationPresetCatalog {
             preset.translationOutputLayout,
             preset.translationOutputDirection,
         )
-        val bubbleClusterGap = MangaOcrAdvancedSettingsPolicy.effectiveBubbleClusterGap(
-            preset.bubbleClusterGap
-        )
-        val mangaOcrCropPaddingPx = MangaOcrAdvancedSettingsPolicy.effectiveCropPaddingPx(
-            preset.mangaOcrCropPaddingPx
-        )
         return sha256(
             preset.baseUrl,
             preset.model,
@@ -659,10 +547,6 @@ object TranslationPresetCatalog {
             preset.targetLang,
             preset.promptTemplate,
             preset.dictionaryPrompt,
-            preset.ocrEngine.name,
-            preset.preprocess.upscale2x,
-            preset.preprocess.invert,
-            preset.preprocess.binarize,
             preset.renderMode.name,
             preset.translationBlockInteractionMode.name,
             preset.overlayPlacement.name,
@@ -702,20 +586,9 @@ object TranslationPresetCatalog {
             preset.deeplProtocol.name,
             preset.deeplBaseUrl,
             preset.deeplBearerAuth,
-            preset.baiduOcrEndpoint.name,
-            preset.baiduOcrLanguage.name,
-            preset.umiOcrBaseUrl,
-            preset.lunaOcrBaseUrl,
-            preset.tencentRegion,
-            preset.tencentOcrEndpoint.name,
-            preset.tencentOcrLanguage.name,
-            preset.paddleModelVersion.name,
-            preset.paddleDetectionProfile.name,
             preset.apiTimeoutSeconds,
             preset.mergeAdjacentBlocks,
             preset.mergeStrength.name,
-            preset.textOrientationAutoDetect,
-            preset.manualTextOrientation?.name.orEmpty(),
             output.followRecognition,
             output.layout.name,
             output.direction.name,
@@ -723,12 +596,7 @@ object TranslationPresetCatalog {
             preset.sendAppNameToTranslator,
             preset.localLlmContextSize,
             preset.localLlmMaxNewTokens,
-            preset.dbnetProbThresh.toBits(),
-            preset.dbnetBoxScoreThresh.toBits(),
-            preset.dbnetUnclipRatio.toBits(),
-            preset.mangaOcrDbnetUnclipRatio.toBits(),
-            bubbleClusterGap,
-            mangaOcrCropPaddingPx
+            preset.localLlmMaxNewTokens
         )
     }
 
@@ -763,7 +631,7 @@ object TranslationPresetCatalog {
 
     fun isBuiltIn(id: String): Boolean = id in builtInIds
 
-    private val builtInIds: Set<String> = setOf(BUILTIN_MANGA_JA_ZH)
+    private val builtInIds: Set<String> = emptySet()
 }
 
 /**
@@ -910,61 +778,6 @@ enum class PaddleDetectionProfile(
     ),
 }
 
-/**
- * PaddleOCR 模型版本。支持多版本切换：v5 mobile（当前默认）和 v6 tiny（更轻量、更快）。
- * 每个版本的模型文件存在独立子目录（[PaddleModelInstaller.modelsDir] / [dirName]），
- * 切版本时不需要删另一个版本的模型。
- *
- * 枚举值的 name 会被 DataStore 序列化，改名需做 silent migration。
- */
-@Serializable
-enum class PaddleModelVersion(
-    val displayNameRes: Int,
-    val descRes: Int,
-    val languageCount: Int,
-    val supportedLanguagesRes: Int,
-    val supportsJapanese: Boolean,
-    /** modelsDir 下的子目录名 */
-    val dirName: String
-) {
-    /** 官方 PP-OCRv5 mobile（det 4.6MiB + rec 15.8MiB + inference.yml 145KiB，约 20.5MiB） */
-    V5_MOBILE(
-        R.string.paddle_version_v5_mobile,
-        R.string.paddle_version_v5_mobile_desc,
-        4,
-        R.string.paddle_version_v5_mobile_languages,
-        true,
-        "v5"
-    ),
-    /** PP-OCRv6 tiny（det ~1.5M params + rec ~1.5M params，极轻量极快） */
-    V6_TINY(
-        R.string.paddle_version_v6_tiny,
-        R.string.paddle_version_v6_tiny_desc,
-        49,
-        R.string.paddle_version_v6_tiny_languages,
-        false,
-        "v6tiny"
-    ),
-    /** PP-OCRv6 small: mobile tier with higher accuracy than tiny at a higher runtime cost. */
-    V6_SMALL(
-        R.string.paddle_version_v6_small,
-        R.string.paddle_version_v6_small_desc,
-        50,
-        R.string.paddle_version_v6_full_languages,
-        true,
-        "v6small"
-    ),
-    /** PP-OCRv6 medium: higher accuracy tier with a larger download/runtime cost. */
-    V6_MEDIUM(
-        R.string.paddle_version_v6_medium,
-        R.string.paddle_version_v6_medium_desc,
-        50,
-        R.string.paddle_version_v6_full_languages,
-        true,
-        "v6medium"
-    );
-}
-
 @Serializable
 enum class TranslatorEngine {
     /** Thin-client mode: screenshot -> PC server -> PaddleOCR/context/LLM -> translated blocks. */
@@ -977,7 +790,6 @@ enum class TranslatorEngine {
     DEEPL,
     /**
      * 有道智云图片翻译（ocrtransapi）。**端到端引擎**：传整张截图，直接拿回带 box 的译文，
-     * 无需先调 OCR 引擎。选中后 CaptureService 会跳过 [Settings.ocrEngine]。
      */
     YOUDAO_PICTRANS,
     /**
@@ -1210,23 +1022,6 @@ enum class TencentOcrLanguage(
 }
 
 @Serializable
-enum class OcrEngineKind {
-    UMI_OCR,          // Umi-OCR HTTP service running on LAN/PC.
-    LUNA_OCR,         // LunaTranslator HTTP service running on LAN/PC.
-    ML_KIT_AUTO,      // 自动选 latin / 日 / 韩 / 中（按文字类型探测）
-    ML_KIT_LATIN,
-    ML_KIT_JAPANESE,
-    ML_KIT_CHINESE,
-    ML_KIT_KOREAN,    // ML Kit 韩文识别器（端侧、~20MB 模型按需下载）
-    BAIDU,            // 百度通用文字识别（云端，需要 API Key + Secret）
-    TENCENT,          // 腾讯云 GeneralBasicOCR（云端，需要 SecretId + SecretKey）
-    YOUDAO,           // 有道智云通用文字识别 ocrapi（云端，需要 AppKey + AppSecret）
-    PADDLE_AI_STUDIO, // PaddleOCR AI Studio async jobs API (cloud, requires bearer token)
-    PADDLE_ONNX,      // PaddleOCR PP-OCRv5 mobile (ONNX Runtime 端侧，按需下载模型)
-    MANGA_OCR_JA      // l0wgear/manga-ocr-2025-onnx 日漫专用（端侧；复用 PaddleOCR DBNet 检测；~140MB 按需下载，需开代理）
-}
-
-@Serializable
 enum class LoopTriggerMode {
     FIXED_INTERVAL,
     WAIT_FOR_TEXT_COMPLETE,
@@ -1239,35 +1034,10 @@ enum class LoopTextRegionMode {
     ANYWHERE,
 }
 
-/**
- * 此引擎是否要求 [CaptureService] 跳过 [PreprocessOptions.invert] / [PreprocessOptions.binarize]
- * 预处理，传入接近原图的 bitmap。MANGA_OCR_JA 训练时见的是漫画原图（含网点、灰阶），
- * 二值化后效果显著下降，因此走 raw 路径。其它引擎默认走完整预处理链。
- *
- * 注：[PreprocessOptions.upscale2x] 仍会应用——DBNet 对小字检测有帮助，对 manga-ocr 224×224
- * squash resize 后无副作用。
- */
-val OcrEngineKind.needsRawBitmap: Boolean
-    get() = this == OcrEngineKind.MANGA_OCR_JA
-
-fun Settings.dbnetUnclipRatioFor(engine: OcrEngineKind): Float =
-    if (engine == OcrEngineKind.MANGA_OCR_JA) mangaOcrDbnetUnclipRatio else dbnetUnclipRatio
-
-@Serializable
-data class PreprocessOptions(
-    val upscale2x: Boolean = false,
-    val invert: Boolean = false,
-    val binarize: Boolean = false
-) {
-    fun anyEnabled(): Boolean = upscale2x || invert || binarize
-}
-
 @Serializable
 enum class RenderMode {
-    /** 译文紧贴每段原文下方（按 OCR boundingBox）。 */
     BLOCKS,
-    /** 可拖拽 / 可缩放的悬浮窗口，列出所有原文 → 译文。0.3.x 之前叫 BANNER（屏幕底部整条横幅）。 */
-    FLOATING_WINDOW
+    FLOATING_WINDOW,
 }
 
 @Serializable

@@ -1,7 +1,6 @@
 package com.gameocr.app.ocr
 
 import android.graphics.Rect
-import com.gameocr.app.ocr.BubbleClusterer.IntRect
 
 /**
  * 一段识别出的文本（一般对应原图里的一个文本块）。
@@ -23,30 +22,6 @@ internal fun TextBlock.sourceBoxesOrBoundingBox(): List<Rect> =
 
 internal fun mergeSourceBoxes(first: TextBlock, second: TextBlock): List<Rect> =
     first.sourceBoxesOrBoundingBox() + second.sourceBoxesOrBoundingBox()
-
-internal fun inferSourceLayoutOrientation(
-    sourceBoxes: List<IntRect>,
-    blockBounds: IntRect,
-    ambiguousFallback: TextOrientation = TextOrientation.VERTICAL_RTL,
-): TextOrientation {
-    var portrait = 0
-    var landscape = 0
-    sourceBoxes.forEach { box ->
-        val width = box.width.coerceAtLeast(1)
-        val height = box.height.coerceAtLeast(1)
-        when {
-            height >= width * 1.2f -> portrait++
-            width >= height * 1.2f -> landscape++
-        }
-    }
-    return when {
-        portrait > landscape -> TextOrientation.VERTICAL_RTL
-        landscape > portrait -> TextOrientation.HORIZONTAL_LTR
-        blockBounds.width >= blockBounds.height * 1.3f -> TextOrientation.HORIZONTAL_LTR
-        blockBounds.height >= blockBounds.width * 1.3f -> TextOrientation.VERTICAL_RTL
-        else -> ambiguousFallback
-    }
-}
 
 internal fun TextBlock.withFallbackLayoutOrientation(
     fallback: TextOrientation,

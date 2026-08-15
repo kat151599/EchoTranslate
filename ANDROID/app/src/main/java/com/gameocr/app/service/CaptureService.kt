@@ -1,4 +1,4 @@
-﻿package com.gameocr.app.service
+package com.gameocr.app.service
 
 import android.app.Service
 import android.content.Context
@@ -66,23 +66,11 @@ import com.gameocr.app.data.SettingsRepository
 import com.gameocr.app.data.TranslationPreset
 import com.gameocr.app.data.TranslationPresetCatalog
 import com.gameocr.app.data.translationLanguageCodesConflict
-import com.gameocr.app.data.needsRawBitmap
 import com.gameocr.app.data.Languages
-import com.gameocr.app.ocr.BitmapPreprocessor
-import com.gameocr.app.ocr.MangaDelayedMaskDebugSessionManager
-import com.gameocr.app.ocr.OrientationCoordinator
-import com.gameocr.app.ocr.OrientationResult
-import com.gameocr.app.ocr.OrientationRouting
-import com.gameocr.app.ocr.PaddleTextLineOrientationClassifier
 import com.gameocr.app.ocr.TextBlock
 import com.gameocr.app.ocr.TextOrientation
 import com.gameocr.app.ocr.TranslationOutputOrientationPolicy
-import com.gameocr.app.ocr.findOcrResultQualityIssue
-import com.gameocr.app.ocr.mapBlocksFromRotated180
-import com.gameocr.app.ocr.orientationHintFromLayout
 import com.gameocr.app.ocr.resolveTextBlockReadingOrientation
-import com.gameocr.app.ocr.shouldRerunLowQualityChinesePaddleOcr
-import com.gameocr.app.ocr.sortTextBlocksForReading
 import com.gameocr.app.data.resolveTranslationOutputSettings
 import com.gameocr.app.data.FloatingSkill
 import com.gameocr.app.overlay.FloatingButtonManager
@@ -157,8 +145,6 @@ class CaptureService : Service() {
     @Inject lateinit var shizukuCapabilities: ShizukuCapabilities
     @Inject lateinit var logRepository: LogRepository
     // Р В Р’В Р вЂ™Р’В·Р В РІР‚в„ўР вЂ™Р’В«Р В Р’В Р Р†Р вЂљР Р‹Р В Р’В Р СћРІР‚ВР В Р Р‹Р Р†Р вЂљРЎС›Р В РІР‚в„ўР вЂ™Р’В§ LLM Р В Р’В Р вЂ™Р’В·Р В Р Р‹Р Р†Р вЂљРІР‚СњР В РІР‚в„ўР вЂ™Р’В»Р В Р’В Р РЋРІР‚ВР В Р’В Р Р†Р вЂљР Р‹Р В Р вЂ Р В РІР‚С™Р вЂ™Р’ВР В Р’В Р вЂ™Р’ВµР В Р вЂ Р В РІР‚С™Р вЂ™Р’В¦Р В РІР‚в„ўР вЂ™Р’В±Р В Р’В Р СћРІР‚ВР В Р Р‹Р Р†Р вЂљРЎСљР В РІР‚в„ўР вЂ™Р’В«Р В Р’В Р вЂ™Р’ВµР В РІР‚в„ўР вЂ™Р’В±Р В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В Р’В Р РЋРІР‚вЂњР В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В Р’В Р РЋРІР‚ВР В РІР‚в„ўР вЂ™Р’В®Р В Р Р‹Р Р†Р вЂљРЎС›Р В Р’В Р вЂ™Р’В·Р В Р’В Р Р†Р вЂљР’В¦Р В РІР‚в„ўР вЂ™Р’В®Р В Р’В Р Р†РІР‚С›РІР‚вЂњР В Р вЂ Р В РІР‚С™Р В Р вЂ№Р В Р’В Р В РІР‚В°Р В Р’В Р вЂ™Р’ВµР В Р вЂ Р Р†Р вЂљРЎв„ўР вЂ™Р’В¬Р В Р вЂ Р В РІР‚С™Р В Р вЂ№Р В Р’В Р РЋРІР‚ВР В РІР‚в„ўР вЂ™Р’ВµР В РІР‚в„ўР вЂ™Р’В° LOCAL_* Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р вЂ™Р’ВР В Р вЂ Р В РІР‚С™Р РЋРЎвЂєР В Р’В Р вЂ™Р’В¶Р В Р вЂ Р В РІР‚С™Р РЋРЎв„ўР В Р’В Р Р†Р вЂљРІвЂћвЂ“Р В Р’В Р вЂ™Р’В¶Р В Р вЂ Р Р†Р вЂљРЎв„ўР вЂ™Р’В¬Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎС™ Service Р В Р’В Р Р†РІР‚С›РІР‚вЂњР В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В Р’В Р Р†Р вЂљРЎв„ўР В Р’В Р вЂ™Р’В¶Р В Р’В Р Р†Р вЂљР Р‹Р В Р’В Р РЋРІР‚СљР В Р’В Р вЂ™Р’В¶Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљР В РІР‚в„ўР вЂ™Р’В¶Р В Р’В Р СћРІР‚ВР В Р Р‹Р Р†Р вЂљР’ВР В РІР‚в„ўР вЂ™Р’В»Р В Р’В Р вЂ™Р’ВµР В Р’В Р Р†Р вЂљР’В°Р В Р’В Р В РЎвЂњ unload Р В Р’В Р Р†РІР‚С›РІР‚вЂњР В Р вЂ Р В РІР‚С™Р В Р вЂ№Р В Р’В Р Р†Р вЂљР’В°Р В Р’В Р вЂ™Р’В¶Р В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В Р Р‹Р Р†Р вЂљРЎС› ~500 MB Р В Р’В Р вЂ™Р’ВµР В Р вЂ Р В РІР‚С™Р вЂ™Р’В Р В Р вЂ Р В РІР‚С™Р вЂ™Р’В¦Р В Р’В Р вЂ™Р’ВµР В РІР‚в„ўР вЂ™Р’В­Р В РІР‚в„ўР вЂ™Р’ВР В Р’В Р РЋРІР‚вЂњР В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћ
-    // Р В Р’В Р вЂ™Р’В¶Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎС™Р В Р вЂ Р В РІР‚С™Р В Р вЂ№Р В Р’В Р вЂ™Р’В¶Р В Р Р‹Р РЋРІвЂћСћР В РІР‚в„ўР вЂ™Р’В¬Р В Р’В Р вЂ™Р’В¶Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎС™Р В Р вЂ Р Р†Р вЂљРЎвЂєР Р†Р вЂљРІР‚СљР В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРІвЂћСћР В Р вЂ Р В РІР‚С™Р вЂ™Р’ВР В Р’В Р РЋРІР‚ВР В Р вЂ Р В РІР‚С™Р В Р вЂ№Р В Р’В Р Р†Р вЂљРЎвЂєР В Р’В Р вЂ™Р’ВµР В Р’В Р Р†Р вЂљР’В°Р В Р’В Р В РЎвЂњР В Р’В Р вЂ™Р’ВµР В Р вЂ Р Р†Р вЂљРЎв„ўР вЂ™Р’В¬Р В РІР‚в„ўР вЂ™Р’В¤Р В Р’В Р вЂ™Р’ВµР В Р вЂ Р Р†Р вЂљРЎв„ўР вЂ™Р’В¬Р В РІР‚в„ўР вЂ™Р’В« + Р В Р’В Р РЋРІР‚ВР В РІР‚в„ўР вЂ™Р’В·Р В Р’В Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’В·Р В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В РІР‚в„ўР вЂ™Р’В±Р В Р’В Р РЋРІР‚вЂњР В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В Р’В Р СћРІР‚ВР В РІР‚в„ўР вЂ™Р’В»Р В Р вЂ Р В РІР‚С™Р вЂ™Р’В¦Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р РЋРІвЂћСћР В Р’В Р В РЎвЂњ settings.textOrientationAutoDetect = true Р В Р’В Р вЂ™Р’В¶Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљР В РІР‚в„ўР вЂ™Р’В¶Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРІвЂћСћР В Р’В Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’В·Р В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В Р’В Р В РЎвЂњР В Р’В Р РЋРІР‚вЂњР В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћ
-    @Inject lateinit var orientationCoordinator: OrientationCoordinator
     // Р В Р’В Р вЂ™Р’В·Р В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В Р’В Р В РЎвЂњР В Р’В Р СћРІР‚ВР В Р Р‹Р Р†Р вЂљРЎСљР В Р’В Р Р†Р вЂљРІвЂћвЂ“Р В Р’В Р РЋРІР‚ВР В РІР‚в„ўР вЂ™Р’В·Р В Р’В Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’В·Р В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В РІР‚в„ўР вЂ™Р’В±Р В Р’В Р вЂ™Р’ВµР В РІР‚в„ўР вЂ™Р’В±Р В Р вЂ Р В РІР‚С™Р РЋРІвЂћСћР В Р’В Р вЂ™Р’ВµР В Р вЂ Р Р†Р вЂљРЎв„ўР вЂ™Р’В¬Р В РІР‚в„ўР вЂ™Р’В¤Р В Р’В Р вЂ™Р’В¶Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎС™Р В РІР‚в„ўР вЂ™Р’В­"manga-ocr Р В Р’В Р вЂ™Р’В¶Р В Р’В Р В РЎвЂњР В Р’В Р В РІР‚в„–Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРЎвЂќР В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РІР‚вЂњР В Р’В Р вЂ™Р’В¶Р В РІР‚в„ўР вЂ™Р’ВР В Р’В Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’ВµР В Р Р‹Р Р†Р вЂљРІвЂћСћР В РІР‚в„ўР вЂ™Р’В¦Р В Р’В Р вЂ™Р’ВµР В РІР‚в„ўР вЂ™Р’В·Р В Р’В Р Р†Р вЂљР’В Р В Р’В Р СћРІР‚ВР В Р Р‹Р Р†Р вЂљР’ВР В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РІР‚вЂњР В Р’В Р РЋРІР‚ВР В Р’В Р Р†Р вЂљР’В¦Р В Р’В Р Р†Р вЂљР’В¦"Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В Р’В Р В РІР‚В Р В Р’В Р Р†Р вЂљРЎв„ўР В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В Р’В Р вЂ™Р’В¶Р В Р Р‹Р РЋРІвЂћСћР В Р’В Р Р†Р вЂљРЎвЂєР В Р’В Р СћРІР‚ВР В Р Р‹Р Р†Р вЂљР’ВР В Р вЂ Р В РІР‚С™Р Р†РІР‚С›РІР‚вЂњР В Р’В Р РЋРІР‚ВР В Р’В Р Р†Р вЂљР’В¦Р В Р’В Р Р†Р вЂљР’В¦Р В Р’В Р вЂ™Р’В¶Р В Р вЂ Р В РІР‚С™Р Р†Р вЂљРЎСљР В РІР‚в„ўР вЂ™Р’В¶ (VERTICAL_RTL, ja) Р В Р’В Р СћРІР‚ВР В Р Р‹Р Р†Р вЂљР’ВР В Р’В Р В Р вЂ°Р В Р’В Р СћРІР‚ВР В Р Р‹Р вЂ™Р’ВР В Р Р‹Р Р†РІР‚С›РЎС›Р В Р’В Р РЋРІР‚ВР В Р Р‹Р РЋРІР‚С”Р В РІР‚в„ўР вЂ™Р’В«Р В Р’В Р РЋРІР‚ВР В РІР‚в„ўР вЂ™Р’В·Р В Р’В Р Р†Р вЂљР Р‹Р В Р’В Р вЂ™Р’В·Р В Р вЂ Р В РІР‚С™Р РЋРЎС™Р В РІР‚в„ўР вЂ™Р’В±Р В Р’В Р вЂ™Р’ВµР В Р вЂ Р Р†Р вЂљРЎв„ўР вЂ™Р’В¬Р В РІР‚в„ўР вЂ™Р’В° manga
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -551,10 +537,6 @@ class CaptureService : Service() {
         return Bitmap.createBitmap(src, l, t, r - l, b - t)
     }
 
-    private fun shouldRerunForTextLine180(result: OrientationResult): Boolean =
-        result.source == PaddleTextLineOrientationClassifier.SOURCE && result.rawAngle == 180
-
-
     private fun rotateBitmap180(bitmap: Bitmap): Bitmap {
         val matrix = Matrix().apply { postRotate(180f) }
         return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
@@ -734,11 +716,7 @@ class CaptureService : Service() {
         }
     }
 
-    private fun presetDisplayName(preset: TranslationPreset): String = when (preset.id) {
-        TranslationPresetCatalog.BUILTIN_MANGA_JA_ZH ->
-            getString(R.string.settings_translation_preset_builtin_manga)
-        else -> preset.name
-    }
+    private fun presetDisplayName(preset: TranslationPreset): String = preset.name
 
     private fun toggleLoopMode() {
         if (loopMode) {
@@ -1235,19 +1213,9 @@ class CaptureService : Service() {
             logBlankLikeFrame(diagId, "workBitmap", workStats)
             if (workBitmap !== full) full.recycle()
 
-            val redBoxActive = DeveloperOcrDebugPolicy.redBoxActive(
-                settings.developerOptionsEnabled,
-                settings.ocrRedBoxModeEnabled,
-            )
-            val debugShouldTranslate = DeveloperOcrDebugPolicy.shouldTranslate(
-                settings.developerOptionsEnabled,
-                settings.ocrRedBoxModeEnabled,
-                settings.ocrRedBoxShowTranslation,
-            )
             val routingT = translator as? com.gameocr.app.translate.RoutingTranslator
             val configuredEndToEnd = routingT?.isEndToEndFor(settings) ?: translator.isEndToEnd
-            // Source-only red-box mode needs the regular OCR pipeline so no translator/API is called.
-            val isEndToEnd = configuredEndToEnd && debugShouldTranslate
+            val isEndToEnd = configuredEndToEnd
 
             val smartLoopEnabled = loopMode &&
                 settings.loopTriggerMode == LoopTriggerMode.WAIT_FOR_TEXT_COMPLETE
@@ -1313,8 +1281,7 @@ class CaptureService : Service() {
             logVerticalDiag(
                 diagId,
                 "translator=${settings.translatorEngine.name} isEndToEnd=$isEndToEnd " +
-                    "configuredEndToEnd=$configuredEndToEnd redBox=$redBoxActive " +
-                    "debugTranslate=$debugShouldTranslate stability=${stabilityTrigger.name} " +
+                    "configuredEndToEnd=$configuredEndToEnd stability=${stabilityTrigger.name} " +
                     "renderMode=${settings.renderMode.name}"
             )
             val ocrStartedAt = System.currentTimeMillis()
@@ -1503,17 +1470,6 @@ class CaptureService : Service() {
             )
         }
         when {
-            DeveloperOcrDebugPolicy.redBoxActive(
-                settings.developerOptionsEnabled,
-                settings.ocrRedBoxModeEnabled,
-            ) -> withContext(Dispatchers.Main) {
-                overlay?.showBlocks(
-                    items,
-                    outputOrientation,
-                    diagnosticId = diagId,
-                    followBlockOrientations = translationOutput.followRecognition,
-                )
-            }
             settings.renderMode == RenderMode.BLOCKS -> withContext(Dispatchers.Main) {
                 overlay?.showBlocks(
                     items,
@@ -1536,7 +1492,6 @@ class CaptureService : Service() {
         orientation: TextOrientation = TextOrientation.HORIZONTAL_LTR,
         diagId: Long? = null,
         adaptiveStyles: List<AdaptiveOverlayStyle> = emptyList(),
-        delayedMaskDebugBatch: MangaDelayedMaskDebugSessionManager.Batch? = null,
     ) {
         val translationOutput = resolveTranslationOutputSettings(
             settings.translationOutputFollowRecognition,
@@ -2417,9 +2372,6 @@ class CaptureService : Service() {
             "settings screen=${screenW}x${screenH} region=${settings.captureRegion.toDiagString()} " +
                 "source=${settings.sourceLang} target=${settings.targetLang} " +
                 "translator=${settings.translatorEngine.name} " +
-                "paddleVersion=${settings.paddleModelVersion.name} " +
-                "baiduEndpoint=${settings.baiduOcrEndpoint.name} baiduLanguage=${settings.baiduOcrLanguage.name} " +
-                "dbnet=prob:${settings.dbnetProbThresh.toDiagFloat()},box:${settings.dbnetBoxScoreThresh.toDiagFloat()},unclip:${settings.dbnetUnclipRatio.toDiagFloat()} " +
                 "render=${settings.renderMode.name} streaming=${settings.streamingTranslate} " +
                 "retryEmptyTranslation=${settings.retryEmptyTranslation} " +
                 "loopTrigger=${settings.loopTriggerMode.name} loopIntervalMs=${settings.captureLoopIntervalMs} " +
@@ -2431,22 +2383,9 @@ class CaptureService : Service() {
                 "loopSimilarity=${settings.loopFrameSimilarityThreshold.toDiagFloat()} " +
                 "loopTextRegion=${settings.loopTextRegionMode.name} " +
                 "loopTranslateRegionOnly=${settings.loopTranslateRegionOnly} " +
-                "autoOrient=${settings.textOrientationAutoDetect} manualOrient=${settings.manualTextOrientation?.name ?: "null"} " +
-                "preprocess=${settings.preprocess.toDiagString()} merge=${settings.mergeAdjacentBlocks}/${settings.mergeStrength.name} " +
+                "merge=${settings.mergeAdjacentBlocks}/${settings.mergeStrength.name} " +
                 "overlayPlacement=${settings.overlayPlacement.name} overlayTextSizeSp=${settings.overlayTextSizeSp} " +
                 "allowWrap=${settings.overlayAllowWrap} avoidCollision=${settings.overlayAvoidCollision}"
-        )
-    }
-
-    private fun logVerticalOrientation(
-        diagId: Long,
-        stage: String,
-        result: OrientationResult
-    ) {
-        logVerticalDiag(
-            diagId,
-            "orientation-$stage orientation=${result.orientation.name} conf=${result.confidence.toDiagFloat()} " +
-                "raw=${result.rawAngle} source=${result.source}"
         )
     }
 
@@ -2490,9 +2429,6 @@ class CaptureService : Service() {
 
     private fun Float.toDiagFloat(): String =
         String.format(Locale.US, "%.3f", this)
-
-    private fun com.gameocr.app.data.PreprocessOptions.toDiagString(): String =
-        "upscale2x=$upscale2x,invert=$invert,binarize=$binarize"
 
     private fun CaptureRegion?.toDiagString(): String =
         this?.let { "(${it.left},${it.top},${it.right},${it.bottom})" } ?: "full"
@@ -2538,12 +2474,6 @@ class CaptureService : Service() {
                 customBorderStyle = settings.customBorderStyle
                 overlayTypeface = typeface
                 overlayTextStyle = effectiveOverlaySettings.overlayTextStyle.normalized()
-                ocrDebugRedBoxActive = DeveloperOcrDebugPolicy.redBoxActive(
-                    settings.developerOptionsEnabled,
-                    settings.ocrRedBoxModeEnabled,
-                )
-                ocrDebugShowSourceText = settings.ocrRedBoxShowSourceText
-                ocrDebugShowTranslation = settings.ocrRedBoxShowTranslation
                 syncFloatingWindowFromSettings(
                     effectiveOverlaySettings,
                     syncLockedState = syncFloatingWindowLock,

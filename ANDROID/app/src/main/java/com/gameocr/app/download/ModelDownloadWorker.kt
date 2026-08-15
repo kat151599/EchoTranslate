@@ -13,12 +13,8 @@ import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.gameocr.app.R
-import com.gameocr.app.data.PaddleModelVersion
 import com.gameocr.app.llm.LlmModelInstaller
 import com.gameocr.app.llm.LlmModelKind
-import com.gameocr.app.ocr.MangaOcrModelInstaller
-import com.gameocr.app.ocr.OrientationModelInstaller
-import com.gameocr.app.ocr.PaddleModelInstaller
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CancellationException
@@ -30,9 +26,6 @@ class ModelDownloadWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val llmInstaller: LlmModelInstaller,
-    private val paddleInstaller: PaddleModelInstaller,
-    private val mangaOcrInstaller: MangaOcrModelInstaller,
-    private val orientationModelInstaller: OrientationModelInstaller,
 ) : CoroutineWorker(appContext, workerParams) {
 
     private var lastProgressUpdateAt = 0L
@@ -118,22 +111,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                     publishProgress(spec, label, index, count, progress.fileName(), progress.downloaded, progress.total, progress.done, progress.error)
                 }
             }
-            ModelDownloadType.PADDLE -> {
-                val version = PaddleModelVersion.valueOf(spec.variant)
-                paddleInstaller.downloadAll(version).collect { progress ->
-                    publishProgress(spec, label, index, count, progress.file, progress.downloaded, progress.total, progress.done, progress.error)
-                }
-            }
-            ModelDownloadType.MANGA_OCR -> {
-                mangaOcrInstaller.downloadAll().collect { progress ->
-                    publishProgress(spec, label, index, count, progress.file, progress.downloaded, progress.total, progress.done, progress.error)
-                }
-            }
-            ModelDownloadType.ORIENTATION -> {
-                orientationModelInstaller.downloadAll().collect { progress ->
-                    publishProgress(spec, label, index, count, progress.file, progress.downloaded, progress.total, progress.done, progress.error)
-                }
-            }
+            else -> error("Unsupported model download type: ${spec.type}")
         }
     }
 
@@ -281,9 +259,7 @@ class ModelDownloadWorker @AssistedInject constructor(
 
     private fun displayName(spec: ModelDownloadSpec): String = when (spec.type) {
         ModelDownloadType.LLM -> LlmModelKind.valueOf(spec.variant).displayName
-        ModelDownloadType.PADDLE -> applicationContext.getString(PaddleModelVersion.valueOf(spec.variant).displayNameRes)
-        ModelDownloadType.MANGA_OCR -> applicationContext.getString(R.string.settings_manga_ocr_model_name)
-        ModelDownloadType.ORIENTATION -> applicationContext.getString(R.string.settings_orientation_model_name)
+        else -> spec.encode()
     }
 
     companion object {

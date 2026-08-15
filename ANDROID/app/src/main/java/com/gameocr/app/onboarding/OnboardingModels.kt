@@ -2,10 +2,8 @@ package com.gameocr.app.onboarding
 
 import com.gameocr.app.data.Languages
 import com.gameocr.app.data.MergeStrength
-import com.gameocr.app.data.OcrEngineKind
 import com.gameocr.app.data.OverlayPlacement
 import com.gameocr.app.data.OverlayStyleMode
-import com.gameocr.app.data.PaddleModelVersion
 import com.gameocr.app.data.RenderMode
 import com.gameocr.app.data.Settings
 import com.gameocr.app.data.TranslationOutputDirection
@@ -21,9 +19,7 @@ enum class OnboardingStep {
     USAGE,
     MANGA_DIRECTION,
     TRANSLATION_METHOD,
-    PADDLE_OCR_DOWNLOAD,
     OFFLINE_LANGUAGE_DOWNLOAD,
-    MANGA_OFFLINE_DOWNLOAD,
     CLOUD_CONFIG,
     SUMMARY,
 }
@@ -135,41 +131,14 @@ object OnboardingPolicy {
             add(OnboardingStep.DISPLAY_MODE)
         }
         add(OnboardingStep.TRANSLATION_METHOD)
-        if (shouldRecommendPaddleOcr(draft)) {
-            add(OnboardingStep.PADDLE_OCR_DOWNLOAD)
-        }
         if (draft.translationMethod == OnboardingTranslationMethod.CLOUD_LLM) {
             add(OnboardingStep.CLOUD_CONFIG)
-        } else if (draft.usage == OnboardingUsage.MANGA) {
-            add(OnboardingStep.MANGA_OFFLINE_DOWNLOAD)
         }
         add(OnboardingStep.SUMMARY)
     }
 
     fun isSakuraPairSupported(sourceLang: String, targetLang: String): Boolean =
         sourceLang == "ja" && targetLang == "zh-CN"
-
-    fun ocrEngineForSourceLanguage(sourceLang: String): OcrEngineKind =
-        when (sourceLang.trim().substringBefore('-').substringBefore('_').lowercase()) {
-            "ja" -> OcrEngineKind.ML_KIT_JAPANESE
-            "ko" -> OcrEngineKind.ML_KIT_KOREAN
-            "zh" -> OcrEngineKind.ML_KIT_CHINESE
-            "en" -> OcrEngineKind.ML_KIT_LATIN
-            else -> OcrEngineKind.PADDLE_ONNX
-        }
-
-    fun recommendedOcrEngine(draft: OnboardingDraft): OcrEngineKind =
-        if (
-            draft.usage == OnboardingUsage.MANGA &&
-            draft.translationMethod == OnboardingTranslationMethod.OFFLINE
-        ) {
-            OcrEngineKind.MANGA_OCR_JA
-        } else {
-            ocrEngineForSourceLanguage(draft.sourceLang)
-        }
-
-    fun shouldRecommendPaddleOcr(draft: OnboardingDraft): Boolean =
-        recommendedOcrEngine(draft) == OcrEngineKind.PADDLE_ONNX
 
     fun cloudConfigError(draft: OnboardingDraft): CloudConfigError? {
         if (draft.cloudBaseUrl.isBlank()) return CloudConfigError.BASE_URL_REQUIRED
@@ -233,7 +202,6 @@ object OnboardingPolicy {
                 else -> OnboardingDisplayMode.BELOW_SOURCE
             },
             usage = if (
-                settings.ocrEngine == OcrEngineKind.MANGA_OCR_JA ||
                 settings.translatorEngine == TranslatorEngine.LOCAL_SAKURA ||
                 (
                     settings.overlayStyleMode == OverlayStyleMode.ADAPTIVE &&
@@ -309,12 +277,6 @@ object OnboardingPolicy {
                     } else {
                         TranslatorEngine.OPENAI
                     }
-            },
-            ocrEngine = recommendedOcrEngine(draft),
-            paddleModelVersion = if (shouldRecommendPaddleOcr(draft)) {
-                PaddleModelVersion.V5_MOBILE
-            } else {
-                settings.paddleModelVersion
             },
         )
         if (draft.translationMethod == OnboardingTranslationMethod.CLOUD_LLM) {

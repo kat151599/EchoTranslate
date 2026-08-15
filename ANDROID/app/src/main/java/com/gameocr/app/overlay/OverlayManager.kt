@@ -38,7 +38,6 @@ import com.gameocr.app.data.SettingsRepository
 import com.gameocr.app.data.TranslationBlockInteractionMode
 import com.gameocr.app.ocr.TextBlock
 import com.gameocr.app.ocr.TextOrientation
-import com.gameocr.app.ocr.ShapeAwareBubblePatch
 import com.gameocr.app.util.VerticalDiagnosticLog
 import com.gameocr.app.util.physicalDisplaySize
 import kotlin.math.ceil
@@ -1603,104 +1602,6 @@ class OverlayManager(
             lastFloatingPairs?.getOrNull(index)?.let { lastFloatingPairs!![index] = source to translation }
             updateFloatingWindowText(index, translation)
         }
-    }
-
-    /**
-     * Replaces successfully repaired adaptive blocks with transparent, shape-aware bitmap patches.
-     *
-     * Patch bounds use capture coordinates, so only [regionOffset] is applied. User text offsets
-     * must not move the repaired pixels away from the source glyphs they cover.
-     */
-    internal fun showShapeAwareBubblePatches(
-        patches: List<ShapeAwareBubblePatch>,
-        diagnosticId: Long? = null,
-    ): Int {
-        val root = blocksView as? FrameLayout ?: return 0
-        if (overlayStyleMode != OverlayStyleMode.ADAPTIVE || patches.isEmpty()) return 0
-
-        clearBubblePatches(restoreFallback = true)
-        val diagPrefix = diagnosticId.toDiagPrefix()
-        var displayed = 0
-        patches.forEach { patch ->
-            val displayBounds = patch.displayBounds()
-            val displayWidth = displayBounds.width.coerceAtLeast(1)
-            val displayHeight = displayBounds.height.coerceAtLeast(1)
-            val sourceBitmap = runCatching {
-                Bitmap.createBitmap(
-                    patch.pixels,
-                    patch.bounds.width,
-                    patch.bounds.height,
-                    Bitmap.Config.ARGB_8888,
-                )
-            }.getOrElse { error ->
-                VerticalDiagnosticLog.w(
-                    error,
-                    "${diagPrefix}shape patch bitmap allocation failed model=${patch.modelBubbleIndex}",
-                )
-                return@forEach
-            }
-            val displayBitmap = if (
-                sourceBitmap.width == displayWidth && sourceBitmap.height == displayHeight
-            ) {
-                sourceBitmap
-            } else {
-                runCatching {
-                    Bitmap.createScaledBitmap(
-                        sourceBitmap,
-                        displayWidth,
-                        displayHeight,
-                        true,
-                    )
-                }.getOrElse { error ->
-                    sourceBitmap.recycle()
-                    VerticalDiagnosticLog.w(
-                        error,
-                        "${diagPrefix}shape patch scaling failed model=${patch.modelBubbleIndex}",
-                    )
-                    return@forEach
-                }.also {
-                    sourceBitmap.recycle()
-                }
-            }
-            val view = ImageView(context).apply {
-                setImageBitmap(displayBitmap)
-                scaleType = ImageView.ScaleType.FIT_XY
-                isClickable = false
-                isFocusable = false
-                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-            }
-            val layoutParams = FrameLayout.LayoutParams(displayWidth, displayHeight).apply {
-                leftMargin = displayBounds.left + regionOffset.x
-                topMargin = displayBounds.top + regionOffset.y
-            }
-            val added = runCatching {
-                root.addView(view, layoutParams)
-            }.onFailure { error ->
-                view.setImageDrawable(null)
-                displayBitmap.recycle()
-                VerticalDiagnosticLog.w(
-                    error,
-                    "${diagPrefix}shape patch view add failed model=${patch.modelBubbleIndex}",
-                )
-            }.isSuccess
-            if (!added) return@forEach
-
-            bubblePatchViews += view
-            bubblePatchBitmaps += displayBitmap
-            bubblePatchHiddenBlockIndices += patch.blockIndices
-            displayed += 1
-            VerticalDiagnosticLog.i(
-                "${diagPrefix}shape patch displayed model=${patch.modelBubbleIndex} " +
-                    "source=${patch.bounds.width}x${patch.bounds.height} " +
-                    "display=${displayWidth}x${displayHeight} " +
-                    "screen=(${layoutParams.leftMargin},${layoutParams.topMargin}) " +
-                    "scale=${patch.coordinateScale} blocks=${patch.blockIndices}",
-            )
-        }
-        bubblePatchHiddenBlockIndices.forEach { index ->
-            blockViews[index]?.visibility = View.INVISIBLE
-        }
-        return displayed
     }
 
     private fun applyBlockText(index: Int, update: PendingOverlayTextUpdate) {

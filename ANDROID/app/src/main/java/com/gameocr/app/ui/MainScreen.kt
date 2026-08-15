@@ -126,9 +126,6 @@ import com.gameocr.app.data.Settings as AppSettings
 import com.gameocr.app.data.SettingsRepository
 import com.gameocr.app.data.TranslationPreset
 import com.gameocr.app.data.TranslationPresetCatalog
-import com.gameocr.app.ocr.MangaOcrModelInstaller
-import com.gameocr.app.ocr.OrientationModelInstaller
-import com.gameocr.app.ocr.PaddleModelInstaller
 import com.gameocr.app.overlay.FloatingMenuTourPalette
 import com.gameocr.app.rom.RomHelper
 import com.gameocr.app.service.CaptureService
@@ -1857,9 +1854,6 @@ class MainViewModel @Inject constructor(
     private val repo: SettingsRepository,
     private val shizukuManager: ShizukuManager,
     private val shizukuCapabilities: ShizukuCapabilities,
-    private val paddleModelInstaller: PaddleModelInstaller,
-    private val mangaOcrModelInstaller: MangaOcrModelInstaller,
-    private val orientationModelInstaller: OrientationModelInstaller,
 ) : ViewModel() {
     private var sharePromptEntryRecorded = false
     val settings = repo.settings
@@ -1940,11 +1934,6 @@ class MainViewModel @Inject constructor(
             preset = preset,
             localLlmDeviceCapable = false,
             llmModelReady = { false },
-            paddleModelReady = { version ->
-                paddleModelInstaller.checkInstalled(version) != null
-            },
-            mangaOcrModelReady = mangaOcrModelInstaller.checkInstalled() != null,
-            orientationModelReady = orientationModelInstaller.checkFullyInstalled() != null,
         )
     /** 透传 Shizuku binder 状态 flow——UI collect 后状态变化立即重算 Availability。 */
     val shizukuBinderAlive: kotlinx.coroutines.flow.StateFlow<Boolean> = shizukuManager.binderAlive

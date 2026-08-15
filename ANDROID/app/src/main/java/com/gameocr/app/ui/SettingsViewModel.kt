@@ -6,8 +6,6 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import com.gameocr.app.R
 import com.gameocr.app.data.FloatingMenu
-import com.gameocr.app.data.MangaOcrAdvancedSettingsPolicy
-import com.gameocr.app.data.OcrEngineKind
 import com.gameocr.app.data.OverlayFontEntry
 import com.gameocr.app.data.OverlayFontCommit
 import com.gameocr.app.data.OverlayTextStyle
@@ -15,7 +13,6 @@ import com.gameocr.app.data.OverlayFontImportResult
 import com.gameocr.app.data.OverlayFontManager
 import com.gameocr.app.data.OverlayPlacement
 import com.gameocr.app.data.OverlayTheme
-import com.gameocr.app.data.PreprocessOptions
 import com.gameocr.app.data.RenderMode
 import com.gameocr.app.data.Settings
 import com.gameocr.app.data.SettingsBundleExportResult
@@ -34,10 +31,6 @@ import com.gameocr.app.download.ModelDownloadManager
 import com.gameocr.app.download.ModelDownloadSpec
 import com.gameocr.app.llm.LlmModelInstaller
 import com.gameocr.app.llm.LlmModelKind
-import com.gameocr.app.ocr.OrientationModelInstaller
-import com.gameocr.app.ocr.PaddleModelInstaller
-import com.gameocr.app.ocr.lunaOcrHttpHostOrNull
-import com.gameocr.app.ocr.umiOcrHttpHostOrNull
 import com.gameocr.app.translate.RoutingTranslator
 import com.gameocr.app.translate.TestResult
 import androidx.work.WorkInfo
@@ -53,9 +46,6 @@ import kotlinx.coroutines.withContext
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val repo: SettingsRepository,
-    private val paddleInstaller: PaddleModelInstaller,
-    private val mangaOcrInstaller: com.gameocr.app.ocr.MangaOcrModelInstaller,
-    private val orientationModelInstaller: OrientationModelInstaller,
     private val routingTranslator: RoutingTranslator,
     private val llmInstaller: LlmModelInstaller,
     private val overlayFontManager: OverlayFontManager,
@@ -190,12 +180,8 @@ class SettingsViewModel @Inject constructor(
         loopTextRegionMode: com.gameocr.app.data.LoopTextRegionMode,
         loopTranslateRegionOnly: Boolean,
         developerOptionsEnabled: Boolean,
-        ocrScreenshotSavingEnabled: Boolean,
         disableTranslationCache: Boolean,
         batchCumulativeCompletionTimeEnabled: Boolean,
-        ocrRedBoxModeEnabled: Boolean,
-        ocrRedBoxShowSourceText: Boolean,
-        ocrRedBoxShowTranslation: Boolean,
         streaming: Boolean,
         retryEmptyTranslation: Boolean,
         renderMode: RenderMode,
@@ -209,20 +195,6 @@ class SettingsViewModel @Inject constructor(
         customBorderW: Int,
         offsetX: Int,
         offsetY: Int,
-        ocrEngine: OcrEngineKind,
-        baiduKey: String,
-        baiduSecret: String,
-        baiduEndpoint: com.gameocr.app.data.BaiduOcrEndpoint,
-        baiduLanguage: com.gameocr.app.data.BaiduOcrLanguage,
-        umiOcrBaseUrl: String,
-        lunaOcrBaseUrl: String,
-        paddleAiStudioToken: String,
-        tencentId: String,
-        tencentKey: String,
-        tencentRegion: String,
-        tencentEndpoint: com.gameocr.app.data.TencentOcrEndpoint,
-        tencentLanguage: com.gameocr.app.data.TencentOcrLanguage,
-        preprocess: PreprocessOptions,
         a11yVolume: Boolean,
         floatingButtonSizeDp: Int,
         floatingButtonSnapToEdge: Boolean,
@@ -278,12 +250,8 @@ class SettingsViewModel @Inject constructor(
                 loopTextRegionMode = loopTextRegionMode,
                 loopTranslateRegionOnly = loopTranslateRegionOnly,
                 developerOptionsEnabled = developerOptionsEnabled,
-                ocrScreenshotSavingEnabled = ocrScreenshotSavingEnabled,
                 disableTranslationCache = disableTranslationCache,
                 batchCumulativeCompletionTimeEnabled = batchCumulativeCompletionTimeEnabled,
-                ocrRedBoxModeEnabled = ocrRedBoxModeEnabled,
-                ocrRedBoxShowSourceText = ocrRedBoxShowSourceText,
-                ocrRedBoxShowTranslation = ocrRedBoxShowTranslation,
                 streamingTranslate = streaming,
                 retryEmptyTranslation = retryEmptyTranslation,
                 renderMode = renderMode,
@@ -297,20 +265,6 @@ class SettingsViewModel @Inject constructor(
                 customBorderWidth = customBorderW,
                 overlayOffsetX = offsetX,
                 overlayOffsetY = offsetY,
-                ocrEngine = ocrEngine,
-                baiduOcrApiKey = baiduKey.trim(),
-                baiduOcrSecretKey = baiduSecret.trim(),
-                baiduOcrEndpoint = baiduEndpoint,
-                baiduOcrLanguage = baiduLanguage,
-                umiOcrBaseUrl = umiOcrBaseUrl.trim(),
-                lunaOcrBaseUrl = lunaOcrBaseUrl.trim(),
-                paddleAiStudioToken = paddleAiStudioToken.trim(),
-                tencentSecretId = tencentId.trim(),
-                tencentSecretKey = tencentKey.trim(),
-                tencentRegion = tencentRegion.trim().ifBlank { "ap-guangzhou" },
-                tencentOcrEndpoint = tencentEndpoint,
-                tencentOcrLanguage = tencentLanguage,
-                preprocess = preprocess,
                 a11yVolumeTrigger = a11yVolume,
                 floatingButtonSizeDp = floatingButtonSizeDp.coerceIn(32, 96),
                 floatingButtonSnapToEdge = floatingButtonSnapToEdge,
@@ -322,12 +276,7 @@ class SettingsViewModel @Inject constructor(
                 mergeAdjacentBlocks = mergeAdjacentBlocks,
                 mergeStrength = mergeStrength,
                 disableCrossLineContextTranslation = disableCrossLineContextTranslation,
-                cleartextAllowedHosts = cleartextHostsWithLocalOcrUrls(
-                    cleartextAllowedHosts,
-                    umiOcrBaseUrl,
-                    lunaOcrBaseUrl,
-                    remotePcBaseUrl,
-                ),
+                cleartextAllowedHosts = cleartextAllowedHosts,
                 translatorEngine = translatorEngine,
                 remotePcBaseUrl = remotePcBaseUrl.trim().trimEnd('/'),
                 remotePcApiKey = remotePcApiKey.trim(),
@@ -354,10 +303,6 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun setActiveTranslationPreset(id: String) {
         repo.update { it.copy(activeTranslationPresetId = id) }
-    }
-
-    suspend fun savePaddleModelVersion(version: com.gameocr.app.data.PaddleModelVersion) {
-        repo.update { it.copy(paddleModelVersion = version) }
     }
 
     /**
@@ -502,16 +447,6 @@ class SettingsViewModel @Inject constructor(
         repo.update { it.copy(dictionaryPrompt = prompt) }
     }
 
-    /** 文本方向自动判别开关。立即落盘 + 即时生效，不走 [save] 流程的 dirty 判定。 */
-    suspend fun saveTextOrientationAutoDetect(enabled: Boolean) {
-        repo.update { it.copy(textOrientationAutoDetect = enabled) }
-    }
-
-    /** 手动锁定文本方向（null = 解除锁定，走自动判别）。 */
-    suspend fun saveManualTextOrientation(orient: com.gameocr.app.ocr.TextOrientation?) {
-        repo.update { it.copy(manualTextOrientation = orient) }
-    }
-
     suspend fun saveTranslationOutputLayout(layout: com.gameocr.app.data.TranslationOutputLayout) {
         repo.update { it.copy(translationOutputLayout = layout) }
     }
@@ -576,137 +511,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    data class DownloadableModelUiState(
-        val status: String,
-        val ready: Boolean,
-    )
-
-    suspend fun paddleModelStatus(): String = paddleModelStatus(repo.get().paddleModelVersion)
-
-    suspend fun paddleModelUiState(): DownloadableModelUiState =
-        paddleModelUiState(repo.get().paddleModelVersion)
-
-    fun paddleModelStatus(version: com.gameocr.app.data.PaddleModelVersion): String {
-        return paddleModelUiState(version).status
-    }
-
-    fun paddleModelUiState(version: com.gameocr.app.data.PaddleModelVersion): DownloadableModelUiState {
-        val files = paddleInstaller.checkInstalled(version)
-        return if (files != null) {
-            val total = (files.det.length() + files.rec.length() + files.keys.length()) / 1024
-            DownloadableModelUiState(
-                status = appContext.getString(R.string.settings_paddle_status_ready_format, total.toInt()),
-                ready = true,
-            )
-        } else {
-            DownloadableModelUiState(
-                status = appContext.getString(R.string.settings_paddle_status_missing_hint),
-                ready = false,
-            )
-        }
-    }
-
-    suspend fun downloadPaddleModels(onProgress: (String) -> Unit) {
-        downloadPaddleModels(repo.get().paddleModelVersion, onProgress)
-    }
-
-    suspend fun downloadPaddleModels(version: com.gameocr.app.data.PaddleModelVersion, onProgress: (String) -> Unit) {
-        downloadModels(listOf(ModelDownloadSpec.paddle(version)), onProgress)
-    }
-
-    fun deletePaddleModels() {
-        paddleInstaller.deleteAll()
-    }
-
-    suspend fun importPaddleFromLocal(uris: List<android.net.Uri>): Int =
-        importPaddleFromLocal(repo.get().paddleModelVersion, uris)
-
-    suspend fun importPaddleFromLocal(
-        version: com.gameocr.app.data.PaddleModelVersion,
-        uris: List<android.net.Uri>,
-    ): Int = paddleInstaller.importFromLocal(uris, version)
-
-    /** PaddleOCR 模型是否已就位。manga-ocr 复用 Paddle DBNet 做检测，下完 manga 后用它判断要不要级联拉 Paddle。 */
-    suspend fun isPaddleInstalled(): Boolean = isPaddleInstalled(repo.get().paddleModelVersion)
-
-    fun isPaddleInstalled(version: com.gameocr.app.data.PaddleModelVersion): Boolean =
-        paddleModelUiState(version).ready
-
-    // —— manga-ocr 端侧（日漫 OCR）——
-    // 与 paddle 5 个方法严格对称。模型 ~160MB 比 paddle 大一个数量级，状态里用 MB 而非 KB。
-
-    fun mangaOcrModelStatus(): String {
-        return mangaOcrModelUiState().status
-    }
-
-    fun mangaOcrModelUiState(): DownloadableModelUiState {
-        val files = mangaOcrInstaller.checkInstalled()
-        return if (files != null) {
-            val totalMb = (files.encoder.length() + files.decoder.length() +
-                files.vocab.length() + files.config.length() + files.generationConfig.length() +
-                files.preprocessorConfig.length() + files.specialTokensMap.length()) / (1024 * 1024)
-            DownloadableModelUiState(
-                status = appContext.getString(R.string.settings_manga_ocr_status_ready_format, totalMb.toInt()),
-                ready = true,
-            )
-        } else {
-            DownloadableModelUiState(
-                status = appContext.getString(R.string.settings_manga_ocr_status_missing_hint),
-                ready = false,
-            )
-        }
-    }
-
-    fun mangaOcrModelReady(): Boolean = mangaOcrModelUiState().ready
-
-    suspend fun downloadMangaOcrModels(onProgress: (String) -> Unit) {
-        downloadModels(listOf(ModelDownloadSpec.mangaOcr()), onProgress)
-    }
-
-    fun deleteMangaOcrModels() {
-        mangaOcrInstaller.deleteAll()
-    }
-
-    suspend fun importMangaOcrFromLocal(uris: List<android.net.Uri>): Int =
-        mangaOcrInstaller.importFromLocal(uris)
-
-    // —— Paddle doc-orientation ONNX model ——
-
-    fun orientationModelStatus(): String {
-        return orientationModelUiState().status
-    }
-
-    fun orientationModelUiState(): DownloadableModelUiState {
-        val files = orientationModelInstaller.checkFullyInstalled()
-        return if (files != null) {
-            DownloadableModelUiState(
-                status = appContext.getString(
-                    R.string.settings_orientation_model_status_ready_format,
-                    (files.totalBytes / 1024).toInt()
-                ),
-                ready = true,
-            )
-        } else {
-            DownloadableModelUiState(
-                status = appContext.getString(R.string.settings_orientation_model_status_missing_hint),
-                ready = false,
-            )
-        }
-    }
-
-    fun orientationModelReady(): Boolean = orientationModelUiState().ready
-
-    suspend fun downloadOrientationModel(onProgress: (String) -> Unit) {
-        downloadModels(listOf(ModelDownloadSpec.orientation()), onProgress)
-    }
-
-    fun deleteOrientationModel() {
-        orientationModelInstaller.deleteAll()
-    }
-
-    suspend fun importOrientationModelFromLocal(uris: List<android.net.Uri>): Int =
-        orientationModelInstaller.importFromLocal(uris)
-
     // —— 端侧 LLM 翻译 ——
 
     fun llmDeviceCapable(): Boolean = false
@@ -762,38 +566,6 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun saveLlmMirror(choice: com.gameocr.app.data.LlmMirrorChoice, customUrl: String) {
         repo.update { it.copy(localLlmMirror = choice, localLlmMirrorUrl = customUrl.trim()) }
-    }
-
-    suspend fun savePaddleDetectionProfile(profile: com.gameocr.app.data.PaddleDetectionProfile) {
-        repo.update { it.copy(paddleDetectionProfile = profile) }
-    }
-
-    /** DBNet 阈值即时落盘；prob/score 共用，unclip 按 Paddle/MangaOCR 分开。 */
-    suspend fun saveDbnetThresholds(
-        ocrEngine: OcrEngineKind,
-        prob: Float,
-        score: Float,
-        unclip: Float,
-    ) {
-        repo.update {
-            val clampedUnclip = unclip.coerceIn(1.2f, 2.6f)
-            it.copy(
-                dbnetProbThresh = prob.coerceIn(0.05f, 0.5f),
-                dbnetBoxScoreThresh = score.coerceIn(0.2f, 0.8f),
-                dbnetUnclipRatio = if (ocrEngine == OcrEngineKind.MANGA_OCR_JA) {
-                    it.dbnetUnclipRatio
-                } else {
-                    clampedUnclip
-                },
-                mangaOcrDbnetUnclipRatio = if (ocrEngine == OcrEngineKind.MANGA_OCR_JA) {
-                    clampedUnclip
-                } else {
-                    it.mangaOcrDbnetUnclipRatio
-                },
-                bubbleClusterGap = MangaOcrAdvancedSettingsPolicy.BUBBLE_CLUSTER_GAP,
-                mangaOcrCropPaddingPx = MangaOcrAdvancedSettingsPolicy.CROP_PADDING_PX,
-            )
-        }
     }
 
     suspend fun saveLocalLlmInferenceParams(contextSize: Int, maxNewTokens: Int) {
@@ -855,8 +627,6 @@ class SettingsViewModel @Inject constructor(
             remotePcImageQuality = remotePcImageQuality.coerceIn(50, 100),
             cleartextAllowedHosts = cleartextHostsWithLocalOcrUrls(
                 base.cleartextAllowedHosts,
-                base.umiOcrBaseUrl,
-                base.lunaOcrBaseUrl,
                 normalizedRemotePcBaseUrl,
             ),
             baseUrl = baseUrl.trim(),
@@ -878,9 +648,6 @@ class SettingsViewModel @Inject constructor(
             volcRegion = volcRegion.trim().ifBlank { base.volcRegion },
             baiduFanyiAppId = baiduFanyiAppId.trim().ifBlank { base.baiduFanyiAppId },
             baiduFanyiSecretKey = baiduFanyiSecretKey.trim().ifBlank { base.baiduFanyiSecretKey },
-            tencentSecretId = tencentSecretId.trim().ifBlank { base.tencentSecretId },
-            tencentSecretKey = tencentSecretKey.trim().ifBlank { base.tencentSecretKey },
-            tencentRegion = tencentRegion.trim().ifBlank { base.tencentRegion },
             apiTimeoutSeconds = apiTimeoutSeconds.coerceIn(5, 300)
         )
         return routingTranslator.testConnection(temp)
@@ -898,19 +665,11 @@ internal fun remotePcHttpHostOrNull(baseUrl: String): String? {
 
 internal fun cleartextHostsWithLocalOcrUrls(
     hosts: List<String>,
-    umiOcrBaseUrl: String,
-    lunaOcrBaseUrl: String,
-    remotePcBaseUrl: String = "",
+    remotePcBaseUrl: String,
 ): List<String> {
     val normalized = hosts.map { it.trim() }.filter { it.isNotEmpty() }
-    val umiHost = umiOcrHttpHostOrNull(umiOcrBaseUrl)
-    val lunaHost = lunaOcrHttpHostOrNull(lunaOcrBaseUrl)
     val remotePcHost = remotePcHttpHostOrNull(remotePcBaseUrl)
-    return (normalized + listOfNotNull(
-        umiHost,
-        lunaHost,
-        remotePcHost,
-    ))
+    return (normalized + listOfNotNull(remotePcHost))
         .distinctBy { it.lowercase() }
 }
 

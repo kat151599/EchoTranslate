@@ -1,13 +1,9 @@
 package com.gameocr.app.download
 
-import com.gameocr.app.data.PaddleModelVersion
 import com.gameocr.app.llm.LlmModelKind
 
 enum class ModelDownloadType {
     LLM,
-    PADDLE,
-    MANGA_OCR,
-    ORIENTATION,
 }
 
 data class ModelDownloadSpec(
@@ -18,9 +14,6 @@ data class ModelDownloadSpec(
 
     companion object {
         fun llm(kind: LlmModelKind) = ModelDownloadSpec(ModelDownloadType.LLM, kind.name)
-        fun paddle(version: PaddleModelVersion) = ModelDownloadSpec(ModelDownloadType.PADDLE, version.name)
-        fun mangaOcr() = ModelDownloadSpec(ModelDownloadType.MANGA_OCR)
-        fun orientation() = ModelDownloadSpec(ModelDownloadType.ORIENTATION)
 
         fun decode(value: String): ModelDownloadSpec? {
             val parts = value.split('|', limit = 2)
@@ -28,7 +21,7 @@ data class ModelDownloadSpec(
                 ModelDownloadType.entries.firstOrNull { it.name == name }
             } ?: return null
             val variant = parts.getOrElse(1) { "" }
-            if ((type == ModelDownloadType.LLM || type == ModelDownloadType.PADDLE) && variant.isBlank()) {
+            if (type == ModelDownloadType.LLM && variant.isBlank()) {
                 return null
             }
             return ModelDownloadSpec(type, variant)

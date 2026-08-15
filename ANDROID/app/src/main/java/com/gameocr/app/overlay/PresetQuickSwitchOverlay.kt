@@ -18,7 +18,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.gameocr.app.R
 import com.gameocr.app.data.Languages
-import com.gameocr.app.data.OcrEngineKind
 import com.gameocr.app.data.OverlayTheme
 import com.gameocr.app.data.Settings
 import com.gameocr.app.data.TranslationPreset
@@ -225,13 +224,11 @@ class PresetQuickSwitchOverlay(private val context: Context) {
             ellipsize = TextUtils.TruncateAt.END
         }
         val summary = TextView(context).apply {
-            text = context.getString(
-                R.string.preset_quick_summary_format,
-                ocrName(preset.ocrEngine),
+            text = listOf(
                 presetLlmName(preset),
                 Languages.nameOf(context, preset.sourceLang),
                 Languages.nameOf(context, preset.targetLang),
-            )
+            ).joinToString(" · ")
             setTextColor(mutedColor)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             maxLines = 4
@@ -243,27 +240,7 @@ class PresetQuickSwitchOverlay(private val context: Context) {
         return row
     }
 
-    private fun presetDisplayName(preset: TranslationPreset): String = when (preset.id) {
-        TranslationPresetCatalog.BUILTIN_MANGA_JA_ZH ->
-            context.getString(R.string.settings_translation_preset_builtin_manga)
-        else -> preset.name
-    }
-
-    private fun ocrName(engine: OcrEngineKind): String = when (engine) {
-        OcrEngineKind.ML_KIT_AUTO -> context.getString(R.string.settings_ocr_chip_auto)
-        OcrEngineKind.ML_KIT_LATIN -> context.getString(R.string.settings_ocr_chip_latin)
-        OcrEngineKind.ML_KIT_JAPANESE -> context.getString(R.string.settings_ocr_chip_japanese)
-        OcrEngineKind.ML_KIT_KOREAN -> context.getString(R.string.settings_ocr_chip_korean)
-        OcrEngineKind.ML_KIT_CHINESE -> context.getString(R.string.settings_ocr_chip_chinese)
-        OcrEngineKind.PADDLE_ONNX -> context.getString(R.string.settings_ocr_chip_paddle)
-        OcrEngineKind.PADDLE_AI_STUDIO -> context.getString(R.string.settings_ocr_chip_paddle_ai_studio)
-        OcrEngineKind.BAIDU -> context.getString(R.string.settings_ocr_chip_baidu)
-        OcrEngineKind.TENCENT -> context.getString(R.string.settings_ocr_chip_tencent)
-        OcrEngineKind.YOUDAO -> context.getString(R.string.settings_ocr_chip_youdao)
-        OcrEngineKind.UMI_OCR -> context.getString(R.string.settings_ocr_chip_umi)
-        OcrEngineKind.LUNA_OCR -> context.getString(R.string.settings_ocr_chip_luna)
-        OcrEngineKind.MANGA_OCR_JA -> context.getString(R.string.settings_ocr_chip_manga_ocr_ja)
-    }
+    private fun presetDisplayName(preset: TranslationPreset): String = preset.name
 
     private fun translatorName(engine: TranslatorEngine): String = when (engine) {
         TranslatorEngine.REMOTE_PC -> context.getString(R.string.settings_engine_remote_pc)

@@ -100,22 +100,12 @@ object SettingsFieldPolicy {
         portable("sourceLang", R.string.settings_search_item_source_lang),
         portable("targetLang", R.string.settings_search_item_target_lang),
         portable("promptTemplate", R.string.settings_search_item_prompt, SettingsDiagnostic.SUMMARY),
-        portable("ocrEngine", R.string.settings_search_item_ocr_switch),
         portable("captureLoopIntervalMs", R.string.settings_search_item_loop_interval),
         portable("loopTriggerMode", R.string.settings_search_item_loop_trigger_mode),
-        portable("loopTextStableDurationMs", R.string.settings_search_item_loop_trigger_mode),
-        portable("loopSkipSimilarFrames", R.string.settings_search_item_loop_similarity),
-        portable("loopFrameSimilarityThreshold", R.string.settings_search_item_loop_similarity),
-        portable("loopTextRegionMode", R.string.settings_search_item_loop_region),
-        portable("loopTranslateRegionOnly", R.string.settings_search_item_loop_region),
         portable("developerOptionsEnabled", R.string.settings_search_item_developer_ocr),
-        portable("ocrScreenshotSavingEnabled", R.string.settings_search_item_developer_ocr),
         portable("disableTranslationCache", R.string.settings_search_item_developer_ocr),
         portable("batchCumulativeCompletionTimeEnabled", R.string.settings_search_item_developer_ocr),
         portable("disableCrossLineContextTranslation", R.string.settings_search_item_cross_line_context),
-        portable("ocrRedBoxModeEnabled", R.string.settings_search_item_developer_ocr),
-        portable("ocrRedBoxShowSourceText", R.string.settings_search_item_developer_ocr),
-        portable("ocrRedBoxShowTranslation", R.string.settings_search_item_developer_ocr),
         deviceLocal("captureRegion", diagnostic = SettingsDiagnostic.SUMMARY),
         deviceLocal("captureRegionSavedScreenW"),
         deviceLocal("captureRegionSavedScreenH"),
@@ -138,29 +128,9 @@ object SettingsFieldPolicy {
         portable("customBorderWidth", R.string.settings_search_item_custom_theme),
         portable("overlayOffsetX", R.string.settings_search_item_offset),
         portable("overlayOffsetY", R.string.settings_search_item_offset),
-        portable("preprocess", R.string.settings_search_item_upscale),
-        portable("textOrientationAutoDetect", R.string.settings_orient_auto_detect_title),
-        portable("manualTextOrientation", R.string.settings_search_item_manual_orientation),
         portable("translationOutputFollowRecognition", R.string.settings_translation_output_follow_title),
         portable("translationOutputLayout", R.string.settings_translation_output_layout_label),
         portable("translationOutputDirection", R.string.settings_translation_output_layout_label),
-        credential("baiduOcrApiKey", R.string.settings_search_item_baidu_api_key),
-        credential("baiduOcrSecretKey", R.string.settings_search_item_baidu_api_key),
-        portable("baiduOcrEndpoint", R.string.settings_search_item_baidu_endpoint),
-        portable("baiduOcrLanguage", R.string.settings_search_item_baidu_lang),
-        privateConnection("umiOcrBaseUrl", R.string.settings_search_item_umi_ocr),
-        privateConnection("lunaOcrBaseUrl", R.string.settings_search_item_luna_ocr),
-        credential("paddleAiStudioToken", R.string.settings_search_item_paddle_ai_studio),
-        credential("tencentSecretId", R.string.settings_search_item_tencent_secret),
-        credential("tencentSecretKey", R.string.settings_search_item_tencent_secret),
-        portable("tencentRegion", R.string.settings_search_item_tencent_region),
-        portable("tencentOcrEndpoint", R.string.settings_search_item_tencent_endpoint),
-        portable("tencentOcrLanguage", R.string.settings_search_item_tencent_lang),
-        portable("paddleModelVersion", R.string.settings_search_item_paddle_download),
-        portable("paddleDetectionProfile", R.string.settings_search_item_dbnet_advanced),
-        privateConnection("paddleModelMirrorUrl", R.string.settings_search_item_paddle_download),
-        privateConnection("mangaOcrModelMirrorUrl", R.string.settings_search_item_manga_ocr_download),
-        privateConnection("orientationModelMirrorUrl", R.string.settings_search_item_orientation_model),
         deviceLocal("preferShizukuCapture"),
         portable("a11yVolumeTrigger", R.string.settings_search_item_a11y_volume),
         portable("translatorEngine", R.string.settings_search_item_translator_engine),
@@ -199,11 +169,6 @@ object SettingsFieldPolicy {
         portable("mergeAdjacentBlocks", R.string.settings_search_item_merge_adjacent),
         portable("mergeStrength", R.string.settings_search_item_merge_strength),
         portable("pinnedLanguages", R.string.settings_search_item_source_lang, SettingsDiagnostic.SUMMARY),
-        deviceLocal(
-            "mlKitRecentSourceLanguages",
-            R.string.settings_search_item_source_lang,
-            SettingsDiagnostic.SUMMARY,
-        ),
         privateConnection("cleartextAllowedHosts", R.string.settings_search_item_cleartext_hosts),
         portable("floatingMenuItemOrder", R.string.settings_search_item_arc_menu_order, SettingsDiagnostic.SUMMARY),
         portable("arcMenuPageSize", R.string.settings_search_item_arc_menu_order),
@@ -211,12 +176,6 @@ object SettingsFieldPolicy {
         portable("dictionaryPrompt", R.string.settings_search_item_dictionary_prompt, SettingsDiagnostic.SUMMARY),
         portable("localLlmContextSize", R.string.settings_search_item_local_llm_model),
         portable("localLlmMaxNewTokens", R.string.settings_search_item_local_llm_model),
-        portable("dbnetProbThresh", R.string.settings_search_item_dbnet_advanced),
-        portable("dbnetBoxScoreThresh", R.string.settings_search_item_dbnet_advanced),
-        portable("dbnetUnclipRatio", R.string.settings_search_item_dbnet_advanced),
-        portable("mangaOcrDbnetUnclipRatio", R.string.settings_search_item_dbnet_advanced),
-        portable("bubbleClusterGap"),
-        portable("mangaOcrCropPaddingPx"),
         portable("localLlmMirror", R.string.settings_search_item_llm_mirror),
         privateConnection("localLlmMirrorUrl", R.string.settings_search_item_llm_mirror),
         portable("translationPresets", R.string.settings_section_translation_presets, SettingsDiagnostic.SUMMARY),
@@ -264,9 +223,7 @@ object SettingsFieldPolicy {
     }
 
     fun encodePortable(settings: Settings): JsonObject {
-        val encoded = json.encodeToJsonElement(
-            MangaOcrAdvancedSettingsPolicy.normalize(settings)
-        ).asObject()
+        val encoded = json.encodeToJsonElement(settings).asObject()
         return JsonObject(encoded.filterKeys(portableFieldNames::contains))
     }
 
@@ -283,9 +240,7 @@ object SettingsFieldPolicy {
             }
         }
         return SettingsFieldDecodeResult(
-            settings = MangaOcrAdvancedSettingsPolicy.normalize(
-                json.decodeFromJsonElement<Settings>(JsonObject(defaults))
-            ),
+            settings = json.decodeFromJsonElement<Settings>(JsonObject(defaults)),
             skippedFields = skipped.sorted(),
         )
     }
@@ -295,19 +250,15 @@ object SettingsFieldPolicy {
         val importedValues = json.encodeToJsonElement(imported).asObject()
         val merged = currentValues.toMutableMap()
         portableFieldNames.forEach { name -> importedValues[name]?.let { merged[name] = it } }
-        return MangaOcrAdvancedSettingsPolicy.normalize(
-            json.decodeFromJsonElement<Settings>(JsonObject(merged)).copy(
-                runtimeTranslationContext = current.runtimeTranslationContext,
-                runtimeTranslationScopePackage = current.runtimeTranslationScopePackage,
-                runtimeTranslationScopeLabel = current.runtimeTranslationScopeLabel,
-            )
+        return json.decodeFromJsonElement<Settings>(JsonObject(merged)).copy(
+            runtimeTranslationContext = current.runtimeTranslationContext,
+            runtimeTranslationScopePackage = current.runtimeTranslationScopePackage,
+            runtimeTranslationScopeLabel = current.runtimeTranslationScopeLabel,
         )
     }
 
     fun formatDiagnostics(settings: Settings): String {
-        val encoded = json.encodeToJsonElement(
-            MangaOcrAdvancedSettingsPolicy.normalize(settings)
-        ).asObject()
+        val encoded = json.encodeToJsonElement(settings).asObject()
         return buildString {
             rules.forEach { rule ->
                 append("  ").append(rule.name).append(": ")

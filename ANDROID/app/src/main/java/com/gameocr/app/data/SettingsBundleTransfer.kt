@@ -317,8 +317,6 @@ object SettingsBundleTransfer {
         return preset.copy(
             baseUrl = defaults.baseUrl,
             deeplBaseUrl = defaults.deeplBaseUrl,
-            umiOcrBaseUrl = defaults.umiOcrBaseUrl,
-            lunaOcrBaseUrl = defaults.lunaOcrBaseUrl,
         )
     }
 
