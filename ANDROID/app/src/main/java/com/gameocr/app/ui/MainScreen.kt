@@ -126,10 +126,6 @@ import com.gameocr.app.data.Settings as AppSettings
 import com.gameocr.app.data.SettingsRepository
 import com.gameocr.app.data.TranslationPreset
 import com.gameocr.app.data.TranslationPresetCatalog
-import com.gameocr.app.gallery.GalleryTaskStatus
-import com.gameocr.app.gallery.GalleryTranslationTaskEntity
-import com.gameocr.app.gallery.GalleryTranslationRepository
-import com.gameocr.app.gallery.GalleryTranslationWorkPolicy
 import com.gameocr.app.ocr.MangaOcrModelInstaller
 import com.gameocr.app.ocr.OrientationModelInstaller
 import com.gameocr.app.ocr.PaddleModelInstaller
@@ -158,13 +154,8 @@ fun MainScreen(
     onOpenLogs: () -> Unit,
     onOpenLegalNotices: () -> Unit,
     onOpenOnboarding: () -> Unit,
-    onGalleryImagesSelected: (List<String>) -> Unit,
-    onOpenGalleryTasks: () -> Unit,
-    onOpenGalleryTask: (String) -> Unit,
     initialStatusPresetPageIndex: Int,
     onStatusPresetPageChanged: (Int) -> Unit,
-    initialCarouselPageIndex: Int,
-    onCarouselPageChanged: (Int) -> Unit,
     viewModel: MainViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
@@ -177,23 +168,6 @@ fun MainScreen(
     }
     val serviceRunning by CaptureServiceState.running.collectAsState()
     val appSettings by viewModel.settings.collectAsState(initial = null)
-    val featuredGalleryTaskState by produceState<MainGalleryTaskLoadState>(
-        initialValue = MainGalleryTaskLoadState.Loading,
-        key1 = viewModel,
-    ) {
-        viewModel.featuredGalleryTask.collectLatest { task ->
-            value = MainGalleryTaskLoadState.Loaded(task)
-        }
-    }
-    val featuredGalleryTask =
-        (featuredGalleryTaskState as? MainGalleryTaskLoadState.Loaded)?.task
-    val galleryPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickMultipleVisualMedia(
-            GalleryTranslationWorkPolicy.MAX_IMAGES_PER_TASK
-        )
-    ) { uris ->
-        if (uris.isNotEmpty()) onGalleryImagesSelected(uris.map { it.toString() })
-    }
     val unsavedPresetName = stringResource(R.string.settings_translation_preset_unsaved_name)
     val presetPlans = remember(appSettings, unsavedPresetName) {
         appSettings?.let { presetCarouselPlans(it, unsavedPresetName) }
@@ -565,24 +539,9 @@ fun MainScreen(
                 },
             )
 
-            CaptureGalleryCarousel(
-                initialPageIndex = initialCarouselPageIndex,
-                onPageChanged = onCarouselPageChanged,
-                captureMeasurementKey = listOf(
-                    canDrawOverlay,
-                    serviceRunning,
-                    startMode,
-                    shizukuAvail,
-                ),
-                galleryMeasurementKey = listOf(
-                    canDrawOverlay,
-                    featuredGalleryTaskState,
-                ),
-                capturePage = { pageModifier ->
                     // 主操作：截屏服务
                     ActionCard(
                         title = stringResource(R.string.main_section_capture),
-                        modifier = pageModifier,
                     ) {
                 if (!canDrawOverlay) {
                     Button(
@@ -786,64 +745,6 @@ fun MainScreen(
                     )
                 }
                     }
-                },
-                galleryPage = { pageModifier ->
-                    ActionCard(
-                        title = stringResource(R.string.gallery_main_title),
-                        modifier = pageModifier,
-                    ) {
-                Text(
-                    text = stringResource(R.string.gallery_main_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        galleryPicker.launch(
-                            PickVisualMediaRequest(
-                                ActivityResultContracts.PickVisualMedia.ImageOnly
-                            )
-                        )
-                    },
-                ) {
-                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null)
-                    Text(
-                        stringResource(R.string.gallery_main_import),
-                        modifier = Modifier.padding(start = 6.dp),
-                    )
-                }
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onOpenGalleryTasks,
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.List, contentDescription = null)
-                    Text(
-                        stringResource(R.string.gallery_main_all_tasks),
-                        modifier = Modifier.padding(start = 6.dp),
-                    )
-                }
-                when (
-                    mainGalleryTaskSlot(
-                        canDrawOverlay = canDrawOverlay,
-                        isLoaded = featuredGalleryTaskState is MainGalleryTaskLoadState.Loaded,
-                        hasTask = featuredGalleryTask != null,
-                    )
-                ) {
-                    MainGalleryTaskSlot.PLACEHOLDER -> MainGalleryTaskSummaryPlaceholder()
-                    MainGalleryTaskSlot.EMPTY -> MainGalleryTaskEmptyPlaceholder()
-                    MainGalleryTaskSlot.TASK -> {
-                        val task = requireNotNull(featuredGalleryTask)
-                        MainGalleryTaskSummary(
-                            task = task,
-                            onClick = { onOpenGalleryTask(task.id) },
-                        )
-                    }
-                    MainGalleryTaskSlot.HIDDEN -> Unit
-                }
-                    }
-                },
-            )
 
             // 截屏区域入口暂时隐藏；按产品要求保留完整代码，便于后续恢复。
             /* BEGIN_DISABLED_SCREENSHOT_REGION
@@ -1253,360 +1154,12 @@ private fun UpdateResultDialog(
 internal const val UPDATE_DIALOG_TAG = "update_dialog"
 internal const val UPDATE_DIALOG_RELEASE_NOTES_TAG = "update_dialog_release_notes"
 
-@Composable
-private fun CaptureGalleryCarousel(
-    initialPageIndex: Int,
-    onPageChanged: (Int) -> Unit,
-    captureMeasurementKey: Any?,
-    galleryMeasurementKey: Any?,
-    capturePage: @Composable (Modifier) -> Unit,
-    galleryPage: @Composable (Modifier) -> Unit,
-) {
-    val initialPage = remember { captureGalleryCarouselInitialPage(initialPageIndex) }
-    val pagerState = rememberPagerState(initialPage = initialPage) { Int.MAX_VALUE }
-    val currentOnPageChanged by rememberUpdatedState(onPageChanged)
-    val density = LocalDensity.current
-    var captureHeightPx by remember { mutableIntStateOf(0) }
-    var galleryHeightPx by remember { mutableIntStateOf(0) }
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.settledPage }
-            .distinctUntilChanged()
-            .collect { page ->
-                currentOnPageChanged(captureGalleryCarouselPageIndex(page))
-            }
-    }
-    LaunchedEffect(captureMeasurementKey) {
-        captureHeightPx = 0
-    }
-    LaunchedEffect(galleryMeasurementKey) {
-        galleryHeightPx = 0
-    }
-    val commonHeightPx = captureGalleryCarouselCommonHeightPx(
-        captureHeightPx = captureHeightPx,
-        galleryHeightPx = galleryHeightPx,
-    )
-    val commonHeight = commonHeightPx?.let { with(density) { it.toDp() } }
-    val indicatorPage = captureGalleryCarouselPageIndex(pagerState.currentPage)
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(
-                    commonHeight?.let { Modifier.height(it) }
-                        ?: Modifier.wrapContentHeight()
-                ),
-            beyondViewportPageCount = 1,
-        ) { page ->
-            val pageOffset = (
-                (page - pagerState.currentPage) - pagerState.currentPageOffsetFraction
-            ).coerceIn(-1f, 1f)
-            val pivotX = when {
-                pageOffset < 0f -> 1f
-                pageOffset > 0f -> 0f
-                else -> 0.5f
-            }
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        rotationY = captureGalleryCarouselRotation(pageOffset)
-                        cameraDistance = 16f * density.density
-                        transformOrigin = TransformOrigin(pivotX, 0.5f)
-                    },
-            ) {
-                when (captureGalleryCarouselPageIndex(page)) {
-                    CAPTURE_CAROUSEL_PAGE -> capturePage(
-                        Modifier
-                            .onSizeChanged { size ->
-                                if (commonHeightPx == null && size.height > 0) {
-                                    captureHeightPx = size.height
-                                }
-                            }
-                            .then(
-                                if (commonHeightPx != null) Modifier.fillMaxHeight()
-                                else Modifier
-                            )
-                    )
-                    GALLERY_CAROUSEL_PAGE -> galleryPage(
-                        Modifier
-                            .onSizeChanged { size ->
-                                if (commonHeightPx == null && size.height > 0) {
-                                    galleryHeightPx = size.height
-                                }
-                            }
-                            .then(
-                                if (commonHeightPx != null) Modifier.fillMaxHeight()
-                                else Modifier
-                            )
-                    )
-                }
-            }
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 8.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            repeat(CAPTURE_GALLERY_PAGE_COUNT) { page ->
-                val selected = page == indicatorPage
-                Surface(
-                    modifier = Modifier
-                        .padding(horizontal = 3.dp)
-                        .size(
-                            width = if (selected) 18.dp else 6.dp,
-                            height = 6.dp,
-                        ),
-                    shape = CircleShape,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    },
-                ) {}
-            }
-        }
-    }
-}
-
-private const val CAPTURE_GALLERY_PAGE_COUNT = 2
-private const val CAPTURE_CAROUSEL_PAGE = 0
-private const val GALLERY_CAROUSEL_PAGE = 1
-
-internal fun captureGalleryCarouselPageIndex(page: Int): Int =
-    Math.floorMod(page, CAPTURE_GALLERY_PAGE_COUNT)
-
-internal fun captureGalleryCarouselInitialPage(pageIndex: Int = CAPTURE_CAROUSEL_PAGE): Int {
-    val anchor = Int.MAX_VALUE / 2
-    val captureAnchor = anchor - Math.floorMod(anchor, CAPTURE_GALLERY_PAGE_COUNT)
-    return captureAnchor + Math.floorMod(pageIndex, CAPTURE_GALLERY_PAGE_COUNT)
-}
-
-internal fun captureGalleryCarouselRotation(pageOffset: Float): Float =
-    pageOffset.coerceIn(-1f, 1f) * 90f
-
-internal fun captureGalleryCarouselCommonHeightPx(
-    captureHeightPx: Int,
-    galleryHeightPx: Int,
-): Int? = if (captureHeightPx > 0 && galleryHeightPx > 0) {
-    maxOf(captureHeightPx, galleryHeightPx)
-} else {
-    null
-}
-
-@Composable
-private fun MainGalleryTaskSummary(
-    task: GalleryTranslationTaskEntity,
-    onClick: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = Color.Transparent,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        MainGalleryTaskSummaryContent(task)
-    }
-}
-
-@Composable
-private fun MainGalleryTaskSummaryPlaceholder() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = Color.Transparent,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        MainGalleryTaskSummaryContent(task = null)
-    }
-}
-
-@Composable
-private fun MainGalleryTaskEmptyPlaceholder() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = Color.Transparent,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Box {
-            MainGalleryTaskSummaryContent(task = null)
-            Text(
-                stringResource(R.string.gallery_main_no_history_task),
-                modifier = Modifier.align(Alignment.Center),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun MainGalleryTaskSummaryContent(
-    task: GalleryTranslationTaskEntity?,
-) {
-    val placeholder = task == null
-    val active = placeholder || isMainGalleryTaskActive(task.status)
-    val totalCount = task?.totalCount ?: 0
-    val completedCount = task?.completedCount ?: 0
-    val successCount = task?.successCount ?: 0
-    val failedCount = task?.failedCount ?: 0
-    val contentModifier = if (placeholder) {
-        Modifier
-            .graphicsLayer { alpha = 0f }
-            .clearAndSetSemantics {}
-    } else {
-        Modifier
-    }
-
-        Column(
-            modifier = Modifier
-                .padding(12.dp)
-                .then(contentModifier),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    stringResource(
-                        if (active) {
-                            R.string.gallery_main_active_task
-                        } else {
-                            R.string.gallery_main_latest_task
-                        }
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    stringResource(R.string.gallery_task_images, totalCount),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                task?.let {
-                    mainGalleryTaskPresetLabel(
-                        storedName = it.presetName,
-                        builtInStoredName = TranslationPresetCatalog.BUILTIN_MANGA_JA_ZH_NAME,
-                        builtInDisplayName = stringResource(
-                            R.string.settings_translation_preset_builtin_manga
-                        ),
-                        unsavedDisplayName = stringResource(
-                            R.string.settings_translation_preset_unsaved_name
-                        ),
-                    )
-                } ?: stringResource(R.string.settings_translation_preset_unsaved_name),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                stringResource(
-                    R.string.gallery_main_progress,
-                    completedCount,
-                    totalCount,
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (active) {
-                LinearProgressIndicator(
-                    progress = {
-                        mainGalleryTaskProgress(completedCount, totalCount)
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Text(
-                    stringResource(
-                        R.string.gallery_task_success_count,
-                        successCount,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Text(
-                    stringResource(
-                        R.string.gallery_task_failed_count,
-                        failedCount,
-                    ),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (failedCount > 0) {
-                        MaterialTheme.colorScheme.error
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
-                )
-            }
-        }
-}
-
-internal sealed interface MainGalleryTaskLoadState {
-    data object Loading : MainGalleryTaskLoadState
-    data class Loaded(
-        val task: GalleryTranslationTaskEntity?,
-    ) : MainGalleryTaskLoadState
-}
-
-internal enum class MainGalleryTaskSlot {
-    HIDDEN,
-    PLACEHOLDER,
-    EMPTY,
-    TASK,
-}
-
-internal fun mainGalleryTaskSlot(
-    canDrawOverlay: Boolean,
-    isLoaded: Boolean,
-    hasTask: Boolean,
-): MainGalleryTaskSlot = when {
-    !canDrawOverlay -> MainGalleryTaskSlot.HIDDEN
-    !isLoaded -> MainGalleryTaskSlot.PLACEHOLDER
-    hasTask -> MainGalleryTaskSlot.TASK
-    else -> MainGalleryTaskSlot.EMPTY
-}
-
-internal fun isMainGalleryTaskActive(status: GalleryTaskStatus): Boolean =
-    status == GalleryTaskStatus.QUEUED ||
-        status == GalleryTaskStatus.RUNNING ||
-        status == GalleryTaskStatus.WAITING_RETRY
-
 internal fun mainUsageTextRes(canDrawOverlay: Boolean): Int =
     if (canDrawOverlay) {
         R.string.main_usage_text
     } else {
         R.string.main_usage_overlay_permission_required
     }
-
-internal fun mainGalleryTaskProgress(completedCount: Int, totalCount: Int): Float =
-    if (totalCount <= 0) {
-        0f
-    } else {
-        (completedCount.toFloat() / totalCount).coerceIn(0f, 1f)
-    }
-
-internal fun mainGalleryTaskPresetLabel(
-    storedName: String,
-    builtInStoredName: String,
-    builtInDisplayName: String,
-    unsavedDisplayName: String,
-): String = when {
-    storedName.isBlank() -> unsavedDisplayName
-    storedName == builtInStoredName -> builtInDisplayName
-    else -> storedName
-}
 
 @Composable
 private fun StatusPresetCarousel(
@@ -2302,7 +1855,6 @@ private enum class StartMode { MEDIA_PROJECTION, SHIZUKU, ASB }
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repo: SettingsRepository,
-    galleryTranslationRepository: GalleryTranslationRepository,
     private val shizukuManager: ShizukuManager,
     private val shizukuCapabilities: ShizukuCapabilities,
     private val paddleModelInstaller: PaddleModelInstaller,
@@ -2311,7 +1863,6 @@ class MainViewModel @Inject constructor(
 ) : ViewModel() {
     private var sharePromptEntryRecorded = false
     val settings = repo.settings
-    val featuredGalleryTask = galleryTranslationRepository.observeFeaturedTask()
 
     suspend fun currentRegion(): CaptureRegion? = repo.get().captureRegion
     suspend fun clearRegion() {

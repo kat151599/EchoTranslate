@@ -7,8 +7,6 @@ import com.gameocr.app.data.AndroidKeystoreSettingsSecretCipher
 import com.gameocr.app.data.SettingsSecretCipher
 import com.gameocr.app.glossary.TranslationGlossaryDao
 import com.gameocr.app.glossary.TranslationGlossaryDatabase
-import com.gameocr.app.gallery.GalleryTranslationDao
-import com.gameocr.app.gallery.GalleryTranslationDatabase
 import com.gameocr.app.ocr.OcrEngine
 import com.gameocr.app.ocr.RoutingOcrEngine
 import com.gameocr.app.translate.RoutingTranslator
@@ -96,20 +94,6 @@ object AppModule {
         database: TranslationMemoryDatabase,
     ): TranslationMemoryDao = database.translationMemoryDao()
 
-    @Provides
-    @Singleton
-    fun provideGalleryTranslationDatabase(
-        @ApplicationContext context: Context,
-    ): GalleryTranslationDatabase = Room.databaseBuilder(
-        context,
-        GalleryTranslationDatabase::class.java,
-        "gallery-translation.db",
-    ).build()
-
-    @Provides
-    fun provideGalleryTranslationDao(
-        database: GalleryTranslationDatabase,
-    ): GalleryTranslationDao = database.galleryTranslationDao()
 }
 
 @Module

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Screen Translator</string>
 
@@ -87,79 +87,6 @@
     <string name="main_preset_save_then_apply">Save, then apply</string>
     <string name="main_preset_discard_then_apply">Discard and apply</string>
     <string name="main_preset_switch_cancel">Cancel</string>
-    <string name="gallery_main_title">Gallery translation</string>
-    <string name="gallery_main_import">New task</string>
-    <string name="gallery_main_all_tasks">Task list</string>
-    <string name="gallery_main_empty">Import multiple screenshots and process them in the background.</string>
-    <string name="gallery_main_active_task">Active task</string>
-    <string name="gallery_main_latest_task">Latest task</string>
-    <string name="gallery_main_no_history_task">No task history yet</string>
-    <string name="gallery_main_progress">%1$d / %2$d processed</string>
-    <string name="gallery_main_recent">Latest: %1$d succeeded · %2$d failed</string>
-    <string name="gallery_confirm_title">Create translation task</string>
-    <string name="gallery_confirm_count">%1$d images selected</string>
-    <string name="gallery_confirm_add_photos">Add more images</string>
-    <string name="gallery_confirm_remove_photo">Remove image %1$d</string>
-    <string name="gallery_confirm_empty_selection">Select at least one image to create a task.</string>
-    <string name="gallery_confirm_settings">Task settings</string>
-    <string name="gallery_confirm_show_presets">Show presets</string>
-    <string name="gallery_confirm_hide_presets">Hide presets</string>
-    <string name="gallery_confirm_language">%1$s → %2$s</string>
-    <string name="gallery_confirm_ocr">OCR: %1$s</string>
-    <string name="gallery_confirm_translator">Translator: %1$s</string>
-    <string name="gallery_confirm_create">Create and process</string>
-    <string name="gallery_confirm_create_dialog_title">Notice</string>
-    <string name="gallery_confirm_create_dialog_confirm">OK</string>
-    <string name="gallery_confirm_create_dialog_message">The %1$d selected images will be processed in the background using the current task settings.</string>
-    <string name="gallery_confirm_creating">Creating task…</string>
-    <string name="gallery_confirm_error">Could not create task: %1$s</string>
-    <string name="gallery_tasks_title">Translation tasks</string>
-    <string name="gallery_tasks_new">New task</string>
-    <string name="gallery_tasks_empty">No gallery translation tasks yet.</string>
-    <string name="gallery_task_images">%1$d images</string>
-    <string name="gallery_task_settings_summary">OCR: %1$s\nTranslator: %2$s\nLanguages: %3$s → %4$s</string>
-    <string name="gallery_task_progress_label">Progress</string>
-    <string name="gallery_task_duration">Duration %1$s</string>
-    <string name="gallery_task_progress_value">%1$d / %2$d</string>
-    <string name="gallery_task_all_count">All %1$d</string>
-    <string name="gallery_task_success_count">Succeeded %1$d</string>
-    <string name="gallery_task_failed_count">Failed %1$d</string>
-    <string name="gallery_task_open">View results</string>
-    <string name="gallery_task_cancel">Cancel task</string>
-    <string name="gallery_task_cancel_title">Cancel this task?</string>
-    <string name="gallery_task_cancel_message">Processing will stop. Results already completed will be kept.</string>
-    <string name="gallery_task_retry">Retry failed images</string>
-    <string name="gallery_task_delete">Delete task</string>
-    <string name="gallery_task_more_actions">More actions</string>
-    <string name="gallery_task_delete_title">Delete this task?</string>
-    <string name="gallery_task_delete_message">Task results and private image copies will be removed. Original gallery images are not deleted.</string>
-    <string name="gallery_task_detail_title">Task results</string>
-    <string name="gallery_task_missing">This task no longer exists.</string>
-    <string name="gallery_item_source">Source</string>
-    <string name="gallery_item_translation">Translation</string>
-    <string name="gallery_item_processing">Processing…</string>
-    <string name="gallery_item_no_translation">No translation returned</string>
-    <string name="gallery_item_error">Failed: %1$s</string>
-    <string name="gallery_export_action">Save as…</string>
-    <string name="gallery_export_floating_unavailable">Floating window mode cannot export translated images</string>
-    <string name="gallery_exporting">Exporting %1$d / %2$d</string>
-    <string name="gallery_export_success">Exported %1$d translated image(s).</string>
-    <string name="gallery_export_partial">Exported %1$d image(s); %2$d failed.</string>
-    <string name="gallery_export_empty">There are no successful results to export.</string>
-    <string name="gallery_export_failed">Export failed: %1$s</string>
-    <string name="gallery_preview_selected_name">Image %1$d</string>
-    <string name="gallery_preview_close">Close preview</string>
-    <string name="gallery_preview_failed">Could not load the original image.</string>
-    <string name="gallery_status_queued">Queued</string>
-    <string name="gallery_status_running">Processing</string>
-    <string name="gallery_status_waiting_retry">Waiting to retry</string>
-    <string name="gallery_status_partial">Completed with errors</string>
-    <string name="gallery_status_succeeded">Completed</string>
-    <string name="gallery_status_failed">Failed</string>
-    <string name="gallery_status_canceled">Canceled</string>
-    <string name="gallery_notification_channel">Gallery translation tasks</string>
-    <string name="gallery_notification_title">Translating gallery images</string>
-    <string name="gallery_notification_progress">%1$d / %2$d processed</string>
 
     <!-- Settings -->
     <string name="settings_title">Translation settings</string>

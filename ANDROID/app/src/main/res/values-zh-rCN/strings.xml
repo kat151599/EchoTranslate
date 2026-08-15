@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">屏译</string>
 
@@ -87,79 +87,6 @@
     <string name="main_preset_save_then_apply">保存后应用</string>
     <string name="main_preset_discard_then_apply">放弃修改并应用</string>
     <string name="main_preset_switch_cancel">取消</string>
-    <string name="gallery_main_title">批量翻译</string>
-    <string name="gallery_main_import">新建任务</string>
-    <string name="gallery_main_all_tasks">任务列表</string>
-    <string name="gallery_main_empty">批量导入截图，在后台逐张识别和翻译。</string>
-    <string name="gallery_main_active_task">正在进行的任务</string>
-    <string name="gallery_main_latest_task">最近一次任务</string>
-    <string name="gallery_main_no_history_task">暂无历史任务</string>
-    <string name="gallery_main_progress">已处理 %1$d / %2$d</string>
-    <string name="gallery_main_recent">最近：成功 %1$d · 失败 %2$d</string>
-    <string name="gallery_confirm_title">创建翻译任务</string>
-    <string name="gallery_confirm_count">已选择 %1$d 张图片</string>
-    <string name="gallery_confirm_add_photos">继续添加图片</string>
-    <string name="gallery_confirm_remove_photo">移除第 %1$d 张图片</string>
-    <string name="gallery_confirm_empty_selection">请至少选择一张图片后再创建任务。</string>
-    <string name="gallery_confirm_settings">任务设置</string>
-    <string name="gallery_confirm_show_presets">展开预设</string>
-    <string name="gallery_confirm_hide_presets">收起预设</string>
-    <string name="gallery_confirm_language">%1$s → %2$s</string>
-    <string name="gallery_confirm_ocr">OCR：%1$s</string>
-    <string name="gallery_confirm_translator">翻译：%1$s</string>
-    <string name="gallery_confirm_create">创建并开始处理</string>
-    <string name="gallery_confirm_create_dialog_title">提示</string>
-    <string name="gallery_confirm_create_dialog_confirm">确定</string>
-    <string name="gallery_confirm_create_dialog_message">将使用当前任务设置在后台处理已选择的 %1$d 张图片。</string>
-    <string name="gallery_confirm_creating">正在创建任务…</string>
-    <string name="gallery_confirm_error">任务创建失败：%1$s</string>
-    <string name="gallery_tasks_title">翻译任务</string>
-    <string name="gallery_tasks_new">新建任务</string>
-    <string name="gallery_tasks_empty">还没有相册翻译任务。</string>
-    <string name="gallery_task_images">%1$d 张图片</string>
-    <string name="gallery_task_settings_summary">OCR：%1$s\n翻译：%2$s\n语言：%3$s → %4$s</string>
-    <string name="gallery_task_progress_label">进度</string>
-    <string name="gallery_task_duration">耗时 %1$s</string>
-    <string name="gallery_task_progress_value">%1$d / %2$d</string>
-    <string name="gallery_task_all_count">全部 %1$d</string>
-    <string name="gallery_task_success_count">成功 %1$d</string>
-    <string name="gallery_task_failed_count">失败 %1$d</string>
-    <string name="gallery_task_open">查看结果</string>
-    <string name="gallery_task_cancel">取消任务</string>
-    <string name="gallery_task_cancel_title">取消这个任务？</string>
-    <string name="gallery_task_cancel_message">任务将停止处理，已经完成的结果会保留。</string>
-    <string name="gallery_task_retry">重试失败图片</string>
-    <string name="gallery_task_delete">删除任务</string>
-    <string name="gallery_task_more_actions">更多操作</string>
-    <string name="gallery_task_delete_title">删除这个任务？</string>
-    <string name="gallery_task_delete_message">任务结果和应用内图片副本将被移除，不会删除相册原图。</string>
-    <string name="gallery_task_detail_title">任务结果</string>
-    <string name="gallery_task_missing">这个任务已经不存在。</string>
-    <string name="gallery_item_source">原文</string>
-    <string name="gallery_item_translation">译文</string>
-    <string name="gallery_item_processing">处理中……</string>
-    <string name="gallery_item_no_translation">未返回译文</string>
-    <string name="gallery_item_error">失败：%1$s</string>
-    <string name="gallery_export_action">另存为…</string>
-    <string name="gallery_export_floating_unavailable">悬浮窗口模式不支持导出译图</string>
-    <string name="gallery_exporting">正在导出 %1$d / %2$d</string>
-    <string name="gallery_export_success">已导出 %1$d 张译图。</string>
-    <string name="gallery_export_partial">已导出 %1$d 张，失败 %2$d 张。</string>
-    <string name="gallery_export_empty">没有可导出的成功结果。</string>
-    <string name="gallery_export_failed">导出失败：%1$s</string>
-    <string name="gallery_preview_selected_name">第 %1$d 张图片</string>
-    <string name="gallery_preview_close">关闭预览</string>
-    <string name="gallery_preview_failed">无法加载原图。</string>
-    <string name="gallery_status_queued">等待处理</string>
-    <string name="gallery_status_running">处理中</string>
-    <string name="gallery_status_waiting_retry">等待重试</string>
-    <string name="gallery_status_partial">部分完成</string>
-    <string name="gallery_status_succeeded">已完成</string>
-    <string name="gallery_status_failed">失败</string>
-    <string name="gallery_status_canceled">已取消</string>
-    <string name="gallery_notification_channel">相册翻译任务</string>
-    <string name="gallery_notification_title">正在翻译相册图片</string>
-    <string name="gallery_notification_progress">已处理 %1$d / %2$d</string>
 
     <!-- 设置 -->
     <string name="settings_title">翻译设置</string>
