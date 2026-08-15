@@ -681,7 +681,7 @@
     <string name="settings_search_item_llm_mirror">Local LLM model download source</string>
     <string name="settings_search_item_cleartext_hosts">Cleartext HTTP allowlist</string>
     <string name="settings_search_item_arc_menu_order">Arc menu button order</string>
-    <string name="settings_search_item_dictionary_prompt">Dictionary prompt (Word Select)</string>
+    <string name="settings_search_item_dictionary_prompt">Dictionary prompt</string>
     <string name="settings_search_item_floating_window_reset">Reset floating window geometry</string>
     <string name="settings_paddle_status_missing_hint">PaddleOCR not downloaded. Use Auto download, or import local model files.</string>
     <string name="settings_paddle_download_failed_format">Download failed: %1$s</string>
@@ -775,11 +775,9 @@
     <string name="toast_skill_switched_loop">Loop mode selected. Tap the floating ball to start.</string>
     <string name="a11y_floating_ball">Screen Translator floating ball</string>
     <string name="a11y_floating_mode_full_screen">Full-screen translation mode</string>
-    <string name="a11y_floating_mode_word_select">Word-selection translation mode</string>
     <string name="a11y_floating_mode_loop_running">Loop translation mode, running</string>
     <string name="a11y_floating_mode_loop_stopped">Loop translation mode, stopped</string>
     <string name="a11y_floating_hint_full_screen">Double tap to translate. Long press to open the menu</string>
-    <string name="a11y_floating_hint_word_select">Double tap to select text. Long press to open the menu</string>
     <string name="a11y_floating_hint_loop_start">Double tap to start looping. Long press to open the menu</string>
     <string name="a11y_floating_hint_loop_stop">Double tap to stop looping. Long press to open the menu</string>
     <string name="menu_pick_region">Region</string>
@@ -1126,7 +1124,6 @@
     <string name="lang_zu">Zulu</string>
 
     <!-- 0.4: arc menu skill switching + word selection translation -->
-    <string name="menu_word_select">Word Select</string>
     <string name="menu_full_screen_skill">Full-screen Translate</string>
     <string name="menu_next_page">Next Page</string>
     <string name="floating_tour_progress">Floating ball tour %1$d / %2$d</string>
@@ -1152,31 +1149,14 @@
     <string name="floating_tour_preset_body">Switches between saved OCR, translation, language, TTS, and display presets.</string>
     <string name="floating_tour_settings_body">Opens the full settings screen for detailed configuration.</string>
     <string name="floating_tour_home_body">Returns to the Screen Translator home screen.</string>
-    <string name="floating_tour_word_select_body">Switches the main ball to word-select translation. Tap the main ball afterward, then drag a box around the text to translate.</string>
     <string name="floating_tour_full_screen_body">Switches the main ball to full-screen translation. Tap the main ball afterward to capture and translate the configured area.</string>
     <string name="floating_tour_next_page_body">When the actions do not fit on one page, use this ball to open the next group. Tap “Show next page” to continue the tour there.</string>
     <string name="floating_tour_next_page_wrap_body">This is also the paging ball. On the last page, it cycles back to the first group.</string>
     <string name="floating_tour_generic_item_body">Runs this arc-menu action.</string>
     <string name="floating_skill_full_screen_label">Full-screen Translate</string>
-    <string name="floating_skill_word_select_label">Word Select Translate</string>
     <string name="toast_skill_switched_full_screen">Tap the ball to translate full screen</string>
-    <string name="toast_skill_switched_word_select">Tap the ball to drag a selection</string>
 
     <!-- Word selection overlay -->
-    <string name="word_select_hint_drawing">Drag a rectangle around text to translate</string>
-    <string name="word_select_btn_translate">Translate</string>
-    <string name="word_select_btn_cancel">Cancel</string>
-    <string name="word_select_btn_redraw">Redraw</string>
-    <string name="settings_section_word_select">Word-select translation</string>
-    <string name="settings_word_select_precise_adjust">Precise adjustment (adjust selection before translating)</string>
-    <string name="settings_word_select_precise_adjust_help">When on, after drawing a box you can fine-tune its edges before translating. When off, releasing your finger immediately translates the drawn area.</string>
-    <string name="settings_word_select_card_mode">Show translation card</string>
-    <string name="settings_word_select_card_mode_help">When on, results appear in a floating translation card. When off, translated text is overlaid directly on the original positions (like full-screen mode), and the selected area becomes the active capture region.</string>
-    <string name="settings_word_select_remember_region">Remember last selection</string>
-    <string name="settings_word_select_remember_region_help">Pre-fill the previous selection box when opening word-select. You can still redraw a new area.</string>
-    <string name="settings_search_item_word_select_precise">Precise adjust / release to translate</string>
-    <string name="settings_search_item_word_select_card_mode">Word-select card / overlay mode</string>
-    <string name="settings_search_item_word_select_remember">Remember word-select region</string>
     <string name="word_card_speak_source">Speak source text</string>
     <string name="word_card_speak_translation">Speak translated text</string>
     <string name="word_card_speak_dictionary">Speak dictionary details</string>
@@ -1236,8 +1216,6 @@
     <string name="process_text_translating">Translating…</string>
     <string name="process_text_translate_failed">Translation failed</string>
     <string name="process_text_need_overlay">Screen Translator needs the \"Display over other apps\" permission</string>
-    <string name="toast_word_select_ocr_failed_format">OCR (%1$s) failed: %2$s</string>
-    <string name="toast_word_select_translate_failed_format">Translate (%1$s) failed: %2$s</string>
 
     <!-- Settings: arc menu order -->
     <string name="settings_section_arc_menu">Arc Menu Buttons</string>
@@ -1314,7 +1292,7 @@
     <string name="language_quick_updated_format">Language: %1$s → %2$s</string>
 
     <!-- Settings: dictionary prompt -->
-    <string name="settings_dictionary_prompt_title">Dictionary Prompt (Word Select, OpenAI-compatible only)</string>
+    <string name="settings_dictionary_prompt_title">Dictionary Prompt</string>
     <string name="settings_dictionary_prompt_desc">When the selected region looks like a single word or fixed phrase, the LLM returns structured pronunciation, definitions, difficult usage or terminology notes, and examples. Non-OpenAI engines fall back to plain translation.</string>
     <string name="settings_dictionary_prompt_reset">Reset to default</string>
     <string name="settings_prompt_reset_confirm_title">Reset translation prompt?</string>
@@ -1600,4 +1578,6 @@
     <string name="settings_remote_pc_hint">Thin-client mode: the phone only captures, compresses and displays. OCR, context memory and translation run on the PC server.</string>
 
 </resources>
+
+
 

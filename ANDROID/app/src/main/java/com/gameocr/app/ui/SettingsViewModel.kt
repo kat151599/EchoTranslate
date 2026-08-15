@@ -1,4 +1,4 @@
-package com.gameocr.app.ui
+﻿package com.gameocr.app.ui
 
 import android.content.Context
 import android.graphics.Typeface
@@ -394,18 +394,6 @@ class SettingsViewModel @Inject constructor(
     /** CUSTOM 主题的边框样式（SOLID / DASHED / DOTTED / DOUBLE / GROOVE），立即生效。 */
     suspend fun saveCustomBorderStyle(style: com.gameocr.app.data.BorderStyle) {
         repo.update { it.copy(customBorderStyle = style) }
-    }
-
-    suspend fun saveWordSelectPreciseAdjust(enabled: Boolean) {
-        repo.update { it.copy(wordSelectPreciseAdjust = enabled) }
-    }
-
-    suspend fun saveWordSelectCardMode(enabled: Boolean) {
-        repo.update { it.copy(wordSelectCardMode = enabled) }
-    }
-
-    suspend fun saveWordSelectRememberRegion(enabled: Boolean) {
-        repo.update { it.copy(wordSelectRememberRegion = enabled) }
     }
 
     /** 弧菜单按钮顺序：拖拽完即时落盘 + 生效，不走主 [save] 流程的 dirty 判定。 */
@@ -952,3 +940,4 @@ internal fun cleartextHostsWithLocalOcrUrls(
     ))
         .distinctBy { it.lowercase() }
 }
+

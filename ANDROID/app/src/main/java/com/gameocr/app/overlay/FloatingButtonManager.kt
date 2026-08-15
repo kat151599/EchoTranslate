@@ -696,14 +696,14 @@ class FloatingButtonManager(
 
     private fun skillIconRes(): Int = when (skill) {
         FloatingSkill.FULL_SCREEN -> R.drawable.ic_overlay_button
-        FloatingSkill.WORD_SELECT -> R.drawable.ic_overlay_button_word
+        FloatingSkill.WORD_SELECT -> R.drawable.ic_overlay_button
         FloatingSkill.LOOP -> R.drawable.ic_overlay_button_loop
     }
 
     private fun updateAccessibilityDescription() {
         val state = when (skill) {
             FloatingSkill.FULL_SCREEN -> context.getString(R.string.a11y_floating_mode_full_screen)
-            FloatingSkill.WORD_SELECT -> context.getString(R.string.a11y_floating_mode_word_select)
+            FloatingSkill.WORD_SELECT -> context.getString(R.string.a11y_floating_mode_full_screen)
             FloatingSkill.LOOP -> context.getString(
                 if (isLooping) R.string.a11y_floating_mode_loop_running
                 else R.string.a11y_floating_mode_loop_stopped
@@ -711,7 +711,7 @@ class FloatingButtonManager(
         }
         val hint = when (skill) {
             FloatingSkill.FULL_SCREEN -> context.getString(R.string.a11y_floating_hint_full_screen)
-            FloatingSkill.WORD_SELECT -> context.getString(R.string.a11y_floating_hint_word_select)
+            FloatingSkill.WORD_SELECT -> context.getString(R.string.a11y_floating_hint_full_screen)
             FloatingSkill.LOOP -> context.getString(
                 if (isLooping) R.string.a11y_floating_hint_loop_stop
                 else R.string.a11y_floating_hint_loop_start
@@ -758,7 +758,7 @@ class FloatingButtonManager(
     private fun currentSkillDisplayName(): String = context.getString(
         when (skill) {
             FloatingSkill.FULL_SCREEN -> R.string.floating_skill_full_screen_label
-            FloatingSkill.WORD_SELECT -> R.string.floating_skill_word_select_label
+            FloatingSkill.WORD_SELECT -> R.string.floating_skill_full_screen_label
             FloatingSkill.LOOP -> R.string.menu_loop_translate
         }
     )
@@ -896,7 +896,6 @@ class FloatingButtonManager(
             R.string.menu_preset_switch -> R.string.floating_tour_preset_body
             R.string.menu_open_settings -> R.string.floating_tour_settings_body
             R.string.menu_open_main -> R.string.floating_tour_home_body
-            R.string.menu_word_select -> R.string.floating_tour_word_select_body
             R.string.menu_full_screen_skill -> R.string.floating_tour_full_screen_body
             R.string.menu_next_page -> if (
                 target is FloatingMenuTourTarget.NextPage && target.wrapsToFirstPage
@@ -1180,7 +1179,6 @@ class FloatingButtonManager(
                 onPresetSwitch = { dismissArcMenu(); onMenuPresetSwitch() },
                 onRestartCapture = { dismissArcMenu(); onMenuRestartCapture() },
                 onSwitchToFullScreen = { dismissArcMenu(); onSwitchSkill(FloatingSkill.FULL_SCREEN) },
-                onSwitchToWordSelect = { dismissArcMenu(); onSwitchSkill(FloatingSkill.WORD_SELECT) }
             )
         ) + listOf(
             MenuItem(

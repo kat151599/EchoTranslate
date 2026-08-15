@@ -1,4 +1,4 @@
-package com.gameocr.app.data
+﻿package com.gameocr.app.data
 
 import androidx.annotation.StringRes
 import com.gameocr.app.R
@@ -208,12 +208,6 @@ object SettingsFieldPolicy {
         portable("floatingMenuItemOrder", R.string.settings_search_item_arc_menu_order, SettingsDiagnostic.SUMMARY),
         portable("arcMenuPageSize", R.string.settings_search_item_arc_menu_order),
         portable("floatingButtonSkill", R.string.settings_search_item_arc_menu_order),
-        portable("wordSelectPreciseAdjust"),
-        portable("wordSelectCardMode"),
-        portable("wordSelectRememberRegion"),
-        deviceLocal("wordSelectLastRegion"),
-        deviceLocal("wordSelectLastRegionSavedScreenW"),
-        deviceLocal("wordSelectLastRegionSavedScreenH"),
         portable("dictionaryPrompt", R.string.settings_search_item_dictionary_prompt, SettingsDiagnostic.SUMMARY),
         portable("localLlmContextSize", R.string.settings_search_item_local_llm_model),
         portable("localLlmMaxNewTokens", R.string.settings_search_item_local_llm_model),
@@ -354,3 +348,4 @@ object SettingsFieldPolicy {
     private fun JsonElement.asObject(): JsonObject = this as? JsonObject
         ?: error("Serialized settings must be a JSON object.")
 }
+

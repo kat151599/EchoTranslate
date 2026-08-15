@@ -1,4 +1,4 @@
-package com.gameocr.app.data
+﻿package com.gameocr.app.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.MutablePreferences
@@ -163,15 +163,7 @@ class SettingsRepository @Inject constructor(
         val ArcMenuPageSize = intPreferencesKey("arc_menu_page_size")
         val TranslationPresets = stringPreferencesKey("translation_presets_json")
         val ActiveTranslationPresetId = stringPreferencesKey("active_translation_preset_id")
-        // 主球当前技能（FULL_SCREEN / WORD_SELECT）
         val FloatingSkillKey = stringPreferencesKey("floating_button_skill")
-        // 划词翻译行为开关
-        val WordSelectPreciseAdjust = booleanPreferencesKey("word_select_precise_adjust")
-        val WordSelectCardMode = booleanPreferencesKey("word_select_card_mode")
-        val WordSelectRememberRegion = booleanPreferencesKey("word_select_remember_region")
-        val WordSelectLastRegion = stringPreferencesKey("word_select_last_region_json")
-        val WordSelectLastRegionSavedW = intPreferencesKey("word_select_last_region_saved_screen_w")
-        val WordSelectLastRegionSavedH = intPreferencesKey("word_select_last_region_saved_screen_h")
         // 划词翻译词典 prompt
         val DictionaryPrompt = stringPreferencesKey("dictionary_prompt")
         // 端侧 LLM 推理参数
@@ -370,31 +362,6 @@ class SettingsRepository @Inject constructor(
         ) }
     }
 
-    suspend fun rescaleWordSelectLastRegionIfNeeded(currentW: Int, currentH: Int) {
-        if (currentW <= 0 || currentH <= 0) return
-        val s = get()
-        val region = s.wordSelectLastRegion ?: return
-        val savedW = s.wordSelectLastRegionSavedScreenW
-        val savedH = s.wordSelectLastRegionSavedScreenH
-        if (savedW <= 0 || savedH <= 0) {
-            update { it.copy(wordSelectLastRegionSavedScreenW = currentW, wordSelectLastRegionSavedScreenH = currentH) }
-            return
-        }
-        if (savedW == currentW && savedH == currentH) return
-        val scaleX = currentW.toFloat() / savedW
-        val scaleY = currentH.toFloat() / savedH
-        update { it.copy(
-            wordSelectLastRegion = CaptureRegion(
-                left = (region.left * scaleX).toInt().coerceIn(0, currentW),
-                top = (region.top * scaleY).toInt().coerceIn(0, currentH),
-                right = (region.right * scaleX).toInt().coerceIn(0, currentW),
-                bottom = (region.bottom * scaleY).toInt().coerceIn(0, currentH),
-            ),
-            wordSelectLastRegionSavedScreenW = currentW,
-            wordSelectLastRegionSavedScreenH = currentH,
-        ) }
-    }
-
     private fun MutablePreferences.putSecure(key: Preferences.Key<String>, value: String) {
         this[key] = secretCodec.encryptPlainText(value)
     }
@@ -560,12 +527,6 @@ class SettingsRepository @Inject constructor(
             )
             prefs[Keys.ActiveTranslationPresetId] = next.activeTranslationPresetId
             prefs[Keys.FloatingSkillKey] = next.floatingButtonSkill.name
-            prefs[Keys.WordSelectPreciseAdjust] = next.wordSelectPreciseAdjust
-            prefs[Keys.WordSelectCardMode] = next.wordSelectCardMode
-            prefs[Keys.WordSelectRememberRegion] = next.wordSelectRememberRegion
-            prefs[Keys.WordSelectLastRegion] = next.wordSelectLastRegion?.let { json.encodeToString(it) } ?: ""
-            prefs[Keys.WordSelectLastRegionSavedW] = next.wordSelectLastRegionSavedScreenW
-            prefs[Keys.WordSelectLastRegionSavedH] = next.wordSelectLastRegionSavedScreenH
             prefs.putSecure(Keys.DictionaryPrompt, next.dictionaryPrompt)
             prefs[Keys.LocalLlmCtxSize] = next.localLlmContextSize
             prefs[Keys.LocalLlmMaxNewTokens] = next.localLlmMaxNewTokens
@@ -846,14 +807,6 @@ class SettingsRepository @Inject constructor(
                 ?: default.activeTranslationPresetId,
             floatingButtonSkill = runCatching { FloatingSkill.valueOf(this[Keys.FloatingSkillKey] ?: "") }
                 .getOrDefault(default.floatingButtonSkill),
-            wordSelectPreciseAdjust = this[Keys.WordSelectPreciseAdjust] ?: default.wordSelectPreciseAdjust,
-            wordSelectCardMode = this[Keys.WordSelectCardMode] ?: default.wordSelectCardMode,
-            wordSelectRememberRegion = this[Keys.WordSelectRememberRegion] ?: default.wordSelectRememberRegion,
-            wordSelectLastRegion = this[Keys.WordSelectLastRegion]?.takeIf { it.isNotBlank() }?.let {
-                runCatching { json.decodeFromString<CaptureRegion>(it) }.getOrNull()
-            },
-            wordSelectLastRegionSavedScreenW = this[Keys.WordSelectLastRegionSavedW] ?: default.wordSelectLastRegionSavedScreenW,
-            wordSelectLastRegionSavedScreenH = this[Keys.WordSelectLastRegionSavedH] ?: default.wordSelectLastRegionSavedScreenH,
             dictionaryPrompt = secureString(
                 Keys.DictionaryPrompt,
                 defaultDictionaryPromptProvider()
@@ -875,3 +828,5 @@ class SettingsRepository @Inject constructor(
         ))
     }
 }
+
+

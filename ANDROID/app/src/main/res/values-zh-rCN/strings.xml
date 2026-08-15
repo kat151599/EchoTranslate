@@ -773,11 +773,9 @@
     <string name="toast_skill_switched_loop">已切换到循环翻译，点击悬浮球开始</string>
     <string name="a11y_floating_ball">屏译悬浮球</string>
     <string name="a11y_floating_mode_full_screen">全屏翻译模式</string>
-    <string name="a11y_floating_mode_word_select">划词翻译模式</string>
     <string name="a11y_floating_mode_loop_running">循环翻译模式，运行中</string>
     <string name="a11y_floating_mode_loop_stopped">循环翻译模式，已停止</string>
     <string name="a11y_floating_hint_full_screen">双击开始翻译，长按打开菜单</string>
-    <string name="a11y_floating_hint_word_select">双击开始划词，长按打开菜单</string>
     <string name="a11y_floating_hint_loop_start">双击开始循环，长按打开菜单</string>
     <string name="a11y_floating_hint_loop_stop">双击停止循环，长按打开菜单</string>
     <string name="menu_pick_region">截图区域</string>
@@ -1111,7 +1109,6 @@
     <string name="lang_zu">祖鲁语</string>
 
     <!-- 0.4：弧菜单技能切换 + 划词翻译 -->
-    <string name="menu_word_select">划词翻译</string>
     <string name="menu_full_screen_skill">全屏翻译</string>
     <string name="menu_next_page">下一组</string>
     <string name="floating_tour_progress">悬浮球漫游 %1$d / %2$d</string>
@@ -1137,31 +1134,14 @@
     <string name="floating_tour_preset_body">切换已保存的 OCR、翻译、语言、TTS 与显示预设。</string>
     <string name="floating_tour_settings_body">打开完整设置页，调整详细参数。</string>
     <string name="floating_tour_home_body">返回屏译首页。</string>
-    <string name="floating_tour_word_select_body">把主球切换为划词翻译；之后单击主球，再拖框选择需要翻译的文字。</string>
     <string name="floating_tour_full_screen_body">把主球切换为全屏翻译；之后单击主球即可截取并翻译当前设定区域。</string>
     <string name="floating_tour_next_page_body">一页放不下全部功能时，用这个球打开下一组。点击“演示翻页”，引导会在下一页继续。</string>
     <string name="floating_tour_next_page_wrap_body">这也是菜单翻页球；在最后一页点击它，会循环回到第一组。</string>
     <string name="floating_tour_generic_item_body">执行这个弧形菜单功能。</string>
     <string name="floating_skill_full_screen_label">全屏翻译</string>
-    <string name="floating_skill_word_select_label">划词翻译</string>
     <string name="toast_skill_switched_full_screen">主球已切换：单击=全屏翻译</string>
-    <string name="toast_skill_switched_word_select">主球已切换：单击=拖动框选翻译</string>
 
     <!-- 划词选区 overlay -->
-    <string name="word_select_hint_drawing">拖一个矩形框选要翻译的文字</string>
-    <string name="word_select_btn_translate">翻译</string>
-    <string name="word_select_btn_cancel">取消</string>
-    <string name="word_select_btn_redraw">重画</string>
-    <string name="settings_section_word_select">划词翻译</string>
-    <string name="settings_word_select_precise_adjust">精确调整（翻译前可微调选框）</string>
-    <string name="settings_word_select_precise_adjust_help">开启后，画框结束进入调整阶段，可拖动 8 个把手微调后再点翻译。关闭后松手即翻译，不进入调整阶段。</string>
-    <string name="settings_word_select_card_mode">弹出翻译卡片</string>
-    <string name="settings_word_select_card_mode_help">开启后，翻译结果以浮动卡片展示。关闭后，走全屏叠加显示管线，译文叠加在原文位置，同时将选框设为截图区域。</string>
-    <string name="settings_word_select_remember_region">记住上次的选框位置</string>
-    <string name="settings_word_select_remember_region_help">打开划词选框时自动预填上次的选区，可随时重画新区域。</string>
-    <string name="settings_search_item_word_select_precise">精确调整 / 松手翻译</string>
-    <string name="settings_search_item_word_select_card_mode">划词卡片 / 叠加模式</string>
-    <string name="settings_search_item_word_select_remember">记住划词选框</string>
     <string name="word_card_speak_source">朗读原文</string>
     <string name="word_card_speak_translation">朗读译文</string>
     <string name="word_card_speak_dictionary">朗读词典详情</string>
@@ -1221,8 +1201,6 @@
     <string name="process_text_translating">翻译中…</string>
     <string name="process_text_translate_failed">翻译失败</string>
     <string name="process_text_need_overlay">屏译翻译需要「显示在其他应用上层」权限</string>
-    <string name="toast_word_select_ocr_failed_format">OCR (%1$s) 失败: %2$s</string>
-    <string name="toast_word_select_translate_failed_format">翻译 (%1$s) 失败: %2$s</string>
 
     <!-- 设置：弧菜单按钮顺序 -->
     <string name="settings_section_arc_menu">弧形菜单按钮</string>
@@ -1584,4 +1562,6 @@
     <string name="settings_remote_pc_hint">瘦客户端模式：手机只负责截屏、压缩和显示；OCR、上下文记忆和翻译全部在 PC 服务器完成。</string>
 
 </resources>
+
+
 

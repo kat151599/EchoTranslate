@@ -1,4 +1,4 @@
-package com.gameocr.app.ui
+﻿package com.gameocr.app.ui
 
 import android.content.Intent
 import android.content.Context
@@ -531,9 +531,6 @@ fun SettingsScreen(
     // 当前主球技能。技能槽（FULL_SCREEN_SKILL）那一行的文案要跟着它动态显示「切到对方」：
     // 当前 FULL_SCREEN → 显示「— 划词翻译」；当前 WORD_SELECT → 显示「— 全屏翻译」
     var currentSkill by remember { mutableStateOf(com.gameocr.app.data.FloatingSkill.FULL_SCREEN) }
-    var wordSelectPreciseAdjust by remember { mutableStateOf(true) }
-    var wordSelectCardMode by remember { mutableStateOf(true) }
-    var wordSelectRememberRegion by remember { mutableStateOf(false) }
     var dictionaryPrompt by remember { mutableStateOf("") }
     // 悬浮按钮"贴边距离" slider 的实时预览：屏幕两侧画 inset 宽度的半透粉条。
     // 默认 false——进设置就显示条带太突兀；用户在 slider 旁手动开启「预览」后才覆盖到屏幕上。
@@ -878,9 +875,6 @@ fun SettingsScreen(
         menuOrder = s.floatingMenuItemOrder
         arcMenuPageSize = s.arcMenuPageSize.toFloat()
         currentSkill = s.floatingButtonSkill
-        wordSelectPreciseAdjust = s.wordSelectPreciseAdjust
-        wordSelectCardMode = s.wordSelectCardMode
-        wordSelectRememberRegion = s.wordSelectRememberRegion
         apiTimeoutSec = s.apiTimeoutSeconds.toFloat()
         mergeAdjacent = s.mergeAdjacentBlocks
         mergeStrength = s.mergeStrength
@@ -2426,9 +2420,6 @@ fun SettingsScreen(
             menuOrder = s.floatingMenuItemOrder
             arcMenuPageSize = s.arcMenuPageSize.toFloat()
             currentSkill = s.floatingButtonSkill
-            wordSelectPreciseAdjust = s.wordSelectPreciseAdjust
-            wordSelectCardMode = s.wordSelectCardMode
-            wordSelectRememberRegion = s.wordSelectRememberRegion
             dictionaryPrompt = s.dictionaryPrompt
             translationPresets = s.translationPresets
             activeTranslationPresetId = s.activeTranslationPresetId
@@ -4711,38 +4702,6 @@ fun SettingsScreen(
             // —— 悬浮按钮 ——
             }
 
-            // —— 划词翻译 ——
-            item(key = SectionKeys.WORD_SELECT) {
-            SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_WORD_SELECT) {
-            SectionCard(title = stringResource(R.string.settings_section_word_select)) {
-                SwitchRow(
-                    stringResource(R.string.settings_word_select_precise_adjust),
-                    wordSelectPreciseAdjust,
-                    helpText = stringResource(R.string.settings_word_select_precise_adjust_help)
-                ) {
-                    wordSelectPreciseAdjust = it
-                    scope.launch { viewModel.saveWordSelectPreciseAdjust(it) }
-                }
-                SwitchRow(
-                    stringResource(R.string.settings_word_select_card_mode),
-                    wordSelectCardMode,
-                    helpText = stringResource(R.string.settings_word_select_card_mode_help)
-                ) {
-                    wordSelectCardMode = it
-                    scope.launch { viewModel.saveWordSelectCardMode(it) }
-                }
-                SwitchRow(
-                    stringResource(R.string.settings_word_select_remember_region),
-                    wordSelectRememberRegion,
-                    helpText = stringResource(R.string.settings_word_select_remember_region_help)
-                ) {
-                    wordSelectRememberRegion = it
-                    scope.launch { viewModel.saveWordSelectRememberRegion(it) }
-                }
-            }
-            }
-            }
-
             // —— 循环触发器 ——
             item(key = SectionKeys.TRIGGER) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TRIGGER) {
@@ -6079,7 +6038,6 @@ private object SectionKeys {
     const val OCR = "ocr"
     const val TEXT_ORIENTATION = "text_orientation"
     const val OVERLAY = "overlay"
-    const val WORD_SELECT = "word_select"
     const val FLOATING = "floating"
     const val ARC_MENU = "arc_menu"
     const val TRIGGER = "trigger"
@@ -6097,7 +6055,6 @@ internal val SETTINGS_SECTION_KEYS_IN_ORDER = listOf(
     SectionKeys.OCR,
     SectionKeys.TEXT_ORIENTATION,
     SectionKeys.OVERLAY,
-    SectionKeys.WORD_SELECT,
     SectionKeys.TRIGGER,
     SectionKeys.FLOATING,
     SectionKeys.ARC_MENU,
@@ -6214,11 +6171,6 @@ private val SEARCH_TARGET_FLOATING = intArrayOf(
     R.string.settings_search_item_floating_dock_inset,
 )
 private val SEARCH_TARGET_ARC_MENU = intArrayOf(R.string.settings_search_item_arc_menu_order)
-private val SEARCH_TARGET_WORD_SELECT = intArrayOf(
-    R.string.settings_search_item_word_select_precise,
-    R.string.settings_search_item_word_select_card_mode,
-    R.string.settings_search_item_word_select_remember,
-)
 private val SEARCH_TARGET_TRIGGER = intArrayOf(
     R.string.settings_search_item_loop_interval,
     R.string.settings_search_item_loop_trigger_mode,
@@ -6256,7 +6208,6 @@ internal val SETTINGS_SEARCH_TARGET_RES_IDS: Set<Int> = listOf(
     SEARCH_TARGET_OVERLAY_LAYOUT,
     SEARCH_TARGET_FLOATING,
     SEARCH_TARGET_ARC_MENU,
-    SEARCH_TARGET_WORD_SELECT,
     SEARCH_TARGET_TRIGGER,
     SEARCH_TARGET_DEVELOPER,
     SEARCH_TARGET_NETWORK,
@@ -6585,9 +6536,6 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
     SearchEntry(SectionKeys.ARC_MENU, R.string.settings_section_arc_menu, R.string.settings_search_item_arc_menu_order, listOf("arc menu", "弧菜单", "弧形", "顺序", "order", "reorder", "排序", "拖动", "menu", "按钮", "page", "page size", "分页", "每页", "翻页", "loop", "region", "home", "skill", "技能", "划词", "language", "语言", "源语言", "目标语言")),
 
     // —— 划词翻译 ——
-    SearchEntry(SectionKeys.WORD_SELECT, R.string.settings_section_word_select, R.string.settings_search_item_word_select_precise, listOf("划词", "word select", "precise", "adjust", "松手", "精确调整", "release")),
-    SearchEntry(SectionKeys.WORD_SELECT, R.string.settings_section_word_select, R.string.settings_search_item_word_select_card_mode, listOf("划词", "word select", "card", "overlay", "卡片", "叠加", "全屏模式")),
-    SearchEntry(SectionKeys.WORD_SELECT, R.string.settings_section_word_select, R.string.settings_search_item_word_select_remember, listOf("划词", "word select", "remember", "记住", "选框", "region")),
 
     // —— 触发器 ——
     SearchEntry(SectionKeys.TRIGGER, R.string.settings_section_trigger, R.string.settings_search_item_loop_interval, listOf("loop", "循环", "interval", "间隔")),
@@ -8893,7 +8841,7 @@ private fun menuItemLabel(id: MenuItemId, currentSkill: FloatingSkill): String =
                 val targetSkillName = stringResource(
                     when (targetSkill) {
                         FloatingSkill.FULL_SCREEN -> R.string.menu_full_screen_skill
-                        FloatingSkill.WORD_SELECT -> R.string.menu_word_select
+                        FloatingSkill.WORD_SELECT -> R.string.menu_full_screen_skill
                         FloatingSkill.LOOP -> error("Handled above")
                     }
                 )
@@ -8914,7 +8862,7 @@ private fun menuItemIconRes(id: MenuItemId, currentSkill: FloatingSkill): Int = 
     MenuItemId.LOOP,
     MenuItemId.FULL_SCREEN_SKILL -> when (checkNotNull(MenuItemRegistry.targetSkill(id, currentSkill))) {
         FloatingSkill.FULL_SCREEN -> R.drawable.ic_menu_full_screen
-        FloatingSkill.WORD_SELECT -> R.drawable.ic_menu_word_select
+        FloatingSkill.WORD_SELECT -> R.drawable.ic_menu_full_screen
         FloatingSkill.LOOP -> R.drawable.ic_menu_loop
     }
         MenuItemId.REGION -> R.drawable.ic_menu_region
@@ -9080,3 +9028,5 @@ private fun LlmMirrorRadioRow(
         Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 4.dp))
     }
 }
+
+

@@ -97,10 +97,10 @@ object MenuItemRegistry {
             onTap = callbacks.onSwitchToFullScreen,
         )
         FloatingSkill.WORD_SELECT -> MenuItem(
-            iconRes = R.drawable.ic_menu_word_select,
+            iconRes = R.drawable.ic_menu_full_screen,
             bgRes = R.drawable.bg_arc_menu_item,
-            labelRes = R.string.menu_word_select,
-            onTap = callbacks.onSwitchToWordSelect,
+            labelRes = R.string.menu_full_screen_skill,
+            onTap = callbacks.onSwitchToFullScreen,
         )
         FloatingSkill.LOOP -> MenuItem(
             iconRes = R.drawable.ic_menu_loop,
@@ -146,6 +146,5 @@ object MenuItemRegistry {
         val onPresetSwitch: () -> Unit,
         val onRestartCapture: () -> Unit,
         val onSwitchToFullScreen: () -> Unit,
-        val onSwitchToWordSelect: () -> Unit
     )
 }

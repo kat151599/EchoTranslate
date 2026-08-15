@@ -1,4 +1,4 @@
-package com.gameocr.app.data
+﻿package com.gameocr.app.data
 
 import androidx.annotation.StringRes
 import com.gameocr.app.R
@@ -255,21 +255,7 @@ data class Settings(
      */
     val floatingMenuItemOrder: List<MenuItemId> = FloatingMenu.DEFAULT_ORDER,
     val arcMenuPageSize: Int = FloatingMenu.DEFAULT_PAGE_SIZE,
-    /**
-     * 主球单击触发的「技能」。FULL_SCREEN 走全屏 OCR+翻译；WORD_SELECT 进入划词框选；
-     * LOOP 切换循环任务的启动/停止。模式会持久化，循环运行状态不会跨 Service 重启恢复。
-     */
     val floatingButtonSkill: FloatingSkill = FloatingSkill.FULL_SCREEN,
-    /** 划词翻译：选框后进入精确调整阶段（显示 8 个 handle）再点翻译；关闭则松手即翻译。 */
-    val wordSelectPreciseAdjust: Boolean = true,
-    /** 划词翻译：开启 = 弹翻译卡片；关闭 = 走全屏叠加显示管线（译文覆盖在原文位置）。 */
-    val wordSelectCardMode: Boolean = true,
-    /** 划词翻译：记住上次的选框位置，下次打开时自动预填。 */
-    val wordSelectRememberRegion: Boolean = false,
-    /** 划词翻译上次选框（物理像素）。仅 [wordSelectRememberRegion] 开启时读取。 */
-    val wordSelectLastRegion: CaptureRegion? = null,
-    val wordSelectLastRegionSavedScreenW: Int = 0,
-    val wordSelectLastRegionSavedScreenH: Int = 0,
     /**
      * 划词翻译：单词模式专用的 LLM 词典 prompt 模板（仅 OpenAI 兼容引擎生效）。
      * 用占位符 `{source}` / `{target}` 同 [promptTemplate]。返回 JSON 让卡片显示音标 / 词性 /
@@ -782,7 +768,7 @@ object TranslationPresetCatalog {
 
 /**
  * 主球单击技能。FULL_SCREEN 走 CaptureService.triggerOnce()（全屏 OCR+翻译）；
- * WORD_SELECT 走 CaptureService.triggerWordSelect()（拖矩形 → 单段翻译卡片）。
+ * Legacy persisted value falls back to full-screen translation.
  */
 @Serializable
 enum class FloatingSkill {
@@ -1398,3 +1384,6 @@ enum class OverlayTheme {
     /** 自定义：bg/fg/border/border 粗细全由用户设置。 */
     CUSTOM
 }
+
+
+

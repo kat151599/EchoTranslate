@@ -1,4 +1,4 @@
-package com.gameocr.app.service
+﻿package com.gameocr.app.service
 
 import android.app.Service
 import android.content.Context
@@ -113,7 +113,6 @@ import com.gameocr.app.overlay.TranslationCardOverlay
 import com.gameocr.app.overlay.TranslationCorrectionDraft
 import com.gameocr.app.overlay.TranslationCorrectionOverlay
 import com.gameocr.app.overlay.TranslationCorrectionRequest
-import com.gameocr.app.overlay.WordSelectOverlay
 import com.gameocr.app.ui.MainActivity
 import com.gameocr.app.translate.BatchTranslationProgressState
 import com.gameocr.app.translate.BatchTranslationUpdate
@@ -130,8 +129,6 @@ import com.gameocr.app.translate.shouldUseCrossLineContextTranslation
 import com.gameocr.app.translate.WordHeuristic
 import com.gameocr.app.translate.WordResult
 import com.gameocr.app.translate.RemotePcTranslator
-import com.gameocr.app.translate.WordSelectTranslationCoordinator
-import com.gameocr.app.translate.WordSelectTranslationStage
 import com.gameocr.app.util.InferenceTiming
 import com.gameocr.app.util.VerticalDiagnosticLog
 import com.gameocr.app.util.physicalDisplaySize
@@ -233,7 +230,6 @@ class CaptureService : Service() {
     private var languageQuickSwitch: LanguageQuickSwitchOverlay? = null
     private var presetQuickSwitch: PresetQuickSwitchOverlay? = null
     private var historyBlockPicker: HistoryBlockPickerOverlay? = null
-    private var wordSelect: WordSelectOverlay? = null
     private var translationCard: TranslationCardOverlay? = null
     private var translationBlockCopyOverlay: TranslationBlockCopyOverlay? = null
     private var historyCorrectionOverlay: HistoryCorrectionOverlay? = null
@@ -619,342 +615,6 @@ class CaptureService : Service() {
                 showLoadingAfterScreenshot = true,
                 restoreFloatingButtonAfterScreenshot = true
             )
-        }
-    }
-
-    /**
-     * 划词翻译入口：先 hide 球，弹 WordSelectOverlay 让用户拖矩形，确认后截屏 → crop 该区域 →
-     * OCR → 判定单词 → translate / translateWord → 弹 TranslationCardOverlay。
-     *
-     * 全程错误用 [OverlayManager.showErrorHint] 红条提示（跟主链路同链路），不弹 Toast。
-     */
-    private fun triggerWordSelect() {
-        val ws = wordSelect ?: WordSelectOverlay(this).also { wordSelect = it }
-        if (ws.isShown()) return
-        mainScope.launch {
-            val settings = settingsRepository.get()
-            val screen = physicalDisplaySize(this@CaptureService)
-            settingsRepository.rescaleWordSelectLastRegionIfNeeded(screen.width, screen.height)
-            val initialRect: android.graphics.Rect? = if (settings.wordSelectRememberRegion) {
-                settingsRepository.get().wordSelectLastRegion?.let {
-                    android.graphics.Rect(it.left, it.top, it.right, it.bottom)
-                }
-            } else null
-
-            floatingButton?.hide()
-            ws.show(
-                initial = initialRect,
-                skipAdjustment = !settings.wordSelectPreciseAdjust,
-                onTranslate = { rect ->
-                    scope.launch {
-                        // 保存本次选框
-                        if (settings.wordSelectRememberRegion) {
-                            val s = physicalDisplaySize(this@CaptureService)
-                            settingsRepository.update { it.copy(
-                                wordSelectLastRegion = com.gameocr.app.capture.CaptureRegion(rect.left, rect.top, rect.right, rect.bottom),
-                                wordSelectLastRegionSavedScreenW = s.width,
-                                wordSelectLastRegionSavedScreenH = s.height,
-                            ) }
-                        }
-                        prepareCleanCaptureFrame(hideFloatingButton = true)
-                        if (settings.wordSelectCardMode) {
-                            runWordSelectPipeline(rect, restoreFloatingButtonAfterScreenshot = true)
-                        } else {
-                            // 叠加模式：把选框写入 captureRegion，走全屏叠加管线
-                            val s = physicalDisplaySize(this@CaptureService)
-                            settingsRepository.update { it.copy(
-                                captureRegion = com.gameocr.app.capture.CaptureRegion(rect.left, rect.top, rect.right, rect.bottom),
-                                captureRegionSavedScreenW = s.width,
-                                captureRegionSavedScreenH = s.height,
-                            ) }
-                            captureOnce(
-                                showLoadingAfterScreenshot = true,
-                                restoreFloatingButtonAfterScreenshot = true,
-                            )
-                        }
-                    }
-                },
-                onCancel = {
-                    mainScope.launch { floatingButton?.show() }
-                }
-            )
-        }
-    }
-
-    /** 框选后真正跑流水线。screenshot → crop → OCR → translate → 弹卡片。 */
-    private suspend fun runWordSelectPipeline(
-        rect: android.graphics.Rect,
-        restoreFloatingButtonAfterScreenshot: Boolean = false
-    ) {
-        if (!captureLock.tryLock()) {
-            restoreCaptureChrome(
-                showLoading = false,
-                restoreFloatingButton = restoreFloatingButtonAfterScreenshot
-            )
-            mainScope.launch { overlay?.dismissLoading() }
-            return
-        }
-        val diagId = captureSequence.incrementAndGet()
-        beginTranslationBatch(diagId)
-        val perfStartedAt = SystemClock.elapsedRealtime()
-        fun logWordSelectPerf(stage: String, details: String = "") {
-            Timber.tag("WordSelectPerf").i(
-                "capture=%d stage=%s totalMs=%d%s",
-                diagId,
-                stage,
-                SystemClock.elapsedRealtime() - perfStartedAt,
-                details.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty(),
-            )
-        }
-        logWordSelectPerf("started", "rect=${rect.width()}x${rect.height()}")
-        var captureChromeRestored = false
-        var activeCard: TranslationCardOverlay? = null
-        fun restoreCaptureChromeOnce(showLoading: Boolean) {
-            if (captureChromeRestored) return
-            captureChromeRestored = true
-            restoreCaptureChrome(
-                showLoading = showLoading,
-                restoreFloatingButton = restoreFloatingButtonAfterScreenshot
-            )
-        }
-        suspend fun dismissActiveCard() {
-            val card = activeCard ?: return
-            withContext(Dispatchers.Main) {
-                if (card.isShown()) card.dismiss()
-            }
-            activeCard = null
-        }
-        try {
-            logVerticalDiag(diagId, "wordSelect start rect=${rect.toDiagString()}")
-            val shotter = screenshotter ?: run {
-                logVerticalDiag(diagId, "skip: screenshotter is null")
-                restoreCaptureChromeOnce(showLoading = false)
-                return
-            }
-            val full = shotter.capture()
-            if (full == null) {
-                restoreCaptureChromeOnce(showLoading = false)
-                val msg = getString(R.string.toast_capture_failed)
-                mainScope.launch { overlay?.showErrorHint(msg) }
-                return
-            }
-            logWordSelectPerf("screenshot_ready", "frame=${full.width}x${full.height}")
-            restoreCaptureChromeOnce(showLoading = false)
-            val settings = settingsRepository.get()
-            val card = withContext(Dispatchers.Main) {
-                (translationCard ?: TranslationCardOverlay(
-                    context = this@CaptureService,
-                    onDismissed = {},
-                    onShown = { floatingButton?.bringToFront() },
-                ).also {
-                    translationCard = it
-                }).also {
-                    it.show(
-                        sourceText = "",
-                        translation = null,
-                        wordResult = null,
-                        settings = settings,
-                        loading = true,
-                        onCorrectTranslation = { source, translation ->
-                            showTranslationCorrection(
-                                TranslationCorrectionRequest(source, translation)
-                            )
-                        },
-                    )
-                }
-            }
-            activeCard = card
-            logWordSelectPerf("card_visible", "phase=recognizing")
-            val fullStats = sampleBitmapFrameStats(full)
-            logVerticalDiag(
-                diagId,
-                "screenshot full=${full.width}x${full.height} stats=${fullStats.toDiagString()}"
-            )
-            logCaptureGeometry(diagId, "wordSelect", full)
-            logBlankLikeFrame(diagId, "screenshot", fullStats)
-            // 用 word-select rect 裁剪，**不**走 settings.captureRegion——划词是一次性独立选区
-            val cropped = try {
-                cropRect(full, rect)
-            } catch (t: Throwable) {
-                full.recycle()
-                throw t
-            }
-            full.recycle()
-            if (cropped == null) {
-                dismissActiveCard()
-                val msg = getString(R.string.word_card_no_text)
-                mainScope.launch { overlay?.showErrorHint(msg) }
-                return
-            }
-            logWordSelectPerf("crop_ready", "crop=${cropped.width}x${cropped.height}")
-            val croppedStats = sampleBitmapFrameStats(cropped)
-            logVerticalDiag(
-                diagId,
-                "wordSelect workBitmap=${cropped.width}x${cropped.height} " +
-                    "rect=${rect.toDiagString()} stats=${croppedStats.toDiagString()}"
-            )
-            logBlankLikeFrame(diagId, "wordSelect workBitmap", croppedStats)
-            val ocrStartedAt = System.currentTimeMillis()
-            logWordSelectPerf("ocr_started", "engine=${settings.ocrEngine.name}")
-            val ocrBlocks = try {
-                ocrEngine.recognize(cropped, settings.ocrEngine)
-            } catch (ce: kotlinx.coroutines.CancellationException) {
-                cropped.recycle()
-                throw ce
-            } catch (t: Throwable) {
-                Timber.w(t, "Word-select OCR failed")
-                logRepository.error(
-                    LogRepository.Category.OCR,
-                    getString(R.string.log_msg_ocr_failed_format, settings.ocrEngine.name),
-                    t,
-                    elapsedMs = elapsedSince(ocrStartedAt)
-                )
-                val msg = getString(
-                    R.string.toast_word_select_ocr_failed_format,
-                    settings.ocrEngine.name,
-                    shortError(t)
-                )
-                dismissActiveCard()
-                mainScope.launch { overlay?.showErrorHint(msg) }
-                cropped.recycle()
-                return
-            }
-            logWordSelectPerf(
-                "ocr_finished",
-                "ocrMs=${elapsedSince(ocrStartedAt)} blocks=${ocrBlocks.size}",
-            )
-            cropped.recycle()
-            logVerticalBlocks(diagId, "wordSelect rawBlocks engine=${settings.ocrEngine.name}", ocrBlocks)
-            val orderedOcrBlocks = sortTextBlocksForReading(ocrBlocks)
-            logVerticalBlocks(diagId, "wordSelect orderedBlocks", orderedOcrBlocks)
-            val text = orderedOcrBlocks.joinToString(" ") { it.text.trim() }.trim()
-            logVerticalDiag(diagId, "wordSelect joined ${text.toDiagText()}")
-            if (text.isEmpty()) {
-                dismissActiveCard()
-                val msg = getString(R.string.word_card_no_text)
-                mainScope.launch { overlay?.showErrorHint(msg) }
-                return
-            }
-            withContext(Dispatchers.Main) { card.updateSource(text) }
-            logWordSelectPerf("source_visible")
-            logRepository.info(
-                LogRepository.Category.OCR,
-                getString(R.string.log_msg_ocr_results_format, ocrBlocks.size, settings.ocrEngine.name, text),
-                elapsedMs = elapsedSince(ocrStartedAt)
-            )
-
-            val dictionaryCandidate = WordHeuristic.dictionaryTermOrNull(text, settings.sourceLang)
-            // 词典化：只在「单词 + OpenAI 兼容引擎」时尝试 LLM JSON prompt；其他全部走纯翻译
-            val dictionaryTerm = WordHeuristic.structuredDictionaryTermOrNull(
-                text = text,
-                sourceLang = settings.sourceLang,
-                translatorEngine = settings.translatorEngine,
-            )
-            logVerticalDiag(
-                diagId,
-                "wordSelect dictionary eligible=${dictionaryCandidate != null} " +
-                    "request=${dictionaryTerm != null} engine=${settings.translatorEngine.name} " +
-                "term=${dictionaryTerm?.toDiagText() ?: "none"}"
-            )
-            // 单词先请求结构化词典；没有有效词典结果时，才回退到主翻译流式输出。
-            val translateStartedAt = System.currentTimeMillis()
-            val translateStartedElapsed = SystemClock.elapsedRealtime()
-            val outcome = WordSelectTranslationCoordinator(translator).execute(
-                source = text,
-                settings = settings,
-                dictionaryTerm = dictionaryTerm,
-                onPartialTranslation = { partial ->
-                    withContext(Dispatchers.Main) { card.updateTranslation(partial) }
-                },
-                onWordResult = { result ->
-                    logVerticalDiag(
-                        diagId,
-                        "wordSelect dictionary result=ready " +
-                            "phonetic=${result.phonetic.isNotBlank()} pos=${result.pos.size} " +
-                            "definitions=${result.definitions.size} notes=${result.difficultyNotes.size} " +
-                            "examples=${result.examples.size}"
-                    )
-                    withContext(Dispatchers.Main) { card.updateWordResult(result) }
-                },
-                onStage = { stage ->
-                    logWordSelectPerf(
-                        stage = when (stage) {
-                            WordSelectTranslationStage.PRIMARY_STARTED -> "primary_started"
-                            WordSelectTranslationStage.FIRST_PARTIAL_VISIBLE -> "first_partial_visible"
-                            WordSelectTranslationStage.PRIMARY_FINISHED -> "primary_finished"
-                            WordSelectTranslationStage.DICTIONARY_STARTED -> "dictionary_started"
-                            WordSelectTranslationStage.DICTIONARY_FINISHED -> "dictionary_finished"
-                        },
-                        details = "translationMs=${SystemClock.elapsedRealtime() - translateStartedElapsed}",
-                    )
-                },
-            )
-            outcome.dictionaryError?.let { error ->
-                Timber.w(error, "Word-select dictionary request failed")
-                logVerticalDiag(diagId, "wordSelect dictionary failed error=${shortError(error)}")
-            }
-            logVerticalDiag(
-                diagId,
-                "wordSelect translation chunks=${outcome.chunkCount} " +
-                    "firstChunkMs=${outcome.firstChunkLatencyMs ?: -1}"
-            )
-            outcome.translationError?.let { error ->
-                Timber.w(error, "Word-select translate failed")
-                logRepository.error(
-                    LogRepository.Category.TRANSLATE,
-                    getString(R.string.log_msg_translate_failed_format, settings.translatorEngine.name),
-                    error,
-                    elapsedMs = elapsedSince(translateStartedAt)
-                )
-            }
-
-            val dictionaryFallback = outcome.wordResult?.fallbackTranslation
-                ?: outcome.wordResult?.definitions?.firstOrNull()
-            val displayedTranslation = outcome.translation?.takeIf { it.isNotBlank() }
-                ?: dictionaryFallback?.takeIf { it.isNotBlank() }
-                ?: resolveTranslationOutput(
-                    initialOutput = outcome.translation,
-                    source = text,
-                    settings = settings,
-                    diagId = diagId,
-                    label = "wordSelect",
-                ).text
-            withContext(Dispatchers.Main) {
-                card.updateWordResult(outcome.wordResult)
-                card.updateTranslation(displayedTranslation, final = true)
-            }
-            if (outcome.translationError != null && outcome.wordResult == null) {
-                val msg = getString(
-                    R.string.toast_word_select_translate_failed_format,
-                    settings.translatorEngine.name,
-                    shortError(outcome.translationError)
-                )
-                mainScope.launch { overlay?.showErrorHint(msg) }
-            }
-            if (outcome.translation?.isNotBlank() == true) {
-                logRepository.pair(
-                    LogRepository.Category.TRANSLATE,
-                    text,
-                    outcome.translation,
-                    elapsedMs = elapsedSince(translateStartedAt)
-                )
-            }
-            logWordSelectPerf(
-                "result_complete",
-                "translationMs=${elapsedSince(translateStartedAt)} chunks=${outcome.chunkCount}",
-            )
-        } catch (ce: kotlinx.coroutines.CancellationException) {
-            dismissActiveCard()
-            throw ce
-        } catch (t: Throwable) {
-            dismissActiveCard()
-            throw t
-        } finally {
-            restoreCaptureChromeOnce(showLoading = false)
-            logWordSelectPerf("pipeline_finished")
-            logVerticalDiag(diagId, "finish")
-            mainScope.launch { overlay?.dismissLoading() }
-            captureLock.unlock()
         }
     }
 
@@ -4098,8 +3758,6 @@ class CaptureService : Service() {
         languageQuickSwitch = null
         presetQuickSwitch?.dismiss()
         presetQuickSwitch = null
-        wordSelect?.dismiss()
-        wordSelect = null
         translationCard?.dismiss()
         translationCard = null
         translationBlockCopyOverlay?.dismiss()
@@ -4167,3 +3825,4 @@ private fun Int.toDiagOrientation(): String = when (this) {
     android.content.res.Configuration.ORIENTATION_UNDEFINED -> "UNDEFINED"
     else -> "UNKNOWN($this)"
 }
+
