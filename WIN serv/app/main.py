@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from .bootstrap import configure_paddlex_cache
 from .config import ROOT, load_config, save_config
-from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, history_translation_hits, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message
+from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, history_translation_hits, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message, create_pending_history_correction, pending_history_corrections, resolve_pending_history_correction
 from .ocr_engine import ocr_engine, merge_ocr_blocks
 from .token_budget import TokenBudget
 from .prompting import glossary_text, game_glossary_text, target_text, build_messages
@@ -49,6 +49,13 @@ class TerminalLogHandler(logging.Handler):
 terminal_handler = TerminalLogHandler()
 terminal_handler.setFormatter(logging.Formatter("%(asctime)s  %(levelname)s  %(name)s  %(message)s", "%H:%M:%S"))
 logging.getLogger().addHandler(terminal_handler)
+
+
+class HistoryCorrectionRequest(BaseModel):
+    history_id: int
+    proposed_source_text: str | None = None
+    proposed_translation: str | None = None
+    client_request_id: str | None = None
 
 app = FastAPI(title="Overlay Translation Server", version="1.0.0")
 templates = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
@@ -136,6 +143,19 @@ def api_ocr_status():
         "fallback_to_paddle": bool(cfg.get("ocr_fallback_to_paddle", True)),
         **ocr_engine.status(),
     }
+
+
+@app.post("/v1/history/corrections")
+def submit_history_correction(payload: HistoryCorrectionRequest, _: None = Security(check_auth)):
+    proposed_source_text = payload.proposed_source_text.strip() if payload.proposed_source_text is not None else None
+    proposed_translation = payload.proposed_translation.strip() if payload.proposed_translation is not None else None
+    if not proposed_source_text and not proposed_translation:
+        raise HTTPException(400, "Provide proposed_source_text or proposed_translation")
+    client_request_id = payload.client_request_id.strip() if payload.client_request_id else None
+    correction = create_pending_history_correction(payload.history_id, proposed_source_text or None, proposed_translation or None, client_request_id)
+    if correction is None:
+        raise HTTPException(404, "History entry not found")
+    return {"id": correction["id"], "status": correction["status"]}
 
 @app.post("/v1/screen/translate")
 async def translate_screen(
@@ -413,7 +433,16 @@ def admin(request: Request):
     # Do not expose secrets into page source.
     cfg["llm_api_key"] = "" if cfg.get("llm_api_key") else ""
     cfg["server_api_key"] = "" if cfg.get("server_api_key") else ""
-    return templates.TemplateResponse("admin.html", {"request": request, "cfg": cfg, "sessions": list_sessions()})
+    return templates.TemplateResponse("admin.html", {"request": request, "cfg": cfg, "sessions": list_sessions(), "pending_corrections": pending_history_corrections()})
+
+
+@app.post("/admin/history-corrections/{correction_id}/{action}")
+def resolve_admin_history_correction(correction_id: int, action: str):
+    if action not in {"accept", "reject"}:
+        raise HTTPException(404, "Unknown correction action")
+    if not resolve_pending_history_correction(correction_id, action == "accept"):
+        raise HTTPException(404, "Pending correction or history entry not found")
+    return {"ok": True, "id": correction_id, "status": "accepted" if action == "accept" else "rejected"}
 
 
 @app.get("/history", response_class=HTMLResponse)

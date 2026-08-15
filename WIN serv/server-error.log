@@ -1,0 +1,17 @@
+INFO:     Started server process [22888]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8765 (Press CTRL+C to quit)
+[32m[INFO] 2026-08-15 07:51:36,512 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-08-15 07:51:36,528 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\MyHome\Downloads\EchoTranslate\WIN serv\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+[32m[INFO] 2026-08-15 07:51:36,528 [RapidOCR] main.py:63: Using C:\Users\MyHome\Downloads\EchoTranslate\WIN serv\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+[32m[INFO] 2026-08-15 07:51:36,529 [RapidOCR] provider_config.py:40: Windows 10 or above detected, try to use DirectML as primary provider[0m
+[32m[INFO] 2026-08-15 07:51:37,014 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-08-15 07:51:37,018 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\MyHome\Downloads\EchoTranslate\WIN serv\.venv\Lib\site-packages\rapidocr\models\ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+[32m[INFO] 2026-08-15 07:51:37,018 [RapidOCR] main.py:63: Using C:\Users\MyHome\Downloads\EchoTranslate\WIN serv\.venv\Lib\site-packages\rapidocr\models\ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+[32m[INFO] 2026-08-15 07:51:37,019 [RapidOCR] provider_config.py:40: Windows 10 or above detected, try to use DirectML as primary provider[0m
+[32m[INFO] 2026-08-15 07:51:37,185 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-08-15 07:51:37,196 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\MyHome\Downloads\EchoTranslate\WIN serv\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+[32m[INFO] 2026-08-15 07:51:37,196 [RapidOCR] main.py:63: Using C:\Users\MyHome\Downloads\EchoTranslate\WIN serv\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+[32m[INFO] 2026-08-15 07:51:37,196 [RapidOCR] provider_config.py:40: Windows 10 or above detected, try to use DirectML as primary provider[0m
+[33m[WARNING] 2026-08-15 07:51:37,854 [RapidOCR] main.py:132: The text detection result is empty[0m

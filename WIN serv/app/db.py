@@ -83,6 +83,23 @@ def init_db() -> None:
             glossary_scanned_until_history_id INTEGER NOT NULL DEFAULT 0,
             glossary_pending_tokens INTEGER NOT NULL DEFAULT 0
         );
+        CREATE TABLE IF NOT EXISTS pending_history_corrections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            history_id INTEGER NOT NULL,
+            source_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            original_source_text TEXT NOT NULL,
+            original_translation TEXT NOT NULL,
+            proposed_source_text TEXT,
+            proposed_translation TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            status TEXT NOT NULL DEFAULT 'pending',
+            client_request_id TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_history_corrections_client_request
+            ON pending_history_corrections(client_request_id) WHERE client_request_id IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS idx_pending_history_corrections_status
+            ON pending_history_corrections(status, id DESC);
         """)
         columns = {row[1] for row in con.execute("PRAGMA table_info(messages)")}
         source_columns = {row[1] for row in con.execute("PRAGMA table_info(history_sources)")}
@@ -400,6 +417,56 @@ def update_history_message(source_id: str, message_id: int, source_text: str, tr
         con.execute("UPDATE messages SET source_text=?, translation=? WHERE source_id=? AND id=?", (source_text, translation, source_id, message_id))
         if row["screen_hash"]:
             con.execute("DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?", (source_id, row["session_id"], row["screen_hash"]))
+    return True
+
+
+def create_pending_history_correction(history_id: int, proposed_source_text: str | None, proposed_translation: str | None, client_request_id: str | None) -> dict | None:
+    with _lock, connect() as con:
+        row = con.execute("SELECT source_id, session_id, source_text, translation FROM messages WHERE id=?", (history_id,)).fetchone()
+        if row is None:
+            return None
+        if client_request_id:
+            existing = con.execute("SELECT id, status FROM pending_history_corrections WHERE client_request_id=?", (client_request_id,)).fetchone()
+            if existing:
+                return dict(existing)
+        cursor = con.execute(
+            "INSERT INTO pending_history_corrections(history_id, source_id, session_id, original_source_text, original_translation, proposed_source_text, proposed_translation, client_request_id) VALUES(?,?,?,?,?,?,?,?)",
+            (history_id, row["source_id"], row["session_id"], row["source_text"], row["translation"], proposed_source_text, proposed_translation, client_request_id),
+        )
+        return {"id": int(cursor.lastrowid), "status": "pending"}
+
+
+def pending_history_corrections() -> list[dict]:
+    with connect() as con:
+        rows = con.execute("""
+            SELECT c.id, c.history_id, c.source_id, c.session_id, c.original_source_text, c.original_translation,
+                   c.proposed_source_text, c.proposed_translation, c.created_at,
+                   COALESCE(s.source_name, c.source_id) AS source_name,
+                   COALESCE(m.source_text, c.original_source_text) AS current_source_text,
+                   COALESCE(m.translation, c.original_translation) AS current_translation
+            FROM pending_history_corrections AS c
+            LEFT JOIN history_sources AS s ON s.source_id=c.source_id
+            LEFT JOIN messages AS m ON m.id=c.history_id
+            WHERE c.status='pending' ORDER BY c.id DESC
+        """).fetchall()
+    return [dict(row) for row in rows]
+
+
+def resolve_pending_history_correction(correction_id: int, accept: bool) -> bool:
+    with _lock, connect() as con:
+        correction = con.execute("SELECT * FROM pending_history_corrections WHERE id=? AND status='pending'", (correction_id,)).fetchone()
+        if correction is None:
+            return False
+        if accept:
+            row = con.execute("SELECT session_id, screen_hash, source_text, translation FROM messages WHERE id=? AND source_id=?", (correction["history_id"], correction["source_id"])).fetchone()
+            if row is None:
+                return False
+            source_text = str(correction["proposed_source_text"] or row["source_text"]).strip() or row["source_text"]
+            translation = str(correction["proposed_translation"] or row["translation"]).strip() or row["translation"]
+            con.execute("UPDATE messages SET source_text=?, translation=? WHERE id=? AND source_id=?", (source_text, translation, correction["history_id"], correction["source_id"]))
+            if row["screen_hash"]:
+                con.execute("DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?", (correction["source_id"], row["session_id"], row["screen_hash"]))
+        con.execute("UPDATE pending_history_corrections SET status=? WHERE id=?", ("accepted" if accept else "rejected", correction_id))
     return True
 
 
