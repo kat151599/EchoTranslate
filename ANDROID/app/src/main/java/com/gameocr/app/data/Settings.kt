@@ -257,7 +257,6 @@ data class Settings(
      * manga-ocr 专用 DBNet 外扩比例。manga-ocr 识别整气泡 crop，竖排/手绘字体更怕首尾字被裁；
      * 1.65 比 PaddleOCR 常见 1.5 默认值多一点裁剪余量，同时仍避免过度吞邻泡。
      */
-    val mangaOcrDbnetUnclipRatio: Float = 1.65f,
     /** 兼容旧存档保留的退役字段；读取、保存和运行时始终强制为 0。 */
     /** 兼容旧存档保留的退役字段；读取、保存和运行时始终强制为 0。 */
     /**
@@ -754,30 +753,6 @@ enum class DeeplProtocol {
     AUTO
 }
 
-/**
- * DBNet input-size profiles. Thresholds and unclip remain independent user settings.
- */
-@Serializable
-enum class PaddleDetectionProfile(
-    @StringRes val labelRes: Int,
-    @StringRes val descRes: Int,
-    val maxSideLen: Int,
-    val enableMangaTiling: Boolean,
-) {
-    FAST(
-        R.string.settings_paddle_detection_fast,
-        R.string.settings_paddle_detection_fast_desc,
-        maxSideLen = 960,
-        enableMangaTiling = false,
-    ),
-    ACCURATE(
-        R.string.settings_paddle_detection_accurate,
-        R.string.settings_paddle_detection_accurate_desc,
-        maxSideLen = 1920,
-        enableMangaTiling = true,
-    ),
-}
-
 @Serializable
 enum class TranslatorEngine {
     /** Thin-client mode: screenshot -> PC server -> PaddleOCR/context/LLM -> translated blocks. */
@@ -860,165 +835,6 @@ object TargetLangPresets {
         "日本語" to "ja",
         "한국어" to "ko"
     )
-}
-
-/**
- * 百度 OCR 接口类型。每个 endpoint 在百度控制台有独立配额：
- * - `general_basic`：通用文字识别（标准版），每天 1000 次免费，无位置信息
- * - `general`：通用文字识别（标准含位置版），每天 500 次免费，**返回 boundingBox**
- * - `accurate_basic`：通用文字识别（高精度版），每天 500 次免费，识别更准但慢
- * - `accurate`：通用文字识别（高精度含位置版），每天 500 次免费，高精度 + 位置
- * - `webimage`：网络图片文字识别，500 次免费，适合复杂背景（如游戏画面）
- *
- * 含位置版（[hasLocation] = true）的响应里每条 word 带 `location` 字段；译文叠加层可以
- * 按该位置紧贴原文显示，体验远好于"无位置"版的"全部堆在屏幕中央"。
- */
-@Serializable
-enum class BaiduOcrEndpoint(
-    val path: String,
-    @StringRes val displayNameRes: Int,
-    val hasLocation: Boolean,
-    @StringRes val freeQuotaRes: Int
-) {
-    GENERAL_BASIC("general_basic", R.string.baidu_endpoint_general_basic_name, false, R.string.baidu_endpoint_quota_1000_day),
-    GENERAL("general", R.string.baidu_endpoint_general_name, true, R.string.baidu_endpoint_quota_500_day),
-    ACCURATE_BASIC("accurate_basic", R.string.baidu_endpoint_accurate_basic_name, false, R.string.baidu_endpoint_quota_500_day),
-    ACCURATE("accurate", R.string.baidu_endpoint_accurate_name, true, R.string.baidu_endpoint_quota_500_day),
-    WEBIMAGE("webimage", R.string.baidu_endpoint_webimage_name, false, R.string.baidu_endpoint_quota_500_day)
-}
-
-/**
- * 腾讯云 OCR Action 类型。所有接口都在 `ocr.tencentcloudapi.com`，只是 `X-TC-Action` header
- * 不同；响应都用 TextDetections 数组返回。三种各自独立配额：
- * - `GeneralBasicOCR`：通用印刷体识别，最常用，每月 1000 次免费
- * - `GeneralAccurateOCR`：高精度版，识别准确率明显更高但慢，每月 1000 次免费
- * - `RecognizeAgent`：智能 Agent 接口（LLM 增强），适合复杂版面 / 手写 / 表格混排
- */
-@Serializable
-enum class TencentOcrEndpoint(
-    val action: String,
-    @StringRes val displayNameRes: Int,
-    @StringRes val descRes: Int
-) {
-    GENERAL_BASIC("GeneralBasicOCR", R.string.tencent_endpoint_general_basic_name, R.string.tencent_endpoint_general_basic_desc),
-    GENERAL_ACCURATE("GeneralAccurateOCR", R.string.tencent_endpoint_general_accurate_name, R.string.tencent_endpoint_general_accurate_desc),
-    RECOGNIZE_AGENT("RecognizeAgent", R.string.tencent_endpoint_recognize_agent_name, R.string.tencent_endpoint_recognize_agent_desc)
-}
-
-/**
- * 百度 OCR 识别语种参数（`language_type` 字段值，REST API 大写形式）。
- *
- * 端点支持情况（官方文档 2024 实测）：
- * - **标准版 / 含位置版**（`general_basic` / `general`）：10 种主流语种（CHN_ENG / ENG / JAP / KOR / FRE / SPA / POR / GER / ITA / RUS），**不含 auto_detect**
- * - **高精度版 / 高精度含位置版**（`accurate_basic` / `accurate`）：全 25 种，含 `auto_detect`
- * - **网络图片**（`webimage`）：**不读 language_type**（永远走中英混合，文档没暴露该参数）
- *
- * UI 层根据当前 endpoint + 当前语种是否兼容，给出过滤 / 警告。运行时若用户选的语种在当前
- * endpoint 不支持，由 [BaiduOcrLanguage.coerceForEndpoint] 降级到 CHN_ENG 避免 216200 报错。
- */
-@Serializable
-enum class BaiduOcrLanguage(
-    val code: String,
-    /** BCP-47 主语言代码，null 表示该值不对应单一源语言（如 auto / 中英混合）。 */
-    val bcp47: String?,
-    @StringRes val displayNameRes: Int
-) {
-    AUTO_DETECT("auto_detect", null, R.string.ocr_lang_auto_detect),
-    CHN_ENG("CHN_ENG", null, R.string.ocr_lang_chn_eng),
-    ENG("ENG", "en", R.string.lang_en),
-    JAP("JAP", "ja", R.string.lang_ja),
-    KOR("KOR", "ko", R.string.lang_ko),
-    FRE("FRE", "fr", R.string.lang_fr),
-    SPA("SPA", "es", R.string.lang_es),
-    POR("POR", "pt", R.string.lang_pt),
-    GER("GER", "de", R.string.lang_de),
-    ITA("ITA", "it", R.string.lang_it),
-    RUS("RUS", "ru", R.string.lang_ru),
-    DAN("DAN", "da", R.string.lang_da),
-    DUT("DUT", "nl", R.string.lang_nl),
-    MAL("MAL", "ms", R.string.lang_ms),
-    SWE("SWE", "sv", R.string.lang_sv),
-    IND("IND", "id", R.string.lang_id),
-    POL("POL", "pl", R.string.lang_pl),
-    ROM("ROM", "ro", R.string.lang_ro),
-    TUR("TUR", "tr", R.string.lang_tr),
-    GRE("GRE", "el", R.string.lang_el),
-    HUN("HUN", "hu", R.string.lang_hu),
-    THA("THA", "th", R.string.lang_th),
-    VIE("VIE", "vi", R.string.lang_vi),
-    ARA("ARA", "ar", R.string.lang_ar),
-    HIN("HIN", "hi", R.string.lang_hi);
-
-    /** 在 [endpoint] 上是否可用。 */
-    fun supportedOn(endpoint: BaiduOcrEndpoint): Boolean = when (endpoint) {
-        // 高精度系（含位置 + 无位置）支持全 25 种
-        BaiduOcrEndpoint.ACCURATE_BASIC, BaiduOcrEndpoint.ACCURATE -> true
-        // 标准系（含位置 + 无位置）只支持 10 种主流
-        BaiduOcrEndpoint.GENERAL_BASIC, BaiduOcrEndpoint.GENERAL -> this in STANDARD_SUPPORTED
-        // 网络图片端点不读 language_type
-        BaiduOcrEndpoint.WEBIMAGE -> false
-    }
-
-    companion object {
-        /** 标准系（general_basic / general）实际支持的子集（官方文档限定 10 种）。 */
-        val STANDARD_SUPPORTED: Set<BaiduOcrLanguage> = setOf(
-            CHN_ENG, ENG, JAP, KOR, FRE, SPA, POR, GER, ITA, RUS
-        )
-
-        /** 在 [endpoint] 不支持当前 [lang] 时返回该端点能用的最近替代值（用于运行时兜底）。 */
-        fun coerceForEndpoint(lang: BaiduOcrLanguage, endpoint: BaiduOcrEndpoint): BaiduOcrLanguage {
-            if (lang.supportedOn(endpoint)) return lang
-            return CHN_ENG // 所有支持 language_type 的端点都支持 CHN_ENG
-        }
-    }
-}
-
-/**
- * 腾讯云 OCR 识别语种参数（`LanguageType` 字段）。
- *
- * 端点支持情况（官方文档 2024 实测）：
- * - **`GeneralBasicOCR`：支持全 23 种**（含 auto / mix / zh_rare 三个特殊值）
- * - **`GeneralAccurateOCR`：不接受 LanguageType**（多语种走 ConfigID="MulOCR"，本工程暂未接）
- * - **`RecognizeAgent`：不接受 LanguageType**（LLM 自动判断）
- *
- * 默认值 [AUTO]（"auto"）由后端按图片内容判断，覆盖多数场景。
- */
-@Serializable
-enum class TencentOcrLanguage(
-    val code: String,
-    /** BCP-47 主语言代码，null 表示该值不对应单一源语言。 */
-    val bcp47: String?,
-    @StringRes val displayNameRes: Int
-) {
-    AUTO("auto", null, R.string.ocr_lang_auto_detect),
-    ZH("zh", null, R.string.ocr_lang_chn_eng),
-    ZH_RARE("zh_rare", null, R.string.ocr_lang_zh_rare),
-    MIX("mix", null, R.string.ocr_lang_mix),
-    JA("jap", "ja", R.string.lang_ja),
-    KO("kor", "ko", R.string.lang_ko),
-    SPA("spa", "es", R.string.lang_es),
-    FRE("fre", "fr", R.string.lang_fr),
-    GER("ger", "de", R.string.lang_de),
-    POR("por", "pt", R.string.lang_pt),
-    VIE("vie", "vi", R.string.lang_vi),
-    MAY("may", "ms", R.string.lang_ms),
-    RUS("rus", "ru", R.string.lang_ru),
-    ITA("ita", "it", R.string.lang_it),
-    HOL("hol", "nl", R.string.lang_nl),
-    SWE("swe", "sv", R.string.lang_sv),
-    FIN("fin", "fi", R.string.lang_fi),
-    DAN("dan", "da", R.string.lang_da),
-    NOR("nor", "nb", R.string.lang_nb),
-    HUN("hun", "hu", R.string.lang_hu),
-    THA("tha", "th", R.string.lang_th),
-    HIN("hi", "hi", R.string.lang_hi),
-    ARA("ara", "ar", R.string.lang_ar);
-
-    /** 在 [endpoint] 上是否可用。 */
-    fun supportedOn(endpoint: TencentOcrEndpoint): Boolean = when (endpoint) {
-        TencentOcrEndpoint.GENERAL_BASIC -> true
-        TencentOcrEndpoint.GENERAL_ACCURATE, TencentOcrEndpoint.RECOGNIZE_AGENT -> false
-    }
 }
 
 @Serializable

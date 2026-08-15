@@ -93,9 +93,6 @@ class OverlayManager(
     @Volatile var customBorderStyle: BorderStyle = BorderStyle.SOLID,
     @Volatile var overlayTypeface: Typeface? = null,
     @Volatile var overlayTextStyle: OverlayTextStyle = OverlayTextStyle(),
-    @Volatile var ocrDebugRedBoxActive: Boolean = false,
-    @Volatile var ocrDebugShowSourceText: Boolean = true,
-    @Volatile var ocrDebugShowTranslation: Boolean = false,
 ) {
 
     private val wm by lazy { context.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
@@ -138,12 +135,6 @@ class OverlayManager(
     private data class PendingOverlayTextUpdate(
         val text: String,
         val phase: AdaptiveTextLayoutPhase,
-    )
-
-    private data class OcrDebugBlockState(
-        val source: String,
-        val showSource: Boolean,
-        val showTranslation: Boolean,
     )
 
     /** 悬浮窗口（[com.gameocr.app.data.RenderMode.FLOATING_WINDOW]）外壳。lazy 创建。 */
@@ -690,10 +681,6 @@ class OverlayManager(
         clear()
         if (blocks.isEmpty()) return
         blocksDiagnosticId = diagnosticId
-        if (ocrDebugRedBoxActive) {
-            showOcrDebugBlocks(blocks, diagnosticId)
-            return
-        }
         val diagPrefix = diagnosticId.toDiagPrefix()
 
         val root = FrameLayout(context).apply {
@@ -1169,77 +1156,6 @@ class OverlayManager(
         }
     }
 
-    private fun showOcrDebugBlocks(
-        blocks: List<Pair<TextBlock, String>>,
-        diagnosticId: Long?,
-    ) {
-        val root = FrameLayout(context)
-        val dm = context.resources.displayMetrics
-        val physicalSize = physicalDisplaySize(context)
-        val screenW = physicalSize.width
-        val screenH = physicalSize.height
-        val strokePx = (2f * dm.density).toInt().coerceAtLeast(2)
-        val paddingPx = (3f * dm.density).toInt().coerceAtLeast(2)
-        val red = 0xFFFF2020.toInt()
-
-        blocks.forEachIndexed { index, (block, translation) ->
-            val box = block.boundingBox
-            val left = (box.left + regionOffset.x).coerceIn(0, screenW)
-            val top = (box.top + regionOffset.y).coerceIn(0, screenH)
-            val right = (box.right + regionOffset.x).coerceIn(0, screenW)
-            val bottom = (box.bottom + regionOffset.y).coerceIn(0, screenH)
-            val state = OcrDebugBlockState(
-                source = block.text,
-                showSource = ocrDebugShowSourceText,
-                showTranslation = ocrDebugShowTranslation,
-            )
-            val label = debugBoxLabel(state, translation)
-            val view = TextView(context).apply {
-                text = label
-                tag = state
-                contentDescription = label.ifBlank { context.getString(R.string.ocr_debug_box_only) }
-                setTextColor(red)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
-                maxLines = 8
-                setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
-                background = GradientDrawable().apply {
-                    setColor(0x00000000)
-                    setStroke(strokePx, red)
-                }
-            }
-            root.addView(
-                view,
-                FrameLayout.LayoutParams(
-                    (right - left).coerceAtLeast(1),
-                    (bottom - top).coerceAtLeast(1),
-                ).apply {
-                    leftMargin = left
-                    topMargin = top
-                },
-            )
-            blockViews[index] = view
-        }
-        root.setOnClickListener { clear() }
-        val params = newLayoutParams()
-        runCatching { wm.addView(root, params) }
-            .onFailure { Timber.w(it, "Failed to show OCR debug boxes") }
-        blocksView = root
-        VerticalDiagnosticLog.i(
-            "${diagnosticId.toDiagPrefix()}overlay OCR debug boxes count=${blocks.size} " +
-                "source=$ocrDebugShowSourceText translation=$ocrDebugShowTranslation"
-        )
-    }
-
-    private fun debugBoxLabel(state: OcrDebugBlockState, translation: String): String =
-        OcrDebugBoxLabelFormatter.format(
-            source = state.source,
-            translation = translation,
-            showSource = state.showSource,
-            showTranslation = state.showTranslation,
-            sourceLabel = context.getString(R.string.ocr_debug_source_label),
-            translationLabel = context.getString(R.string.ocr_debug_translation_label),
-        )
-
     private fun configureTranslationBlockView(
         index: Int,
         view: View,
@@ -1609,32 +1525,25 @@ class OverlayManager(
         val phase = update.phase
         when (val v = blockViews[index]) {
             is TextView -> {
-                val debugState = v.tag as? OcrDebugBlockState
-                if (debugState != null) {
-                    val label = debugBoxLabel(debugState, text)
-                    v.text = label
-                    v.contentDescription = label.ifBlank { context.getString(R.string.ocr_debug_box_only) }
+                if (v is StyledTranslationTextView) {
+                    if (
+                        v.adaptiveTextFitEnabled &&
+                        v.adaptiveTextLayoutPhase == AdaptiveTextLayoutPhase.PLACEHOLDER &&
+                        phase != AdaptiveTextLayoutPhase.PLACEHOLDER
+                    ) {
+                        v.setAutoSizeTextTypeUniformWithConfiguration(
+                            ADAPTIVE_MIN_TEXT_SIZE_SP,
+                            ADAPTIVE_MAX_TEXT_SIZE_SP,
+                            1,
+                            TypedValue.COMPLEX_UNIT_SP,
+                        )
+                    }
+                    v.adaptiveTextLayoutPhase = phase
+                }
+                v.text = if (v is StyledTranslationTextView && v.horizontalRightToLeft) {
+                    horizontalRtlDisplayText(text)
                 } else {
-                    if (v is StyledTranslationTextView) {
-                        if (
-                            v.adaptiveTextFitEnabled &&
-                            v.adaptiveTextLayoutPhase == AdaptiveTextLayoutPhase.PLACEHOLDER &&
-                            phase != AdaptiveTextLayoutPhase.PLACEHOLDER
-                        ) {
-                            v.setAutoSizeTextTypeUniformWithConfiguration(
-                                ADAPTIVE_MIN_TEXT_SIZE_SP,
-                                ADAPTIVE_MAX_TEXT_SIZE_SP,
-                                1,
-                                TypedValue.COMPLEX_UNIT_SP,
-                            )
-                        }
-                        v.adaptiveTextLayoutPhase = phase
-                    }
-                    v.text = if (v is StyledTranslationTextView && v.horizontalRightToLeft) {
-                        horizontalRtlDisplayText(text)
-                    } else {
-                        text
-                    }
+                    text
                 }
             }
             is VerticalTextView -> {
