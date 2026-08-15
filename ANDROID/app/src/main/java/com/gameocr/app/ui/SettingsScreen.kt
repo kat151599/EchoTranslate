@@ -166,7 +166,6 @@ import com.gameocr.app.appcontext.isUsageAccessGranted
 import com.gameocr.app.data.FloatingMenu
 import com.gameocr.app.data.FloatingSkill
 import com.gameocr.app.data.Languages
-import com.gameocr.app.translate.MlKitLanguagePolicy
 import com.gameocr.app.data.LoopTriggerMode
 import com.gameocr.app.data.LoopTextRegionMode
 import com.gameocr.app.data.MangaOcrAdvancedSettingsPolicy
@@ -477,10 +476,6 @@ fun SettingsScreen(
     var mlKitModelsReady by remember { mutableStateOf<Boolean?>(null) }
     var mlKitDownloadedLanguageModels by remember { mutableStateOf<Set<String>>(emptySet()) }
     var showMlKitMoreLanguages by remember { mutableStateOf(false) }
-    var mlKitMissingModelsPrompt by remember { mutableStateOf<MlKitMissingModelsPrompt?>(null) }
-    var mlKitModelPromptDismissedPair by remember {
-        mutableStateOf<Pair<String, String>?>(null)
-    }
     var fetchedModels by remember { mutableStateOf<List<String>>(emptyList()) }
     var modelPickerExpanded by remember { mutableStateOf(false) }
     var textSize by remember { mutableStateOf(14f) }
@@ -698,9 +693,6 @@ fun SettingsScreen(
     // 星标语言：本地镜像。togglePinLanguage 立即落盘，下次 ON_RESUME / load() 拉回最新；
     // 这里也乐观更新一份本地状态，UI 立刻反映。
     var pinnedLanguages by remember { mutableStateOf<List<String>>(emptyList()) }
-    var mlKitRecentSources by remember {
-        mutableStateOf(DEFAULT_ML_KIT_RECENT_SOURCE_LANGUAGES)
-    }
 
     // dirty 检测：load 时 capture 一份初始 Settings，之后跟 buildSnapshot() 比 equals。
     // 旧版手写两份 List<Any?>，每加 Settings 字段都要在两个 list 同步加，反复犯"忘改一边"的 bug。
@@ -795,6 +787,7 @@ fun SettingsScreen(
         }
     }
 
+    /*
     fun selectMlKitSourceLanguage(languageTag: String) {
         if (translationLanguageCodesConflict(languageTag, targetLang)) return
         timber.log.Timber.tag("MlKitTrans").i(
@@ -864,6 +857,13 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+
+    */
+    fun swapSelectedLanguages() {
+        val swapped = swappedTranslationLanguagePair(sourceLang, targetLang) ?: return
+        sourceLang = swapped.first
+        targetLang = swapped.second
     }
 
     fun applyPresetSettingsToUi(s: Settings) {
@@ -995,7 +995,6 @@ fun SettingsScreen(
         translationPresets = s.translationPresets
         activeTranslationPresetId = s.activeTranslationPresetId
         pinnedLanguages = s.pinnedLanguages
-        mlKitRecentSources = mlKitRecentSourceLanguages(s.mlKitRecentSourceLanguages)
         cleartextHostsText = s.cleartextAllowedHosts.joinToString("\n")
     }
     fun presetDisplayNameForMessage(preset: TranslationPreset): String = when (preset.id) {
@@ -1221,7 +1220,6 @@ fun SettingsScreen(
         anthropicModel = anthropicModel,
         sourceLang = sourceLang,
         targetLang = targetLang,
-        mlKitRecentSourceLanguages = mlKitRecentSources,
         promptTemplate = prompt,
         ocrEngine = ocrEngine,
         captureLoopIntervalMs = loopInterval.toLongOrNull() ?: 2000L,
@@ -2054,6 +2052,7 @@ fun SettingsScreen(
         )
     }
 
+    /*
     mlKitMissingModelsPrompt?.let { prompt ->
         val sourceName = Languages.nameOf(context, prompt.pair.first)
         val targetName = Languages.nameOf(context, prompt.pair.second)
@@ -2093,6 +2092,8 @@ fun SettingsScreen(
         )
     }
 
+    }
+    */
     if (showSakuraFallbackDialog) {
         val sourceName = com.gameocr.app.data.Languages.nameOf(context, sourceLang)
         val targetName = com.gameocr.app.data.Languages.nameOf(context, targetLang)
@@ -2623,7 +2624,6 @@ fun SettingsScreen(
             translationPresets = s.translationPresets
             activeTranslationPresetId = s.activeTranslationPresetId
             pinnedLanguages = s.pinnedLanguages
-            mlKitRecentSources = mlKitRecentSourceLanguages(s.mlKitRecentSourceLanguages)
             allowWrap = s.overlayAllowWrap
             avoidCollision = s.overlayAvoidCollision
             apiTimeoutSec = s.apiTimeoutSeconds.toFloat()
@@ -2659,51 +2659,6 @@ fun SettingsScreen(
 
     // paddleStatus 独立异步加载：file.exists() / file.length() 走 IO 线程，避免阻塞首帧。
     val settingsLoaded = initialSettings != null
-    LaunchedEffect(settingsLoaded, translatorEngine, sourceLang, targetLang) {
-        if (!settingsLoaded || translatorEngine != TranslatorEngine.GOOGLE_ML_KIT) {
-            mlKitModelStatePair = null
-            mlKitModelsReady = null
-            mlKitMissingModelsPrompt = null
-            mlKitDownloadedLanguageModels = emptySet()
-            return@LaunchedEffect
-        }
-        mlKitDownloadedLanguageModels = runCatching {
-            viewModel.getDownloadedMlKitLanguageModels()
-        }.getOrDefault(emptySet())
-        if (
-            sourceLang.isBlank() ||
-            sourceLang.equals(Languages.AUTO.code, ignoreCase = true) ||
-            targetLang.isBlank() ||
-            targetLang.equals(Languages.AUTO.code, ignoreCase = true) ||
-            !MlKitLanguagePolicy.isSupportedLanguageTag(sourceLang) ||
-            !MlKitLanguagePolicy.isSupportedLanguageTag(targetLang)
-        ) {
-            mlKitModelStatePair = null
-            mlKitModelsReady = null
-            mlKitMissingModelsPrompt = null
-            return@LaunchedEffect
-        }
-        val pair = sourceLang to targetLang
-        mlKitModelStatePair = null
-        mlKitModelsReady = null
-        mlKitMissingModelsPrompt = null
-        val missingResult = runCatching {
-            viewModel.getMissingMlKitLanguageModels(pair.first, pair.second)
-        }
-        val missingLanguages = missingResult.getOrDefault(emptySet())
-        mlKitModelsReady = missingResult.isSuccess && missingLanguages.isEmpty()
-        mlKitModelStatePair = pair
-        if (
-            missingResult.isSuccess &&
-            missingLanguages.isNotEmpty() &&
-            mlKitModelPromptDismissedPair != pair
-        ) {
-            mlKitMissingModelsPrompt = MlKitMissingModelsPrompt(
-                pair = pair,
-                missingLanguages = missingLanguages,
-            )
-        }
-    }
     /* TTS UI removed.
     LaunchedEffect(
         settingsLoaded,
@@ -2930,6 +2885,9 @@ fun SettingsScreen(
             // —— 翻译后端 ——
             item(key = SectionKeys.TRANSLATE) {
             SectionCard(title = stringResource(R.string.settings_section_translator)) {
+                // LEGACY_COMPAT: retain provider configuration state until provider cleanup,
+                // but do not expose retired engine selection or provider options.
+                /*
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TRANSLATOR_ENGINE) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.settings_label_translator_engine), style = MaterialTheme.typography.labelLarge)
@@ -3663,6 +3621,39 @@ fun SettingsScreen(
                 // DeepL 是机器翻译 API，不读 prompt、也不走 SSE，隐藏避免误导。
                 }
                 }
+                }
+                */
+                OutlinedTextField(
+                    value = remotePcBaseUrl,
+                    onValueChange = { remotePcBaseUrl = it },
+                    label = { Text(stringResource(R.string.settings_remote_pc_base_url)) },
+                    placeholder = { Text("http://203.0.113.10:8765 or https://example.com") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                )
+                SecretTextField(
+                    value = remotePcApiKey,
+                    onValueChange = { remotePcApiKey = it },
+                    label = stringResource(R.string.settings_remote_pc_api_key),
+                    placeholder = stringResource(R.string.settings_remote_pc_api_key_placeholder),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                OutlinedTextField(
+                    value = remotePcSessionId,
+                    onValueChange = { remotePcSessionId = it },
+                    label = { Text(stringResource(R.string.settings_remote_pc_session_id)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    value = remotePcImageQuality,
+                    onValueChange = { remotePcImageQuality = it.filter(Char::isDigit).take(3) },
+                    label = { Text(stringResource(R.string.settings_remote_pc_image_quality)) },
+                    supportingText = { Text(stringResource(R.string.settings_remote_pc_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
                 val onTogglePin: (String) -> Unit = { code ->
                     pinnedLanguages = if (pinnedLanguages.contains(code)) {
                         pinnedLanguages - code
@@ -3679,20 +3670,16 @@ fun SettingsScreen(
                         if (translationLanguageCodesConflict(it, targetLang)) {
                             return@LanguagePicker
                         }
-                        if (translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) {
-                            selectMlKitSourceLanguage(it)
-                        } else {
-                            timber.log.Timber.tag("OcrLangLink").i(
-                                "[user-select-source] %s -> %s", sourceLang, it
-                            )
-                            sourceLang = it
-                            mlKitModelDownloadMessage = null
-                            if (
-                                translatorEngine == TranslatorEngine.LOCAL_SAKURA &&
-                                !supportsSakuraLanguagePair(it, targetLang)
-                            ) {
-                                showSakuraFallbackDialog = true
-                            }
+                        timber.log.Timber.tag("OcrLangLink").i(
+                            "[user-select-source] %s -> %s", sourceLang, it
+                        )
+                        sourceLang = it
+                        mlKitModelDownloadMessage = null
+                        if (
+                            translatorEngine == TranslatorEngine.LOCAL_SAKURA &&
+                            !supportsSakuraLanguagePair(it, targetLang)
+                        ) {
+                            showSakuraFallbackDialog = true
                         }
                     },
                     pinned = pinnedLanguages,
@@ -3703,11 +3690,7 @@ fun SettingsScreen(
                     onDisabledSelect = {
                         pendingLanguageSwapOrigin = LanguageSwapRequestOrigin.SOURCE_PICKER
                     },
-                    allowedLanguageCodes = if (translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) {
-                        mlKitLanguagePickerCodes
-                    } else {
-                        null
-                    },
+                    allowedLanguageCodes = null,
                 )
                 }
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TARGET_LANGUAGE) {
@@ -3735,11 +3718,7 @@ fun SettingsScreen(
                     onDisabledSelect = {
                         pendingLanguageSwapOrigin = LanguageSwapRequestOrigin.TARGET_PICKER
                     },
-                    allowedLanguageCodes = if (translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) {
-                        mlKitLanguagePickerCodes
-                    } else {
-                        null
-                    },
+                    allowedLanguageCodes = null,
                 )
                 }
                 if (translatorEngine != TranslatorEngine.REMOTE_PC) {
@@ -9458,16 +9437,6 @@ internal enum class MlKitQuickSourceLanguage(
     }
 }
 
-internal val mlKitLanguagePickerCodes: Set<String> = Languages.ALL
-    .asSequence()
-    .map { it.code }
-    .filter(MlKitLanguagePolicy::isSupportedLanguageTag)
-    .toSet()
-
-internal data class MlKitMissingModelsPrompt(
-    val pair: Pair<String, String>,
-    val missingLanguages: Set<String>,
-)
 
 internal enum class OpenAiFallbackField {
     BASE_URL,

@@ -868,8 +868,8 @@ class SettingsRepository @Inject constructor(
             customFgColor = this[Keys.CustomFg] ?: default.customFgColor,
             customBorderColor = this[Keys.CustomBorder] ?: default.customBorderColor,
             customBorderWidth = this[Keys.CustomBorderW] ?: default.customBorderWidth,
-            translatorEngine = runCatching { TranslatorEngine.valueOf(this[Keys.TranslatorEng] ?: "") }
-                .getOrDefault(default.translatorEngine),
+            // LEGACY_COMPAT: old persisted values are ignored and normalized to Remote PC.
+            translatorEngine = TranslatorEngine.REMOTE_PC,
             remotePcBaseUrl = secureString(Keys.RemotePcBaseUrl, default.remotePcBaseUrl),
             remotePcApiKey = secureString(Keys.RemotePcApiKey, default.remotePcApiKey),
             remotePcSessionId = this[Keys.RemotePcSessionId] ?: default.remotePcSessionId,

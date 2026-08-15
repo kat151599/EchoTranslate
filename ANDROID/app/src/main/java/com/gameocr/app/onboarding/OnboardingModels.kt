@@ -12,7 +12,6 @@ import com.gameocr.app.data.TranslationOutputDirection
 import com.gameocr.app.data.TranslationOutputLayout
 import com.gameocr.app.data.TranslatorEngine
 import com.gameocr.app.data.TtsProvider
-import com.gameocr.app.translate.MlKitLanguagePolicy
 import java.net.URI
 
 enum class OnboardingStep {
@@ -151,24 +150,14 @@ object OnboardingPolicy {
         if (shouldRecommendPaddleOcr(draft)) {
             add(OnboardingStep.PADDLE_OCR_DOWNLOAD)
         }
-        add(
-            when (draft.translationMethod) {
-                OnboardingTranslationMethod.OFFLINE ->
-                    if (draft.usage == OnboardingUsage.MANGA) {
-                        OnboardingStep.MANGA_OFFLINE_DOWNLOAD
-                    } else {
-                        OnboardingStep.OFFLINE_LANGUAGE_DOWNLOAD
-                    }
-                OnboardingTranslationMethod.CLOUD_LLM -> OnboardingStep.CLOUD_CONFIG
-            }
-        )
+        if (draft.translationMethod == OnboardingTranslationMethod.CLOUD_LLM) {
+            add(OnboardingStep.CLOUD_CONFIG)
+        } else if (draft.usage == OnboardingUsage.MANGA) {
+            add(OnboardingStep.MANGA_OFFLINE_DOWNLOAD)
+        }
         add(OnboardingStep.TTS)
         add(OnboardingStep.SUMMARY)
     }
-
-    fun isMlKitPairSupported(sourceLang: String, targetLang: String): Boolean =
-        MlKitLanguagePolicy.isSupportedLanguageTag(sourceLang) &&
-            MlKitLanguagePolicy.isSupportedLanguageTag(targetLang)
 
     fun isSakuraPairSupported(sourceLang: String, targetLang: String): Boolean =
         sourceLang == "ja" && targetLang == "zh-CN"

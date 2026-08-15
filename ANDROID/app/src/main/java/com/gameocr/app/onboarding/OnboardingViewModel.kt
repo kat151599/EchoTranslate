@@ -30,10 +30,6 @@ class OnboardingViewModel @Inject constructor(
         settingsRepository.update { current -> OnboardingPolicy.apply(current, draft) }
     }
 
-    suspend fun downloadMlKitLanguagePair(sourceLang: String, targetLang: String) {
-        routingTranslator.downloadMlKitLanguagePair(sourceLang, targetLang)
-    }
-
     fun paddleV5ModelReady(): Boolean =
         paddleModelInstaller.checkInstalled(PaddleModelVersion.V5_MOBILE) != null
 
@@ -44,10 +40,6 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    suspend fun missingMlKitLanguageModels(
-        sourceLang: String,
-        targetLang: String,
-    ): Set<String> = routingTranslator.getMissingMlKitLanguageModels(sourceLang, targetLang)
 
     fun mangaOfflineModelReadiness(): MangaOfflineModelReadiness =
         MangaOfflineModelReadiness(

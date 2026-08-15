@@ -452,7 +452,6 @@ class CaptureService : Service() {
 
         CaptureServiceState.setRunning(true)
         startOcrWarmupIfNeeded()
-        startLocalLlmWarmupIfNeeded()
 
         // Shizuku 路径 dry-run：即使 availability == READY，未通过 ADB / root 配对的 Shizuku 也会
         // 让 shell 截屏失败。立刻跑一次截屏，失败则用悬浮错误条引导用户改
@@ -500,6 +499,7 @@ class CaptureService : Service() {
         }
     }
 
+    /*
     private fun startLocalLlmWarmupIfNeeded() {
         localLlmWarmupJob?.cancel()
         localLlmWarmupJob = scope.launch {
@@ -534,6 +534,7 @@ class CaptureService : Service() {
         }
     }
 
+    */
     private suspend fun prepareCleanCaptureFrame(
         hideFloatingButton: Boolean
     ) {

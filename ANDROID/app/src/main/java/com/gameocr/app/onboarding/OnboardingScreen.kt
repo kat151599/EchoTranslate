@@ -151,23 +151,7 @@ fun OnboardingScreen(
 
     LaunchedEffect(currentStep, currentDraft.sourceLang, currentDraft.targetLang) {
         if (currentStep != OnboardingStep.OFFLINE_LANGUAGE_DOWNLOAD) return@LaunchedEffect
-        if (!OnboardingPolicy.isMlKitPairSupported(
-                currentDraft.sourceLang,
-                currentDraft.targetLang,
-            )
-        ) {
-            downloadState = MlKitDownloadState.Unsupported
-            return@LaunchedEffect
-        }
-        downloadState = MlKitDownloadState.Checking
-        downloadState = runCatching {
-            val missing = viewModel.missingMlKitLanguageModels(
-                currentDraft.sourceLang,
-                currentDraft.targetLang,
-            )
-            if (missing.isEmpty()) MlKitDownloadState.Ready
-            else MlKitDownloadState.Missing(missing)
-        }.getOrElse { MlKitDownloadState.Error(it.message ?: it.javaClass.simpleName) }
+        downloadState = MlKitDownloadState.Ready
     }
 
     LaunchedEffect(currentStep) {
@@ -317,22 +301,7 @@ fun OnboardingScreen(
                         paddleDownloadState = paddleDownloadState,
                         saving = saving,
                         onDraftChange = { draft = it },
-                        onDownload = {
-                            downloadState = MlKitDownloadState.Downloading
-                            scope.launch {
-                                downloadState = runCatching {
-                                    viewModel.downloadMlKitLanguagePair(
-                                        currentDraft.sourceLang,
-                                        currentDraft.targetLang,
-                                    )
-                                    MlKitDownloadState.Ready
-                                }.getOrElse {
-                                    MlKitDownloadState.Error(
-                                        it.message ?: it.javaClass.simpleName
-                                    )
-                                }
-                            }
-                        },
+                        onDownload = {},
                         onDownloadPaddleModel = ::requestPaddleOcrModelDownload,
                         onDownloadMangaModels = ::requestMangaOfflineModelsDownload,
                         onNext = {
@@ -361,22 +330,7 @@ fun OnboardingScreen(
                         paddleDownloadState = paddleDownloadState,
                         saving = saving,
                         onDraftChange = { draft = it },
-                        onDownload = {
-                            downloadState = MlKitDownloadState.Downloading
-                            scope.launch {
-                                downloadState = runCatching {
-                                    viewModel.downloadMlKitLanguagePair(
-                                        currentDraft.sourceLang,
-                                        currentDraft.targetLang,
-                                    )
-                                    MlKitDownloadState.Ready
-                                }.getOrElse {
-                                    MlKitDownloadState.Error(
-                                        it.message ?: it.javaClass.simpleName
-                                    )
-                                }
-                            }
-                        },
+                        onDownload = {},
                         onDownloadPaddleModel = ::requestPaddleOcrModelDownload,
                         onDownloadMangaModels = ::requestMangaOfflineModelsDownload,
                         onNext = {
@@ -907,18 +861,8 @@ private fun TranslationMethodPage(
     )
     if (
         draft.translationMethod == OnboardingTranslationMethod.OFFLINE &&
-        (
-            draft.usage == OnboardingUsage.MANGA &&
-                !OnboardingPolicy.isSakuraPairSupported(
-                    draft.sourceLang,
-                    draft.targetLang,
-                ) ||
-                draft.usage == OnboardingUsage.DAILY &&
-                !OnboardingPolicy.isMlKitPairSupported(
-                    draft.sourceLang,
-                    draft.targetLang,
-                )
-            )
+        draft.usage == OnboardingUsage.MANGA &&
+        !OnboardingPolicy.isSakuraPairSupported(draft.sourceLang, draft.targetLang)
     ) {
         Text(
             stringResource(
@@ -1541,7 +1485,7 @@ private fun canContinue(
         draft.translationMethod != OnboardingTranslationMethod.OFFLINE -> true
         draft.usage == OnboardingUsage.MANGA ->
             OnboardingPolicy.isSakuraPairSupported(draft.sourceLang, draft.targetLang)
-        else -> OnboardingPolicy.isMlKitPairSupported(draft.sourceLang, draft.targetLang)
+        else -> true
     }
     OnboardingStep.OFFLINE_LANGUAGE_DOWNLOAD ->
         downloadState == MlKitDownloadState.Ready

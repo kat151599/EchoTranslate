@@ -2,9 +2,7 @@ package com.gameocr.app.translate
 
 import android.graphics.Bitmap
 import com.gameocr.app.data.Settings
-import com.gameocr.app.data.TranslatorEngine
 import com.gameocr.app.glossary.TranslationContextResolver
-import com.gameocr.app.llm.LlamaEngineHolder
 import com.gameocr.app.ocr.TextBlock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,18 +17,6 @@ import timber.log.Timber
 @Singleton
 class RoutingTranslator @Inject constructor(
     private val remotePc: RemotePcTranslator,
-    private val openAi: OpenAiTranslator,
-    private val anthropic: AnthropicTranslator,
-    private val deepl: DeepLTranslator,
-    private val youdaoPicTrans: YoudaoPicTransTranslator,
-    private val google: GoogleTranslator,
-    private val googleMlKit: MlKitOnDeviceTranslator,
-    private val volc: VolcTranslator,
-    private val baiduFanyi: BaiduFanyiTranslator,
-    private val tencent: TencentTranslator,
-    private val sakura: SakuraGalTranslator,
-    private val hyMt2: HyMt2Translator,
-    private val llamaEngineHolder: LlamaEngineHolder,
     private val translationContextResolver: TranslationContextResolver,
     private val translationMemory: TranslationMemoryService,
 ) : Translator {
@@ -72,6 +58,7 @@ class RoutingTranslator @Inject constructor(
 
     fun prefersBatchFor(settings: Settings): Boolean = engineFor(settings).prefersBatch
 
+    /*
     suspend fun downloadMlKitLanguagePair(sourceLang: String, targetLang: String) {
         googleMlKit.ensureLanguagePairModelsDownloaded(sourceLang, targetLang)
     }
@@ -104,6 +91,7 @@ class RoutingTranslator @Inject constructor(
             modelKind = local?.prewarmModelKind?.name,
         )
     }
+    */
 
     override suspend fun translateBatch(
         sources: List<String>,
@@ -329,7 +317,13 @@ class RoutingTranslator @Inject constructor(
     private fun preview(text: String): String =
         text.replace('\n', ' ').replace('\r', ' ').take(80)
 
-    private fun engineFor(settings: Settings): Translator = when (settings.translatorEngine) {
+    private fun engineFor(settings: Settings): Translator = remotePc
+
+    /*
+    // LEGACY_COMPAT: retained only to avoid a cascading provider cleanup in this step.
+    // All production requests route through [engineFor] above.
+    @Suppress("unused")
+    private fun legacyEngineFor(settings: Settings): Translator = when (settings.translatorEngine) {
         TranslatorEngine.REMOTE_PC -> remotePc
         TranslatorEngine.OPENAI -> openAi
         TranslatorEngine.ANTHROPIC -> anthropic
@@ -356,6 +350,7 @@ class RoutingTranslator @Inject constructor(
             }
     }
 
+    */
     internal companion object {
         fun shouldUseLocalSakura(
             sourceLang: String,
