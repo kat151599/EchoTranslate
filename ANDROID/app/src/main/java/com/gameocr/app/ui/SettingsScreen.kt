@@ -1300,7 +1300,6 @@ fun SettingsScreen(
             parseCleartextHosts(cleartextHostsText),
             umiOcrBaseUrl,
             lunaOcrBaseUrl,
-            ttsHttpBaseUrl,
             remotePcBaseUrl = remotePcBaseUrl,
         )
     )

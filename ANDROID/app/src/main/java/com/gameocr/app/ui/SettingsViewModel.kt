@@ -48,8 +48,6 @@ import com.gameocr.app.ocr.lunaOcrHttpHostOrNull
 import com.gameocr.app.ocr.umiOcrHttpHostOrNull
 import com.gameocr.app.translate.RoutingTranslator
 import com.gameocr.app.translate.TestResult
-import com.gameocr.app.tts.ttsHttpHostOrNull
-import com.gameocr.app.tts.ttsApiHttpHostOrNull
 import androidx.work.WorkInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -466,10 +464,6 @@ class SettingsViewModel @Inject constructor(
                     cleartextAllowedHosts,
                     umiOcrBaseUrl,
                     lunaOcrBaseUrl,
-                    ttsHttpBaseUrl,
-                    ttsMiniMaxBaseUrl,
-                    ttsMimoBaseUrl,
-                    ttsVolcengineBaseUrl,
                     remotePcBaseUrl,
                 ),
                 translatorEngine = translatorEngine,
@@ -1027,10 +1021,6 @@ class SettingsViewModel @Inject constructor(
                 base.cleartextAllowedHosts,
                 base.umiOcrBaseUrl,
                 base.lunaOcrBaseUrl,
-                base.ttsHttpBaseUrl,
-                base.ttsMiniMaxBaseUrl,
-                base.ttsMimoBaseUrl,
-                base.ttsVolcengineBaseUrl,
                 normalizedRemotePcBaseUrl,
             ),
             baseUrl = baseUrl.trim(),
@@ -1074,27 +1064,15 @@ internal fun cleartextHostsWithLocalOcrUrls(
     hosts: List<String>,
     umiOcrBaseUrl: String,
     lunaOcrBaseUrl: String,
-    ttsHttpBaseUrl: String = "",
-    ttsMiniMaxBaseUrl: String = "",
-    ttsMimoBaseUrl: String = "",
-    ttsVolcengineBaseUrl: String = "",
     remotePcBaseUrl: String = "",
 ): List<String> {
     val normalized = hosts.map { it.trim() }.filter { it.isNotEmpty() }
     val umiHost = umiOcrHttpHostOrNull(umiOcrBaseUrl)
     val lunaHost = lunaOcrHttpHostOrNull(lunaOcrBaseUrl)
-    val ttsHost = ttsHttpHostOrNull(ttsHttpBaseUrl)
-    val miniMaxTtsHost = ttsApiHttpHostOrNull(ttsMiniMaxBaseUrl)
-    val mimoTtsHost = ttsApiHttpHostOrNull(ttsMimoBaseUrl)
-    val volcengineTtsHost = ttsApiHttpHostOrNull(ttsVolcengineBaseUrl)
     val remotePcHost = remotePcHttpHostOrNull(remotePcBaseUrl)
     return (normalized + listOfNotNull(
         umiHost,
         lunaHost,
-        ttsHost,
-        miniMaxTtsHost,
-        mimoTtsHost,
-        volcengineTtsHost,
         remotePcHost,
     ))
         .distinctBy { it.lowercase() }
