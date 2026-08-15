@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>История — Overlay Translation Server</title>
+  <style>
+    body{font-family:Inter,Segoe UI,Arial,sans-serif;background:radial-gradient(circle at 15% 0,#172554 0,transparent 32%),#080d18;color:#e8eef9;margin:0;min-height:100vh}
+    .wrap{max-width:1180px;margin:0 auto;padding:38px 22px 70px}
+    h1{font-size:30px;letter-spacing:-.03em;margin:0 0 22px}
+    .muted{color:#91a0b7;font-size:13px}
+    button{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:0;border-radius:9px;padding:10px 16px;font-weight:600;cursor:pointer;box-shadow:0 5px 15px rgba(37,99,235,.22);transition:.18s}
+    button:hover{transform:translateY(-1px);filter:brightness(1.08)}
+    .games{display:grid;grid-template-columns:repeat(auto-fill,220px);gap:20px;justify-content:start}
+    .game-card{position:relative;width:220px;aspect-ratio:1/1;overflow:hidden;background:#111827;border:1px solid #263244;border-radius:16px;box-shadow:0 12px 30px rgba(0,0,0,.24);transition:border-color .18s,transform .18s,box-shadow .18s}
+    .game-card:hover{border-color:#475569;transform:translateY(-2px);box-shadow:0 16px 34px rgba(0,0,0,.3)}
+    .game-link{display:grid;grid-template-rows:minmax(0,3fr) minmax(54px,1fr);height:100%;color:inherit;text-decoration:none}
+    .image-area{position:relative;min-height:0;overflow:hidden;background:#0b1220;border-bottom:1px solid #263244}
+    .logo{display:block;width:100%;height:100%;object-fit:cover}
+    .logo-placeholder{display:grid;place-items:center;color:#7dd3fc;font-size:36px;cursor:pointer;background:linear-gradient(145deg,#111c30,#0b1220)}
+    .card-footer{display:flex;align-items:center;min-width:0;padding:10px 48px 10px 14px;box-sizing:border-box}
+    .name{width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;font-weight:700}
+    .clear{position:absolute;right:9px;bottom:9px;z-index:2;width:36px;height:36px;padding:0;display:grid;place-items:center;background:#263244;border-radius:9px;box-shadow:none;font-size:16px}
+    .clear:hover{background:#7f1d1d;transform:none;filter:none}
+    .upload{display:none}
+    @media(max-width:600px){.wrap{padding:24px 14px 50px}.games{grid-template-columns:repeat(auto-fill,minmax(170px,220px));gap:16px}.game-card{width:100%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <p><a href="/admin"><button type="button">← Админка</button></a></p>
+    <h1>История</h1>
+    <div class="games">
+      {% for source in sources %}
+      <div class="game-card" data-source-id="{{ source.source_id }}">
+        <a class="game-link" href="/history/{{ source.source_id }}">
+          <div class="image-area">
+            {% if source.image_path %}
+            <img class="logo" src="/uploads/{{ source.image_path }}" alt="">
+            {% else %}
+            <span class="logo logo-placeholder" title="Установить изображение">+</span>
+            {% endif %}
+          </div>
+          <div class="card-footer"><div class="name" title="{{ source.source_name }}">{{ source.source_name }}</div></div>
+        </a>
+        {% if not source.image_path %}<input class="upload" type="file" accept="image/jpeg,image/png,image/webp">{% endif %}
+        <button class="clear" type="button" title="Очистить историю" aria-label="Очистить историю">🗑</button>
+      </div>
+      {% else %}
+      <p class="muted">История пока пуста.</p>
+      {% endfor %}
+    </div>
+  </div>
+  <script>
+    document.querySelectorAll('.clear').forEach(button=>button.addEventListener('click',async event=>{
+      event.preventDefault();event.stopPropagation();
+      const card=button.closest('[data-source-id]'),sourceId=card.dataset.sourceId;
+      if(!confirm('Очистить всю историю этой игры?'))return;
+      button.disabled=true;
+      try{
+        const response=await fetch('/history/'+encodeURIComponent(sourceId)+'/clear',{method:'POST'}),payload=await response.json();
+        if(!response.ok)throw new Error(payload.detail||'Не удалось очистить историю');
+        card.remove();
+      }catch(error){alert(error.message);button.disabled=false}
+    }));
+    document.querySelectorAll('.logo-placeholder').forEach(logo=>logo.addEventListener('click',event=>{
+      event.preventDefault();event.stopPropagation();
+      logo.closest('.game-card').querySelector('.upload').click();
+    }));
+    document.querySelectorAll('.upload').forEach(input=>input.addEventListener('change',async()=>{
+      const file=input.files[0];if(!file)return;
+      const card=input.closest('[data-source-id]'),data=new FormData();data.set('image',file);
+      try{
+        const response=await fetch('/history/'+encodeURIComponent(card.dataset.sourceId)+'/image',{method:'POST',body:data});
+        if(!response.ok)throw new Error((await response.text())||'Не удалось загрузить изображение');
+        location.reload();
+      }catch(error){alert(error.message)}
+    }));
+  </script>
+</body>
+</html>

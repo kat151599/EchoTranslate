@@ -1,0 +1,5 @@
+# Install this in addition to the base server requirements.
+# IMPORTANT: onnxruntime-directml and onnxruntime expose the same Python module;
+# keep only the DirectML package installed in this virtual environment.
+rapidocr==3.9.2
+onnxruntime-directml==1.24.4

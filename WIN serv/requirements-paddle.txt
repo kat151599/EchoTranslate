@@ -1,0 +1,3 @@
+# Installed explicitly by install_windows*.bat
+paddlepaddle==3.3.0
+paddleocr==3.7.0

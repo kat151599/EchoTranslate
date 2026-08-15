@@ -1,0 +1,15 @@
+Скопировать всё содержимое архива в корень существующего сервера с заменой.
+
+ЗАМЕНЯЮТСЯ:
+app\ocr_engine.py
+app\config.py
+app\main.py
+app\templates\admin.html
+
+ДОБАВЛЯЮТСЯ:
+INSTALL_RAPIDOCR_DIRECTML.bat
+VERIFY_DIRECTML.bat
+requirements-directml.txt
+DIRECTML_PATCH_README_RU.txt
+
+config.json НЕ включён и НЕ заменяется — сохранённые API-ключи и настройки останутся у вас.

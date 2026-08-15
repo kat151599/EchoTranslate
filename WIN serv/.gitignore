@@ -1,0 +1,7 @@
+.venv/
+config.json
+data/*.db*
+data/paddlex/
+logs/*
+__pycache__/
+*.pyc

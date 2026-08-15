@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{ source_name }} — История</title>
+  <style>
+    html{min-height:100%;background:#080d18}
+    body{font-family:Inter,Segoe UI,Arial,sans-serif;background-color:#080d18;background-image:radial-gradient(circle at 15% 0,#172554 0,transparent 32%);background-repeat:no-repeat;background-attachment:fixed;color:#e8eef9;margin:0;min-height:100vh}
+    .wrap{max-width:1180px;margin:0 auto;padding:38px 22px 70px}
+    .card{background:#111827;border:1px solid rgba(148,163,184,.16);border-radius:16px;padding:24px;margin:18px 0;box-shadow:0 16px 45px rgba(0,0,0,.2)}
+    h1{font-size:30px;letter-spacing:-.03em;margin:0 0 6px}
+    h2{font-size:18px;margin:0 0 18px}
+    .muted,.time{color:#91a0b7;font-size:13px}
+    .page-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+    .page-actions a{text-decoration:none}
+    .glossary-action{display:flex;justify-content:flex-end;margin:14px 0 22px}
+    .glossary-action a{text-decoration:none}
+    .glossary-action button{padding:13px 24px;font-size:15px}
+    .game-header{position:relative;min-height:150px;overflow:hidden;display:flex;align-items:center}
+    .game-header-image{position:absolute;inset:0 auto 0 0;width:58%;height:100%;object-fit:cover;object-position:center;opacity:.9;-webkit-mask-image:linear-gradient(to right,#000 0,#000 48%,transparent 100%);mask-image:linear-gradient(to right,#000 0,#000 48%,transparent 100%)}
+    .game-header:after{content:"";position:absolute;inset:0;background:linear-gradient(to right,transparent 18%,rgba(17,24,39,.45) 48%,#111827 68%);pointer-events:none}
+    .game-heading{position:relative;z-index:1;width:52%;margin-left:auto}
+    button{background:linear-gradient(135deg,#3b82f6,#2563eb);color:#fff;border:0;border-radius:9px;padding:10px 16px;font-weight:600;cursor:pointer;box-shadow:0 5px 15px rgba(37,99,235,.22);transition:.18s}
+    button:hover{transform:translateY(-1px);filter:brightness(1.08)}
+    button:disabled{opacity:.55;cursor:wait;transform:none}
+    .entry{position:relative;padding-right:88px}
+    .source{font-weight:600;margin-top:12px;white-space:pre-wrap;line-height:1.5}
+    .translation{margin-top:10px;padding-top:10px;border-top:1px solid #263244;white-space:pre-wrap;line-height:1.5}
+    .actions{position:absolute;right:24px;top:24px;display:flex;gap:6px}
+    .icon{background:#263244;padding:6px 8px;box-shadow:none}
+    .icon:hover{background:#334155}
+    .empty{text-align:center;padding:34px}
+    @media(max-width:600px){.wrap{padding:22px 12px 50px}.card{padding:17px}.entry{padding-right:17px;padding-top:58px}.actions{right:17px;top:17px}.game-header-image{width:72%}.game-header:after{background:linear-gradient(to right,rgba(17,24,39,.08),#111827 82%)}.game-heading{width:56%}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="page-actions">
+      <a href="/history"><button type="button">← История</button></a>
+    </div>
+
+    <div class="card game-header">
+      {% if source and source.image_path %}<img class="game-header-image" src="/uploads/{{ source.image_path }}" alt="">{% endif %}
+      <div class="game-heading">
+        <h1>{{ source_name }}</h1>
+        <div class="muted">{{ source_id }}</div>
+      </div>
+    </div>
+
+    <div class="glossary-action">
+      <a href="/history/{{ source_id }}/glossary"><button type="button">Глоссарий</button></a>
+    </div>
+
+    {% for row in rows %}
+    <div class="card entry" data-id="{{ row.id }}">
+      <div class="actions">
+        <button class="icon delete" type="button" title="Удалить">🗑</button>
+        <button class="icon retranslate" type="button" title="Перевести заново">↻</button>
+      </div>
+      <div class="time">{{ row.created_at }}</div>
+      <div class="source">{{ row.source_text }}</div>
+      <div class="translation">{{ row.translation }}</div>
+    </div>
+    {% else %}
+    <div class="card empty muted">История пока пуста.</div>
+    {% endfor %}
+  </div>
+
+  <script>
+    const sourceId={{ source_id|tojson }};
+    document.querySelectorAll('.delete').forEach(button=>button.addEventListener('click',async()=>{
+      const entry=button.closest('[data-id]');
+      if(!confirm('Удалить эту запись?'))return;
+      const response=await fetch('/history/'+encodeURIComponent(sourceId)+'/'+entry.dataset.id+'/delete',{method:'POST'}),payload=await response.json();
+      if(!response.ok)return alert(payload.detail||'Не удалось удалить запись');
+      entry.remove();
+    }));
+    document.querySelectorAll('.retranslate').forEach(button=>button.addEventListener('click',async()=>{
+      const entry=button.closest('[data-id]');
+      button.disabled=true;
+      try{
+        const response=await fetch('/history/'+encodeURIComponent(sourceId)+'/'+entry.dataset.id+'/retranslate',{method:'POST'}),payload=await response.json();
+        if(!response.ok)throw new Error(payload.detail||'Не удалось перевести заново');
+        entry.querySelector('.translation').textContent=payload.translation;
+      }catch(error){alert(error.message)}finally{button.disabled=false}
+    }));
+  </script>
+</body>
+</html>

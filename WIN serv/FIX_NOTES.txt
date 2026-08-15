@@ -1,0 +1,8 @@
+Fixed Windows installer:
+- never relies on activate.bat; every pip/python command uses .venv\Scripts\python.exe directly
+- removes an incomplete .venv from a failed previous install
+- installs released paddleocr==3.7.0 from PyPI instead of editable-installing a GitHub ZIP without .git metadata
+- stops immediately on failed venv/package/import steps
+- START_SERVER.bat refuses to start an incomplete environment
+- VERIFY_INSTALL.bat confirms the exact Python executable and imports
+- vendor/PaddleOCR-main removed from distributable because it is no longer an install dependency

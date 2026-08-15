@@ -1,0 +1,17 @@
+INFO:     Started server process [6856]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8765 (Press CTRL+C to quit)
+[32m[INFO] 2026-08-15 01:15:23,930 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-08-15 01:15:23,944 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\MyHome\Downloads\overlay-translation-server-win11-fixed\WIN serv\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+[32m[INFO] 2026-08-15 01:15:23,945 [RapidOCR] main.py:63: Using C:\Users\MyHome\Downloads\overlay-translation-server-win11-fixed\WIN serv\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_det_small.onnx[0m
+[32m[INFO] 2026-08-15 01:15:23,945 [RapidOCR] provider_config.py:40: Windows 10 or above detected, try to use DirectML as primary provider[0m
+[32m[INFO] 2026-08-15 01:15:24,230 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-08-15 01:15:24,233 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\MyHome\Downloads\overlay-translation-server-win11-fixed\WIN serv\.venv\Lib\site-packages\rapidocr\models\ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+[32m[INFO] 2026-08-15 01:15:24,234 [RapidOCR] main.py:63: Using C:\Users\MyHome\Downloads\overlay-translation-server-win11-fixed\WIN serv\.venv\Lib\site-packages\rapidocr\models\ch_ppocr_mobile_v2.0_cls_mobile.onnx[0m
+[32m[INFO] 2026-08-15 01:15:24,235 [RapidOCR] provider_config.py:40: Windows 10 or above detected, try to use DirectML as primary provider[0m
+[32m[INFO] 2026-08-15 01:15:24,400 [RapidOCR] base.py:23: Using engine_name: onnxruntime[0m
+[32m[INFO] 2026-08-15 01:15:24,421 [RapidOCR] download_file.py:60: File exists and is valid: C:\Users\MyHome\Downloads\overlay-translation-server-win11-fixed\WIN serv\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+[32m[INFO] 2026-08-15 01:15:24,421 [RapidOCR] main.py:63: Using C:\Users\MyHome\Downloads\overlay-translation-server-win11-fixed\WIN serv\.venv\Lib\site-packages\rapidocr\models\PP-OCRv6_rec_small.onnx[0m
+[32m[INFO] 2026-08-15 01:15:24,422 [RapidOCR] provider_config.py:40: Windows 10 or above detected, try to use DirectML as primary provider[0m
+[33m[WARNING] 2026-08-15 01:15:25,026 [RapidOCR] main.py:132: The text detection result is empty[0m

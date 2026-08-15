@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="menu_retranslate_history">Перегенерировать перевод</string>
+    <string name="menu_delete_history">Удалить из контекста</string>
+    <string name="history_action_no_blocks">Нет текущих фраз, связанных с историей</string>
+    <string name="history_action_failed">Ошибка действия с историей: %1$s</string>
+</resources>
