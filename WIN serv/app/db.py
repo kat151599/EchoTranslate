@@ -316,7 +316,7 @@ def llm_test_model_history(provider_id: str, model: str) -> list[dict]:
 
 def game_glossary(source_id: str) -> list[dict]:
     with connect() as con:
-        rows = con.execute("SELECT id, source_text, translation, type, status FROM game_glossary WHERE source_id=? ORDER BY source_text", (source_id,)).fetchall()
+        rows = con.execute("SELECT id, source_text, translation, type, status FROM game_glossary WHERE source_id=? ORDER BY created_at DESC, id DESC", (source_id,)).fetchall()
     return [dict(row) for row in rows]
 
 
@@ -340,8 +340,9 @@ def update_glossary_state(source_id: str, checkpoint: int, pending_tokens: int =
         con.execute("INSERT INTO glossary_source_state(source_id, glossary_scanned_until_history_id, glossary_pending_tokens) VALUES(?,?,?) ON CONFLICT(source_id) DO UPDATE SET glossary_scanned_until_history_id=excluded.glossary_scanned_until_history_id, glossary_pending_tokens=excluded.glossary_pending_tokens", (source_id, checkpoint, pending_tokens))
 
 
-def merge_game_glossary(source_id: str, entries: list[dict]) -> tuple[int, int]:
+def merge_game_glossary(source_id: str, entries: list[dict]) -> tuple[int, int, list[dict]]:
     added = conflicts = 0
+    added_entries: list[dict] = []
     with _lock, connect() as con:
         for entry in entries:
             source = str(entry.get("source") or "").strip()
@@ -351,25 +352,30 @@ def merge_game_glossary(source_id: str, entries: list[dict]) -> tuple[int, int]:
                 continue
             old = con.execute("SELECT translation, status FROM game_glossary WHERE source_id=? AND source_text=?", (source_id, source)).fetchone()
             if old is None:
-                con.execute("INSERT INTO game_glossary(source_id, source_text, translation, type, status) VALUES(?,?,?,?, 'AUTO')", (source_id, source, translation, kind))
+                cursor = con.execute("INSERT INTO game_glossary(source_id, source_text, translation, type, status) VALUES(?,?,?,?, 'AUTO')", (source_id, source, translation, kind))
                 added += 1
+                added_entries.append({"id": int(cursor.lastrowid), "source_text": source, "translation": translation, "type": kind, "status": "AUTO"})
             elif old["status"] != "LOCKED" and old["translation"] != translation:
                 con.execute("UPDATE game_glossary SET status='CONFLICT', updated_at=datetime('now') WHERE source_id=? AND source_text=?", (source_id, source))
                 conflicts += 1
-    return added, conflicts
+    return added, conflicts, added_entries
 
 
-def save_game_glossary(source_id: str, source_text: str, translation: str, kind: str, entry_id: int | None = None) -> None:
+def save_game_glossary(source_id: str, source_text: str, translation: str, kind: str, entry_id: int | None = None) -> dict | None:
     with _lock, connect() as con:
         if entry_id is None:
             con.execute("INSERT INTO game_glossary(source_id, source_text, translation, type, status) VALUES(?,?,?,?, 'LOCKED') ON CONFLICT(source_id, source_text) DO UPDATE SET translation=excluded.translation, type=excluded.type, status='LOCKED', updated_at=datetime('now')", (source_id, source_text, translation, kind))
+            row = con.execute("SELECT id, source_text, translation, type, status FROM game_glossary WHERE source_id=? AND source_text=?", (source_id, source_text)).fetchone()
         else:
-            con.execute("UPDATE game_glossary SET source_text=?, translation=?, type=?, status='LOCKED', updated_at=datetime('now') WHERE id=? AND source_id=?", (source_text, translation, kind, entry_id, source_id))
+            if not con.execute("UPDATE game_glossary SET source_text=?, translation=?, type=?, status='LOCKED', updated_at=datetime('now') WHERE id=? AND source_id=?", (source_text, translation, kind, entry_id, source_id)).rowcount:
+                return None
+            row = con.execute("SELECT id, source_text, translation, type, status FROM game_glossary WHERE id=? AND source_id=?", (entry_id, source_id)).fetchone()
+    return dict(row) if row else None
 
 
-def delete_game_glossary(source_id: str, entry_id: int) -> None:
+def delete_game_glossary(source_id: str, entry_id: int) -> bool:
     with _lock, connect() as con:
-        con.execute("DELETE FROM game_glossary WHERE source_id=? AND id=?", (source_id, entry_id))
+        return con.execute("DELETE FROM game_glossary WHERE source_id=? AND id=?", (source_id, entry_id)).rowcount > 0
 
 
 def delete_history_message(source_id: str, message_id: int) -> bool:
@@ -383,6 +389,18 @@ def update_history_translation(source_id: str, message_id: int, translation: str
             "UPDATE messages SET translation=? WHERE source_id=? AND id=?",
             (translation, source_id, message_id),
         ).rowcount > 0
+
+
+def update_history_message(source_id: str, message_id: int, source_text: str, translation: str) -> bool:
+    """Edit one history row and invalidate only its matching screen response cache."""
+    with _lock, connect() as con:
+        row = con.execute("SELECT session_id, screen_hash FROM messages WHERE source_id=? AND id=?", (source_id, message_id)).fetchone()
+        if row is None:
+            return False
+        con.execute("UPDATE messages SET source_text=?, translation=? WHERE source_id=? AND id=?", (source_text, translation, source_id, message_id))
+        if row["screen_hash"]:
+            con.execute("DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?", (source_id, row["session_id"], row["screen_hash"]))
+    return True
 
 
 def clear_session(source_id: str, session_id: str) -> None:

@@ -27,6 +27,7 @@
     .entry{position:relative;padding-right:88px}
     .source{font-weight:600;margin-top:12px;white-space:pre-wrap;line-height:1.5}
     .translation{margin-top:10px;padding-top:10px;border-top:1px solid #263244;white-space:pre-wrap;line-height:1.5}
+    .edit-fields{display:none;margin-top:12px}.entry.editing .edit-fields{display:block}.entry.editing .source,.entry.editing .translation{display:none}.edit-fields textarea{width:100%;min-height:74px;box-sizing:border-box;margin:6px 0;background:#0b1220;color:#fff;border:1px solid #334155;border-radius:8px;padding:8px;font:inherit}.edit-actions{display:flex;gap:8px;margin-top:8px}
     .actions{position:absolute;right:24px;top:24px;display:flex;gap:6px}
     .icon{background:#263244;padding:6px 8px;box-shadow:none}
     .icon:hover{background:#334155}
@@ -52,39 +53,56 @@
       <a href="/history/{{ source_id }}/glossary"><button type="button">Глоссарий</button></a>
     </div>
 
+    <div id="history-entries">
     {% for row in rows %}
     <div class="card entry" data-id="{{ row.id }}">
       <div class="actions">
-        <button class="icon delete" type="button" title="Удалить">🗑</button>
-        <button class="icon retranslate" type="button" title="Перевести заново">↻</button>
+        <button class="icon" type="button" data-action="delete" data-id="{{ row.id }}" title="Удалить">🗑</button>
+        <button class="icon" type="button" data-action="retranslate" data-id="{{ row.id }}" title="Перевести заново">↻</button>
+        <button class="icon" type="button" data-action="edit" data-id="{{ row.id }}" title="Редактировать">✎</button>
       </div>
       <div class="time">{{ row.created_at }}</div>
       <div class="source">{{ row.source_text }}</div>
       <div class="translation">{{ row.translation }}</div>
+      <div class="edit-fields"><label>Оригинал<textarea class="edit-source">{{ row.source_text }}</textarea></label><label>Перевод<textarea class="edit-translation">{{ row.translation }}</textarea></label><div class="edit-actions"><button type="button" data-action="save" data-id="{{ row.id }}">Сохранить</button><button class="icon" type="button" data-action="cancel" data-id="{{ row.id }}">Отмена</button></div></div>
     </div>
     {% else %}
     <div class="card empty muted">История пока пуста.</div>
     {% endfor %}
+    </div>
   </div>
 
   <script>
     const sourceId={{ source_id|tojson }};
-    document.querySelectorAll('.delete').forEach(button=>button.addEventListener('click',async()=>{
-      const entry=button.closest('[data-id]');
-      if(!confirm('Удалить эту запись?'))return;
-      const response=await fetch('/history/'+encodeURIComponent(sourceId)+'/'+entry.dataset.id+'/delete',{method:'POST'}),payload=await response.json();
-      if(!response.ok)return alert(payload.detail||'Не удалось удалить запись');
-      entry.remove();
-    }));
-    document.querySelectorAll('.retranslate').forEach(button=>button.addEventListener('click',async()=>{
-      const entry=button.closest('[data-id]');
+    const historyEntries=document.getElementById('history-entries');
+    async function responseData(response,action,id){
+      const payload=await response.json();
+      if(!response.ok){console.error('HISTORY ACTION FAILED action='+action+' id='+id+' status='+response.status);throw new Error(payload.detail||'Не удалось выполнить действие')}
+      return payload;
+    }
+    historyEntries.addEventListener('click',async event=>{
+      const button=event.target.closest('button[data-action]');
+      if(!button||!historyEntries.contains(button))return;
+      const action=button.dataset.action,id=button.dataset.id,entry=button.closest('.entry');
+      if(!entry)return;
+      if(action==='edit'){entry.classList.add('editing');return}
+      if(action==='cancel'){entry.querySelector('.edit-source').value=entry.querySelector('.source').textContent;entry.querySelector('.edit-translation').value=entry.querySelector('.translation').textContent;entry.classList.remove('editing');return}
+      if(action==='delete'&&!confirm('Удалить эту запись?'))return;
       button.disabled=true;
       try{
-        const response=await fetch('/history/'+encodeURIComponent(sourceId)+'/'+entry.dataset.id+'/retranslate',{method:'POST'}),payload=await response.json();
-        if(!response.ok)throw new Error(payload.detail||'Не удалось перевести заново');
-        entry.querySelector('.translation').textContent=payload.translation;
+        if(action==='delete'){
+          await responseData(await fetch('/history/'+encodeURIComponent(sourceId)+'/'+id+'/delete',{method:'POST'}),action,id);entry.remove();
+        }else if(action==='retranslate'){
+          const payload=await responseData(await fetch('/history/'+encodeURIComponent(sourceId)+'/'+id+'/retranslate',{method:'POST'}),action,id);entry.querySelector('.translation').textContent=payload.translation;
+        }else if(action==='save'){
+          const source_text=entry.querySelector('.edit-source').value.trim(),translation=entry.querySelector('.edit-translation').value.trim();
+          if(!source_text||!translation)throw new Error('Оригинал и перевод не могут быть пустыми');
+          const data=new FormData();data.set('source_text',source_text);data.set('translation',translation);
+          const payload=await responseData(await fetch('/history/'+encodeURIComponent(sourceId)+'/'+id+'/edit',{method:'POST',body:data}),action,id);
+          entry.querySelector('.source').textContent=payload.source_text;entry.querySelector('.translation').textContent=payload.translation;entry.classList.remove('editing');
+        }
       }catch(error){alert(error.message)}finally{button.disabled=false}
-    }));
+    });
   </script>
 </body>
 </html>

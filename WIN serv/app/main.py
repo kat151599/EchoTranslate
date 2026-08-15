@@ -24,7 +24,7 @@ from pydantic import BaseModel
 
 from .bootstrap import configure_paddlex_cache
 from .config import ROOT, load_config, save_config
-from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, history_translation_hits, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation
+from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, history_translation_hits, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message
 from .ocr_engine import ocr_engine, merge_ocr_blocks
 from .token_budget import TokenBudget
 from .prompting import glossary_text, game_glossary_text, target_text, build_messages
@@ -80,10 +80,10 @@ def check_auth(credentials: HTTPAuthorizationCredentials | None = Security(beare
         )
 
 
-async def _maybe_scan_glossary(source_id: str, force: bool = False) -> None:
+async def _maybe_scan_glossary(source_id: str, force: bool = False) -> dict:
     with _glossary_scan_lock:
         if source_id in _glossary_scans:
-            return
+            raise RuntimeError("Анализ уже выполняется")
         _glossary_scans.add(source_id)
     try:
         state, rows = glossary_scan_rows(source_id)
@@ -94,7 +94,7 @@ async def _maybe_scan_glossary(source_id: str, force: bool = False) -> None:
         update_glossary_state(source_id, int(state["glossary_scanned_until_history_id"]), pending)
         logger.info("GLOSSARY PENDING source=%s tokens=%s", source_id, pending)
         if not fresh or (pending < 10000 and not force):
-            return
+            return {"added": 0, "entries": []}
         checkpoint = max(row["id"] for row in fresh)
         logger.info("GLOSSARY SCAN START source=%s from=%s to=%s tokens=%s", source_id, state["glossary_scanned_until_history_id"], checkpoint, pending)
         existing = game_glossary(source_id)
@@ -104,14 +104,23 @@ async def _maybe_scan_glossary(source_id: str, force: bool = False) -> None:
             {"role": "user", "content": "EXISTING_GLOSSARY:\n" + "\n".join(f"{row['source_text']} => {row['translation']}" for row in existing) + "\n\nNEW_HISTORY:\n" + records},
         ]
         entries = await extract_glossary_openai_compatible(cfg=cfg, messages=messages)
-        added, conflicts = merge_game_glossary(source_id, entries)
+        added, conflicts, added_entries = merge_game_glossary(source_id, entries)
         update_glossary_state(source_id, checkpoint, 0)
         logger.info("GLOSSARY SCAN DONE source=%s added=%s conflicts=%s", source_id, added, conflicts)
+        return {"added": added, "entries": added_entries}
     except Exception as e:
         logger.exception("GLOSSARY SCAN FAILED source=%s reason=%s", source_id, e)
+        raise
     finally:
         with _glossary_scan_lock:
             _glossary_scans.discard(source_id)
+
+
+async def _scan_glossary_background(source_id: str) -> None:
+    try:
+        await _maybe_scan_glossary(source_id)
+    except Exception:
+        pass
 
 @app.get("/health")
 def health():
@@ -303,7 +312,7 @@ async def translate_screen(
             },
         },
     }
-    background_tasks.add_task(_maybe_scan_glossary, source_id)
+    background_tasks.add_task(_scan_glossary_background, source_id)
     logger.info(
         "TIMING id=%s status=200 decode=%.2fms ocr=%.2fms merge=%.2fms context=%.2fms llm=%.2fms save=%.2fms total=%.2fms",
         request_id, decode_ms, ocr_ms, merge_ms, context_ms, llm_ms, save_ms, total_ms,
@@ -450,21 +459,37 @@ def history_glossary(request: Request, source_id: str):
 
 @app.post("/history/{source_id}/glossary/scan")
 async def history_glossary_scan(source_id: str):
-    asyncio.create_task(_maybe_scan_glossary(source_id, force=True))
-    return HTMLResponse(f'<meta http-equiv="refresh" content="0;url=/history/{source_id}/glossary">')
+    if history_source_name(source_id) is None:
+        raise HTTPException(404, "History source not found")
+    try:
+        return await _maybe_scan_glossary(source_id, force=True)
+    except RuntimeError as e:
+        raise HTTPException(409, str(e)) from e
+    except Exception as e:
+        raise HTTPException(502, f"Ошибка анализа: {e}") from e
 
 
 @app.post("/history/{source_id}/glossary/save")
 async def history_glossary_save(source_id: str, request: Request):
     form = await request.form()
-    save_game_glossary(source_id, str(form.get("source_text") or "").strip(), str(form.get("translation") or "").strip(), str(form.get("type") or "TERM").strip().upper(), int(form["id"]) if form.get("id") else None)
-    return HTMLResponse(f'<meta http-equiv="refresh" content="0;url=/history/{source_id}/glossary">')
+    source_text, translation = str(form.get("source_text") or "").strip(), str(form.get("translation") or "").strip()
+    kind = str(form.get("type") or "TERM").strip().upper()
+    if not source_text or not translation or kind not in {"PERSON", "LOCATION", "ORG", "TITLE", "ITEM", "TERM"}:
+        raise HTTPException(400, "Заполните оригинал, перевод и корректный тип")
+    try:
+        entry = save_game_glossary(source_id, source_text, translation, kind, int(form["id"]) if form.get("id") else None)
+    except Exception as e:
+        raise HTTPException(409, f"Не удалось сохранить запись: {e}") from e
+    if entry is None:
+        raise HTTPException(404, "Glossary entry not found")
+    return {"ok": True, "entry": entry}
 
 
 @app.post("/history/{source_id}/glossary/{entry_id}/delete")
 def history_glossary_delete(source_id: str, entry_id: int):
-    delete_game_glossary(source_id, entry_id)
-    return HTMLResponse(f'<meta http-equiv="refresh" content="0;url=/history/{source_id}/glossary">')
+    if not delete_game_glossary(source_id, entry_id):
+        raise HTTPException(404, "Glossary entry not found")
+    return {"ok": True}
 
 
 @app.get("/llm-test", response_class=HTMLResponse)
@@ -581,6 +606,17 @@ def history_delete_message(source_id: str, message_id: int):
     if not delete_history_message(source_id, message_id):
         raise HTTPException(404, "History entry not found")
     return {"ok": True}
+
+
+@app.post("/history/{source_id}/{message_id}/edit")
+async def history_edit_message(source_id: str, message_id: int, request: Request):
+    form = await request.form()
+    source_text, translation = str(form.get("source_text") or "").strip(), str(form.get("translation") or "").strip()
+    if not source_text or not translation:
+        raise HTTPException(400, "Оригинал и перевод не могут быть пустыми")
+    if not update_history_message(source_id, message_id, source_text, translation):
+        raise HTTPException(404, "History entry not found")
+    return {"ok": True, "source_text": source_text, "translation": translation}
 
 
 @app.post("/history/{source_id}/{message_id}/retranslate")
