@@ -266,18 +266,18 @@ fun SettingsScreen(
     var deeplCustomToken by remember { mutableStateOf("") }
     var deeplProtocol by remember { mutableStateOf(com.gameocr.app.data.DeeplProtocol.OFFICIAL) }
     var deeplAdvancedExpanded by remember { mutableStateOf(false) }
-    // жњ‰йЃ“ж™єдє‘дёЂеҐ— keyпј€OCR + е›ѕз‰‡зї»иЇ‘е…±з”Ёпј‰
+    // Р¶СљвЂ°Р№РѓвЂњР¶в„ўС”РґС”вЂРґС‘Р‚РµТђвЂ” keyРїСв‚¬OCR + РµвЂєС•Р·вЂ°вЂЎР·С—В»РёР‡вЂРµвЂ¦В±Р·вЂќРЃРїСвЂ°
     var youdaoAppKey by remember { mutableStateOf("") }
     var youdaoAppSecret by remember { mutableStateOf("") }
-    // зЃ«е±±еј•ж“Ћжњєе™Ёзї»иЇ‘ AK/SK + regionпј€SignV4пј‰
+    // Р·РѓВ«РµВ±В±РµСвЂўР¶вЂњР‹Р¶СљС”Рµв„ўРЃР·С—В»РёР‡вЂ AK/SK + regionРїСв‚¬SignV4РїСвЂ°
     var volcAk by remember { mutableStateOf("") }
     var volcSk by remember { mutableStateOf("") }
     var volcRegion by remember { mutableStateOf("cn-north-1") }
-    // з™ѕеє¦зї»иЇ‘ејЂж”ѕе№іеЏ° APPID + еЇ†й’Ґпј€дёЋз™ѕеє¦ж™єиѓЅдє‘ OCR е®Ње…ЁдёЌжЇдёЂе›ћдє‹пј‰
+    // Р·в„ўС•РµС”В¦Р·С—В»РёР‡вЂРµСР‚Р¶вЂќС•Рµв„–С–РµРЏВ° APPID + РµР‡вЂ Р№вЂ™ТђРїСв‚¬РґС‘Р‹Р·в„ўС•РµС”В¦Р¶в„ўС”РёС“Р…РґС”вЂ OCR РµВ®РЉРµвЂ¦РЃРґС‘РЊР¶ВР‡РґС‘Р‚РµвЂєС›РґС”вЂ№РїСвЂ°
     var baiduFanyiAppId by remember { mutableStateOf("") }
     var baiduFanyiSecret by remember { mutableStateOf("") }
-    // зї»иЇ‘еј•ж“Ћ"жµ‹иЇ•иїћжЋҐ"жЊ‰й’®зљ„зћ¬ж—¶зЉ¶жЂЃпјљtesting / з»“жћњж–‡е­— / ж€ђеЉџи‰І / OpenAI ж‹‰е€°зљ„ model е€—иЎЁгЂ‚
-    // дёЌиї› SettingsпјЊзєЇ UI зЉ¶жЂЃпј›е€‡жЌў engine дёЌжё…з©єпј€з”Ёж€·е€‡е›ћеЋ»иїиѓЅзњ‹е€°дёЉж¬Ўзљ„з»“жћњпј‰гЂ‚
+    // Р·С—В»РёР‡вЂРµСвЂўР¶вЂњР‹"Р¶ВµвЂ№РёР‡вЂўРёС—С›Р¶Р‹Тђ"Р¶РЉвЂ°Р№вЂ™В®Р·С™вЂћР·С›В¬Р¶вЂ”В¶Р·Р‰В¶Р¶Р‚РѓРїСС™testing / Р·В»вЂњР¶С›СљР¶вЂ“вЂЎРµВ­вЂ” / Р¶в‚¬С’РµР‰СџРёвЂ°Р† / OpenAI Р¶вЂ№вЂ°Рµв‚¬В°Р·С™вЂћ model Рµв‚¬вЂ”РёРЋРЃРіР‚вЂљ
+    // РґС‘РЊРёС—вЂє SettingsРїСРЉР·С”Р‡ UI Р·Р‰В¶Р¶Р‚РѓРїСвЂєРµв‚¬вЂЎР¶РЊСћ engine РґС‘РЊР¶С‘вЂ¦Р·В©С”РїСв‚¬Р·вЂќРЃР¶в‚¬В·Рµв‚¬вЂЎРµвЂєС›РµР‹В»РёС—ВРёС“Р…Р·СљвЂ№Рµв‚¬В°РґС‘Р‰Р¶В¬РЋР·С™вЂћР·В»вЂњР¶С›СљРїСвЂ°РіР‚вЂљ
     var testRunning by remember { mutableStateOf(false) }
     var testMessage by remember { mutableStateOf<String?>(null) }
     var testSuccess by remember { mutableStateOf(false) }
@@ -342,16 +342,16 @@ fun SettingsScreen(
     var floatingSnapEdge by remember { mutableStateOf(true) }
     var floatingAutoDock by remember { mutableStateOf(false) }
     var floatingDockInset by remember { mutableStateOf(0f) }
-    // еј§иЏњеЌ•жЊ‰й’®йЎєеєЏ + е€’иЇЌиЇЌе…ё promptпјљж‹–еЉЁ / зј–иѕ‘еђЋеЌіж—¶йЂљиї‡ vm зљ„ saveArcMenuOrder / saveDictionaryPrompt
-    // еЌ•е­—ж®µиђЅз›пјЊ**дёЌ**иµ°дё» save зљ„ dirty жµЃзЁ‹пј€з”Ёж€·жњџжњ›з«‹е€»з”џж•€пјЊж— йњЂз‚№дїќе­пј‰гЂ‚
+    // РµСВ§РёРЏСљРµРЊвЂўР¶РЉвЂ°Р№вЂ™В®Р№РЋС”РµС”РЏ + Рµв‚¬вЂ™РёР‡РЊРёР‡РЊРµвЂ¦С‘ promptРїСС™Р¶вЂ№вЂ“РµР‰РЃ / Р·СвЂ“РёС•вЂРµС’Р‹РµРЊС–Р¶вЂ”В¶Р№Р‚С™РёС—вЂЎ vm Р·С™вЂћ saveArcMenuOrder / saveDictionaryPrompt
+    // РµРЊвЂўРµВ­вЂ”Р¶В®ВµРёС’Р…Р·вЂєВРїСРЉ**РґС‘РЊ**РёВµВ°РґС‘В» save Р·С™вЂћ dirty Р¶ВµРѓР·РЃвЂ№РїСв‚¬Р·вЂќРЃР¶в‚¬В·Р¶СљСџР¶СљвЂєР·В«вЂ№Рµв‚¬В»Р·вЂќСџР¶вЂўв‚¬РїСРЉР¶вЂ”В Р№СљР‚Р·вЂљв„–РґС—СњРµВ­ВРїСвЂ°РіР‚вЂљ
     var menuOrder by remember { mutableStateOf<List<MenuItemId>>(emptyList()) }
     var arcMenuPageSize by remember { mutableStateOf(FloatingMenu.DEFAULT_PAGE_SIZE.toFloat()) }
-    // еЅ“е‰Ќдё»зђѓжЉЂиѓЅгЂ‚жЉЂиѓЅж§Ѕпј€FULL_SCREEN_SKILLпј‰й‚ЈдёЂиЎЊзљ„ж–‡жЎ€и¦Ѓи·џзќЂе®ѓеЉЁжЂЃжѕз¤єгЂЊе€‡е€°еЇ№ж–№гЂЌпјљ
-    // еЅ“е‰Ќ FULL_SCREEN в†’ жѕз¤єгЂЊвЂ” е€’иЇЌзї»иЇ‘гЂЌпј›еЅ“е‰Ќ WORD_SELECT в†’ жѕз¤єгЂЊвЂ” е…Ёе±Џзї»иЇ‘гЂЌ
+    // РµР…вЂњРµвЂ°РЊРґС‘В»Р·С’С“Р¶Р‰Р‚РёС“Р…РіР‚вЂљР¶Р‰Р‚РёС“Р…Р¶В§Р…РїСв‚¬FULL_SCREEN_SKILLРїСвЂ°Р№вЂљР€РґС‘Р‚РёРЋРЉР·С™вЂћР¶вЂ“вЂЎР¶РЋв‚¬РёВ¦РѓРёВ·СџР·СњР‚РµВ®С“РµР‰РЃР¶Р‚РѓР¶ВС•Р·В¤С”РіР‚РЉРµв‚¬вЂЎРµв‚¬В°РµР‡в„–Р¶вЂ“в„–РіР‚РЊРїСС™
+    // РµР…вЂњРµвЂ°РЊ FULL_SCREEN РІвЂ вЂ™ Р¶ВС•Р·В¤С”РіР‚РЉРІР‚вЂќ Рµв‚¬вЂ™РёР‡РЊР·С—В»РёР‡вЂРіР‚РЊРїСвЂєРµР…вЂњРµвЂ°РЊ WORD_SELECT РІвЂ вЂ™ Р¶ВС•Р·В¤С”РіР‚РЉРІР‚вЂќ РµвЂ¦РЃРµВ±РЏР·С—В»РёР‡вЂРіР‚РЊ
     var currentSkill by remember { mutableStateOf(com.gameocr.app.data.FloatingSkill.FULL_SCREEN) }
     var dictionaryPrompt by remember { mutableStateOf("") }
-    // ж‚¬жµ®жЊ‰й’®"иґґиѕ№и·ќз¦»" slider зљ„е®ћж—¶йў„и§€пјље±Џе№•дё¤дѕ§з”» inset е®Ѕеє¦зљ„еЌЉйЂЏзІ‰жќЎгЂ‚
-    // й»и®¤ falseвЂ”вЂ”иї›и®ѕзЅ®е°±жѕз¤єжќЎеё¦е¤ЄзЄЃе…Ђпј›з”Ёж€·ењЁ slider ж—Ѓж‰‹еЉЁејЂеђЇгЂЊйў„и§€гЂЌеђЋж‰Ќи¦†з›–е€°е±Џе№•дёЉгЂ‚
+    // Р¶вЂљВ¬Р¶ВµВ®Р¶РЉвЂ°Р№вЂ™В®"РёТ‘Т‘РёС•в„–РёВ·СњР·В¦В»" slider Р·С™вЂћРµВ®С›Р¶вЂ”В¶Р№СћвЂћРёВ§в‚¬РїСС™РµВ±РЏРµв„–вЂўРґС‘В¤РґС•В§Р·вЂќВ» inset РµВ®Р…РµС”В¦Р·С™вЂћРµРЊР‰Р№Р‚РЏР·Р†вЂ°Р¶СњРЋРіР‚вЂљ
+    // Р№В»ВРёВ®В¤ falseРІР‚вЂќРІР‚вЂќРёС—вЂєРёВ®С•Р·Р…В®РµВ°В±Р¶ВС•Р·В¤С”Р¶СњРЋРµС‘В¦РµВ¤Р„Р·Р„РѓРµвЂ¦Р‚РїСвЂєР·вЂќРЃР¶в‚¬В·РµСљРЃ slider Р¶вЂ”РѓР¶вЂ°вЂ№РµР‰РЃРµСР‚РµС’Р‡РіР‚РЉР№СћвЂћРёВ§в‚¬РіР‚РЊРµС’Р‹Р¶вЂ°РЊРёВ¦вЂ Р·вЂєвЂ“Рµв‚¬В°РµВ±РЏРµв„–вЂўРґС‘Р‰РіР‚вЂљ
     var insetPreviewActive by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     val insetPreview = remember { EdgeInsetPreviewOverlay(context) }
@@ -390,15 +390,15 @@ fun SettingsScreen(
     var pendingSettingsImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var pendingSettingsImportPreview by remember { mutableStateOf<SettingsBundlePreview?>(null) }
     var pendingSettingsExport by remember { mutableStateOf<Settings?>(null) }
-    // жЋж–‡ HTTP з™ЅеђЌеЌ•пјљз”Ёж€·жЇЏиЎЊдёЂдёЄ hostпјЊUI дёЉз”Ё StringпјЊдїќе­ж—¶ split("\n")
+    // Р¶ВР‹Р¶вЂ“вЂЎ HTTP Р·в„ўР…РµС’РЊРµРЊвЂўРїСС™Р·вЂќРЃР¶в‚¬В·Р¶Р‡РЏРёРЋРЉРґС‘Р‚РґС‘Р„ hostРїСРЉUI РґС‘Р‰Р·вЂќРЃ StringРїСРЉРґС—СњРµВ­ВР¶вЂ”В¶ split("\n")
     var cleartextHostsText by remember { mutableStateOf("") }
-    // жџж ‡иЇ­иЁЂпјљжњ¬ењ°й•њеѓЏгЂ‚togglePinLanguage з«‹еЌіиђЅз›пјЊдё‹ж¬Ў ON_RESUME / load() ж‹‰е›ћжњЂж–°пј›
-    // иї™й‡Њд№џд№ђи§‚ж›ґж–°дёЂд»Ѕжњ¬ењ°зЉ¶жЂЃпјЊUI з«‹е€»еЏЌж гЂ‚
+    // Р¶ВСџР¶В вЂЎРёР‡В­РёРЃР‚РїСС™Р¶СљВ¬РµСљВ°Р№вЂўСљРµС“РЏРіР‚вЂљtogglePinLanguage Р·В«вЂ№РµРЊС–РёС’Р…Р·вЂєВРїСРЉРґС‘вЂ№Р¶В¬РЋ ON_RESUME / load() Р¶вЂ№вЂ°РµвЂєС›Р¶СљР‚Р¶вЂ“В°РїСвЂє
+    // РёС—в„ўР№вЂЎРЉРґв„–СџРґв„–С’РёВ§вЂљР¶вЂєТ‘Р¶вЂ“В°РґС‘Р‚РґВ»Р…Р¶СљВ¬РµСљВ°Р·Р‰В¶Р¶Р‚РѓРїСРЉUI Р·В«вЂ№Рµв‚¬В»РµРЏРЊР¶ВВ РіР‚вЂљ
     var pinnedLanguages by remember { mutableStateOf<List<String>>(emptyList()) }
 
-    // dirty жЈЂжµ‹пјљload ж—¶ capture дёЂд»Ѕе€ќе§‹ SettingsпјЊд№‹еђЋи·џ buildSnapshot() жЇ” equalsгЂ‚
-    // ж—§з‰€ж‰‹е†™дё¤д»Ѕ List<Any?>пјЊжЇЏеЉ  Settings е­—ж®µйѓЅи¦ЃењЁдё¤дёЄ list еђЊж­ҐеЉ пјЊеЏЌе¤ЌзЉЇ"еїж”№дёЂиѕ№"зљ„ bugгЂ‚
-    // зЋ°ењЁз”Ё data class equals и‡ЄеЉЁи¦†з›–ж‰Ђжњ‰е­—ж®µвЂ”вЂ”еЉ е­—ж®µеЏЄж”№ buildSnapshot() дёЂе¤„гЂ‚
+    // dirty Р¶Р€Р‚Р¶ВµвЂ№РїСС™load Р¶вЂ”В¶ capture РґС‘Р‚РґВ»Р…Рµв‚¬СњРµВ§вЂ№ SettingsРїСРЉРґв„–вЂ№РµС’Р‹РёВ·Сџ buildSnapshot() Р¶Р‡вЂќ equalsРіР‚вЂљ
+    // Р¶вЂ”В§Р·вЂ°в‚¬Р¶вЂ°вЂ№РµвЂ в„ўРґС‘В¤РґВ»Р… List<Any?>РїСРЉР¶Р‡РЏРµР‰В  Settings РµВ­вЂ”Р¶В®ВµР№С“Р…РёВ¦РѓРµСљРЃРґС‘В¤РґС‘Р„ list РµС’РЉР¶В­ТђРµР‰В РїСРЉРµРЏРЊРµВ¤РЊР·Р‰Р‡"РµС—ВР¶вЂќв„–РґС‘Р‚РёС•в„–"Р·С™вЂћ bugРіР‚вЂљ
+    // Р·Р‹В°РµСљРЃР·вЂќРЃ data class equals РёвЂЎР„РµР‰РЃРёВ¦вЂ Р·вЂєвЂ“Р¶вЂ°Р‚Р¶СљвЂ°РµВ­вЂ”Р¶В®ВµРІР‚вЂќРІР‚вЂќРµР‰В РµВ­вЂ”Р¶В®ВµРµРЏР„Р¶вЂќв„– buildSnapshot() РґС‘Р‚РµВ¤вЂћРіР‚вЂљ
     var initialSettings by remember { mutableStateOf<Settings?>(null) }
     var showUnsavedDialog by remember { mutableStateOf(false) }
     var showUnsupportedPresetDownloadDialog by remember { mutableStateOf(false) }
@@ -586,7 +586,7 @@ fun SettingsScreen(
     }
     fun presetDisplayNameForMessage(preset: TranslationPreset): String = preset.name
 
-    // вЂ”вЂ” жђњзґўпјљйЎ¶йѓЁиѕ“е…Ґ в†’ дё‹ж‹‰еЊ№й…ЌйЎ№ в†’ з‚№е‡» animateScrollTo е€°еЇ№еє” section йЎ¶йѓЁ вЂ”вЂ”
+    // РІР‚вЂќРІР‚вЂќ Р¶С’СљР·Т‘СћРїСС™Р№РЋВ¶Р№С“РЃРёС•вЂњРµвЂ¦Тђ РІвЂ вЂ™ РґС‘вЂ№Р¶вЂ№вЂ°РµРЉв„–Р№вЂ¦РЊР№РЋв„– РІвЂ вЂ™ Р·вЂљв„–РµвЂЎВ» animateScrollTo Рµв‚¬В°РµР‡в„–РµС”вЂќ section Р№РЋВ¶Р№С“РЃ РІР‚вЂќРІР‚вЂќ
     var settingsViewportTopInWindow by remember { mutableStateOf(Float.NaN) }
     var overlayPreviewTopInWindow by remember { mutableStateOf(Float.NaN) }
     var overlayPreviewHeightPx by remember { mutableStateOf(0) }
@@ -788,9 +788,9 @@ fun SettingsScreen(
     val searchFocusRequester = remember { FocusRequester() }
     val searchTargetRegistry = remember { SettingsSearchTargetRegistry() }
 
-    // д»Ће®Њж•ґжЊЃд№…еЊ–еї«з…§иµ·ж­ҐпјЊе†Ќи¦†з›–жњ¬йЎµе°љжњЄдїќе­зљ„иЌ‰зЁїеЂјгЂ‚дёЌиѓЅд»Ћ Settings() й»и®¤еЂјиµ·ж­ҐпјЊеђ¦е€™
-    // еЇје‡єдјљжЉЉйў„и®ѕгЂЃе›єе®љиЇ­иЁЂгЂЃж‚¬жµ®зЄ—зЉ¶жЂЃе’Њжњ¬ењ° LLM еЏ‚ж•°з­‰йќћеЅ“е‰ЌиЎЁеЌ•е­—ж®µйќ™й»й‡ЌзЅ®гЂ‚
-    // з±»ећ‹иЅ¬жЌўи·џ doSave дїќжЊЃдёЂи‡ґпј€textSize.toInt() / loopInterval.toLongOrNull() з­‰пј‰гЂ‚
+    // РґВ»Р‹РµВ®РЉР¶вЂўТ‘Р¶РЉРѓРґв„–вЂ¦РµРЉвЂ“РµС—В«Р·вЂ¦В§РёВµВ·Р¶В­ТђРїСРЉРµвЂ РЊРёВ¦вЂ Р·вЂєвЂ“Р¶СљВ¬Р№РЋВµРµВ°С™Р¶СљР„РґС—СњРµВ­ВР·С™вЂћРёРЊвЂ°Р·РЃС—РµР‚СРіР‚вЂљРґС‘РЊРёС“Р…РґВ»Р‹ Settings() Р№В»ВРёВ®В¤РµР‚СРёВµВ·Р¶В­ТђРїСРЉРµС’В¦Рµв‚¬в„ў
+    // РµР‡СРµвЂЎС”РґСС™Р¶Р‰Р‰Р№СћвЂћРёВ®С•РіР‚РѓРµвЂєС”РµВ®С™РёР‡В­РёРЃР‚РіР‚РѓР¶вЂљВ¬Р¶ВµВ®Р·Р„вЂ”Р·Р‰В¶Р¶Р‚РѓРµвЂ™РЉР¶СљВ¬РµСљВ° LLM РµРЏвЂљР¶вЂўВ°Р·В­вЂ°Р№СњС›РµР…вЂњРµвЂ°РЊРёРЋРЃРµРЊвЂўРµВ­вЂ”Р¶В®ВµР№Сњв„ўР№В»ВР№вЂЎРЊР·Р…В®РіР‚вЂљ
+    // Р·В±В»РµС›вЂ№РёР…В¬Р¶РЊСћРёВ·Сџ doSave РґС—СњР¶РЉРѓРґС‘Р‚РёвЂЎТ‘РїСв‚¬textSize.toInt() / loopInterval.toLongOrNull() Р·В­вЂ°РїСвЂ°РіР‚вЂљ
     fun buildSnapshot(): Settings = (initialSettings ?: Settings()).copy(
         baseUrl = baseUrl,
         apiKey = apiKey,
@@ -888,7 +888,7 @@ fun SettingsScreen(
             ?: ""
     }
 
-    // derivedStateOf и®© lambda ењЁдѕќиµ– state еЏеЊ–ж—¶ж‰Ќй‡Ќж–°и®Ўз®— equals
+    // derivedStateOf РёВ®В© lambda РµСљРЃРґС•СњРёВµвЂ“ state РµРЏВРµРЉвЂ“Р¶вЂ”В¶Р¶вЂ°РЊР№вЂЎРЊР¶вЂ“В°РёВ®РЋР·В®вЂ” equals
     val dirty by remember {
         derivedStateOf {
             val initial = initialSettings ?: return@derivedStateOf false
@@ -1173,7 +1173,7 @@ fun SettingsScreen(
         )
     }
 
-    // жєђиЇ­иЁЂв†”OCR иЃ”еЉЁпјљжЈЂжџҐиѓЅеђ¦иЇ†е€«еЅ“е‰ЌжєђиЇ­иЁЂпј›дёЌиѓЅе€™жЊ‰"з”Ёж€·е€љеЉЁзљ„жЇе“ЄдёЂиѕ№"е†іе®љжЋЁиЌђж–№еђ‘гЂ‚
+    // Р¶С”С’РёР‡В­РёРЃР‚РІвЂ вЂќOCR РёРѓвЂќРµР‰РЃРїСС™Р¶Р€Р‚Р¶СџТђРёС“Р…РµС’В¦РёР‡вЂ Рµв‚¬В«РµР…вЂњРµвЂ°РЊР¶С”С’РёР‡В­РёРЃР‚РїСвЂєРґС‘РЊРёС“Р…Рµв‚¬в„ўР¶РЉвЂ°"Р·вЂќРЃР¶в‚¬В·Рµв‚¬С™РµР‰РЃР·С™вЂћР¶ВР‡РµвЂњР„РґС‘Р‚РёС•в„–"РµвЂ С–РµВ®С™Р¶Р‹РЃРёРЊС’Р¶вЂ“в„–РµС’вЂРіР‚вЂљ
     pendingLanguageSwapOrigin?.let { origin ->
         val swapAvailable =
             swappedTranslationLanguagePair(sourceLang, targetLang) != null
@@ -1344,11 +1344,11 @@ fun SettingsScreen(
 
     LaunchedEffect(Unit) {
         val s = viewModel.load()
-        // suspend ж“ЌдЅњеї…йЎ»ењЁ Snapshot еќ—е¤–еЃље®Њ
+        // suspend Р¶вЂњРЊРґР…СљРµС—вЂ¦Р№РЋВ»РµСљРЃ Snapshot РµСњвЂ”РµВ¤вЂ“РµРѓС™РµВ®РЉ
         val migratedPrompt = viewModel.migrateDefaultPromptIfStale(context)
-        // е…ій”®жЂ§иѓЅпјљжЉЉ 40+ state е†™е…Ґе°Ѓиї›еђЊдёЂдёЄ mutable snapshotпјЊеЋџе­ђ apply еђЋеЏЄи§¦еЏ‘
-        // дёЂж¬Ў observer йЂљзџҐпјЊйЃїе…Ќ Compose ењЁжЇЏдёЄ state еЏеЊ–ж—¶ schedule дёЂж¬Ў recomposition
-        // / derivedStateOf й‡Ќз®—пјЊиї›и®ѕзЅ®йЎµй‚Јж®µ"еЌЎдёЂдё‹"дё»и¦ЃжќҐи‡Єиї™й‡ЊгЂ‚
+        // РµвЂ¦С–Р№вЂќВ®Р¶Р‚В§РёС“Р…РїСС™Р¶Р‰Р‰ 40+ state РµвЂ в„ўРµвЂ¦ТђРµВ°РѓРёС—вЂєРµС’РЉРґС‘Р‚РґС‘Р„ mutable snapshotРїСРЉРµР‹СџРµВ­С’ apply РµС’Р‹РµРЏР„РёВ§В¦РµРЏвЂ
+        // РґС‘Р‚Р¶В¬РЋ observer Р№Р‚С™Р·СџТђРїСРЉР№РѓС—РµвЂ¦РЊ Compose РµСљРЃР¶Р‡РЏРґС‘Р„ state РµРЏВРµРЉвЂ“Р¶вЂ”В¶ schedule РґС‘Р‚Р¶В¬РЋ recomposition
+        // / derivedStateOf Р№вЂЎРЊР·В®вЂ”РїСРЉРёС—вЂєРёВ®С•Р·Р…В®Р№РЋВµР№вЂљР€Р¶В®Вµ"РµРЊРЋРґС‘Р‚РґС‘вЂ№"РґС‘В»РёВ¦РѓР¶СњТђРёвЂЎР„РёС—в„ўР№вЂЎРЉРіР‚вЂљ
         androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
             baseUrl = s.baseUrl
             apiKey = s.apiKey
@@ -1413,8 +1413,8 @@ fun SettingsScreen(
             customBorderW = s.customBorderWidth.toFloat()
             offsetX = s.overlayOffsetX.toFloat()
             offsetY = s.overlayOffsetY.toFloat()
-            // дёЌй»еЎћдё»зєїзЁ‹пјљfile.exists() + file.length() иµ° IO DispatcherгЂ‚е…€з»™еЌ дЅЌ
-            // ж–‡е­—пјЊIO е®Њж€ђеђЋе†Ќи¦†з›–пј›иї›и®ѕзЅ®зљ„зћ¬й—ґдёЌеЌЎйЎїгЂ‚
+            // РґС‘РЊР№ВВ»РµРЋС›РґС‘В»Р·С”С—Р·РЃвЂ№РїСС™file.exists() + file.length() РёВµВ° IO DispatcherРіР‚вЂљРµвЂ¦в‚¬Р·В»в„ўРµРЊВ РґР…РЊ
+            // Р¶вЂ“вЂЎРµВ­вЂ”РїСРЉIO РµВ®РЉР¶в‚¬С’РµС’Р‹РµвЂ РЊРёВ¦вЂ Р·вЂєвЂ“РїСвЂєРёС—вЂєРёВ®С•Р·Р…В®Р·С™вЂћР·С›В¬Р№вЂ”Т‘РґС‘РЊРµРЊРЋР№РЋС—РіР‚вЂљ
             a11yVolume = s.a11yVolumeTrigger
             floatingSize = s.floatingButtonSizeDp.toFloat()
             floatingSnapEdge = s.floatingButtonSnapToEdge
@@ -1526,9 +1526,9 @@ fun SettingsScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
-                    // йІжЉ¤пјљload е®Њж€ђе‰Ќ state жЇй»и®¤еЌ дЅЌеЂјпјЊж­¤ж—¶дїќе­дјљжЉЉз©єе­—з¬¦дёІ / й»и®¤ enum
-                    // е†™е…Ґ DataStoreпјЊи¦†з›–з”Ёж€·е®ћй™…ж•°жЌ®гЂ‚LaunchedEffect е®Њж€ђпј€~13msпј‰ж‰ЌжЉЉ
-                    // initialSettings и®ѕеЂјпјЊй‚Јд№‹еђЋж‰Ќе…Ѓи®ёдїќе­гЂ‚
+                    // Р№ВР†Р¶Р‰В¤РїСС™load РµВ®РЉР¶в‚¬С’РµвЂ°РЊ state Р¶ВР‡Р№В»ВРёВ®В¤РµРЊВ РґР…РЊРµР‚СРїСРЉР¶В­В¤Р¶вЂ”В¶РґС—СњРµВ­ВРґСС™Р¶Р‰Р‰Р·В©С”РµВ­вЂ”Р·В¬В¦РґС‘Р† / Р№В»ВРёВ®В¤ enum
+                    // РµвЂ в„ўРµвЂ¦Тђ DataStoreРїСРЉРёВ¦вЂ Р·вЂєвЂ“Р·вЂќРЃР¶в‚¬В·РµВ®С›Р№в„ўвЂ¦Р¶вЂўВ°Р¶РЊВ®РіР‚вЂљLaunchedEffect РµВ®РЉР¶в‚¬С’РїСв‚¬~13msРїСвЂ°Р¶вЂ°РЊР¶Р‰Р‰
+                    // initialSettings РёВ®С•РµР‚СРїСРЉР№вЂљР€Рґв„–вЂ№РµС’Р‹Р¶вЂ°РЊРµвЂ¦РѓРёВ®С‘РґС—СњРµВ­ВРіР‚вЂљ
                     if (initialSettings == null) return@ExtendedFloatingActionButton
                     scope.launch { doSave(); onBack() }
                 },
@@ -1547,10 +1547,10 @@ fun SettingsScreen(
                     settingsViewportTopInWindow = coordinates.positionInWindow().y
                 }
         ) {
-            // з›ґжЋҐ inflate ColumnвЂ”вЂ”дёЌжѕз¤є spinnerпјЊйЃїе…Ќ"жЊ‰дё‹и®ѕзЅ® в†’ spinner в†’ UI"й‚Јж®µз©єз™ЅеЌЎйЎїж„џгЂ‚
-            // state й»и®¤еЂјпј€з©єе­—з¬¦дёІ / й»и®¤ enumпј‰дјље…€зџ­жљ‚жѕз¤єпјЊLaunchedEffect ењЁ ~13ms е†… Snapshot
-            // еЋџе­ђж›ґж–°ж‰Ђжњ‰ state е€°е®ћй™…дїќе­еЂјвЂ”вЂ”и‚‰зњје‡ д№ЋдёЌеЇџи§‰й—ЄзѓЃгЂ‚д»Јд»·пјљз”Ёж€·ењЁ initialSettings
-            // иїжЇ null ж—¶з‚№дїќе­жЊ‰й’®дјљз”Ёй»и®¤еЂји¦†з›–ж•°жЌ®пјЊж‰Ђд»Ґдё‹йќў FAB еЉ дє† enabled йІжЉ¤гЂ‚
+            // Р·вЂєТ‘Р¶Р‹Тђ inflate ColumnРІР‚вЂќРІР‚вЂќРґС‘РЊР¶ВС•Р·В¤С” spinnerРїСРЉР№РѓС—РµвЂ¦РЊ"Р¶РЉвЂ°РґС‘вЂ№РёВ®С•Р·Р…В® РІвЂ вЂ™ spinner РІвЂ вЂ™ UI"Р№вЂљР€Р¶В®ВµР·В©С”Р·в„ўР…РµРЊРЋР№РЋС—Р¶вЂћСџРіР‚вЂљ
+            // state Р№В»ВРёВ®В¤РµР‚СРїСв‚¬Р·В©С”РµВ­вЂ”Р·В¬В¦РґС‘Р† / Р№В»ВРёВ®В¤ enumРїСвЂ°РґСС™РµвЂ¦в‚¬Р·СџВ­Р¶С™вЂљР¶ВС•Р·В¤С”РїСРЉLaunchedEffect РµСљРЃ ~13ms РµвЂ вЂ¦ Snapshot
+            // РµР‹СџРµВ­С’Р¶вЂєТ‘Р¶вЂ“В°Р¶вЂ°Р‚Р¶СљвЂ° state Рµв‚¬В°РµВ®С›Р№в„ўвЂ¦РґС—СњРµВ­ВРµР‚СРІР‚вЂќРІР‚вЂќРёвЂљвЂ°Р·СљСРµвЂЎВ Рґв„–Р‹РґС‘РЊРµР‡СџРёВ§вЂ°Р№вЂ”Р„Р·С“РѓРіР‚вЂљРґВ»Р€РґВ»В·РїСС™Р·вЂќРЃР¶в‚¬В·РµСљРЃ initialSettings
+            // РёС—ВР¶ВР‡ null Р¶вЂ”В¶Р·вЂљв„–РґС—СњРµВ­ВР¶РЉвЂ°Р№вЂ™В®РґСС™Р·вЂќРЃР№В»ВРёВ®В¤РµР‚СРёВ¦вЂ Р·вЂєвЂ“Р¶вЂўВ°Р¶РЊВ®РїСРЉР¶вЂ°Р‚РґВ»ТђРґС‘вЂ№Р№СњСћ FAB РµР‰В РґС”вЂ  enabled Р№ВР†Р¶Р‰В¤РіР‚вЂљ
             LazyColumn(
                 state = listState,
                 modifier = Modifier
@@ -1558,7 +1558,7 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-            // вЂ”вЂ” еє”з”ЁиЇ­иЁЂ вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ РµС”вЂќР·вЂќРЃРёР‡В­РёРЃР‚ РІР‚вЂќРІР‚вЂќ
             item(key = SectionKeys.APP_LANG) {
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_APP_LANGUAGE) {
                 SectionCard(title = stringResource(R.string.settings_section_app_lang)) {
@@ -1567,7 +1567,7 @@ fun SettingsScreen(
                 }
             }
 
-            // вЂ”вЂ” дё»йўжЁЎејЏ вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ РґС‘В»Р№СћВР¶РЃРЋРµСРЏ РІР‚вЂќРІР‚вЂќ
             item(key = SectionKeys.THEME_MODE) {
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_THEME_MODE) {
                 SectionCard(title = stringResource(R.string.settings_section_theme_mode)) {
@@ -1582,677 +1582,11 @@ fun SettingsScreen(
                 }
             }
 
-            // вЂ”вЂ” зї»иЇ‘еђЋз«Ї вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ Р·С—В»РёР‡вЂРµС’Р‹Р·В«Р‡ РІР‚вЂќРІР‚вЂќ
             item(key = SectionKeys.TRANSLATE) {
             SectionCard(title = stringResource(R.string.settings_section_translator)) {
                 // LEGACY_COMPAT: retain provider configuration state until provider cleanup,
                 // but do not expose retired engine selection or provider options.
-                /*
-                SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TRANSLATOR_ENGINE) {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(stringResource(R.string.settings_label_translator_engine), style = MaterialTheme.typography.labelLarge)
-
-                // All on-device options share one group; cloud engines remain split by API type.
-                Text(
-                    stringResource(R.string.settings_translator_group_local_llm),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                val quickMlKitSources = mlKitRecentSourceLanguages(
-                    stored = mlKitRecentSources,
-                    selected = sourceLang.takeIf {
-                        translatorEngine == TranslatorEngine.GOOGLE_ML_KIT
-                    },
-                )
-                val downloadedMlKitPickerCodes = mlKitDownloadedPickerLanguageCodes(
-                    mlKitDownloadedLanguageModels
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    quickMlKitSources.forEach { languageTag ->
-                        val defaultOption = MlKitQuickSourceLanguage.fromLanguageTag(languageTag)
-                        FilterChip(
-                            selected = translatorEngine == TranslatorEngine.GOOGLE_ML_KIT &&
-                                mlKitLanguageTagsMatch(languageTag, sourceLang),
-                            onClick = { selectMlKitSourceLanguage(languageTag) },
-                            label = {
-                                Text(
-                                    defaultOption?.let { stringResource(it.labelRes) }
-                                        ?: Languages.nameOf(context, languageTag)
-                                )
-                            },
-                        )
-                    }
-                    FilterChip(
-                        selected = false,
-                        onClick = {
-                            showMlKitMoreLanguages = true
-                            scope.launch {
-                                mlKitDownloadedLanguageModels = runCatching {
-                                    viewModel.getDownloadedMlKitLanguageModels()
-                                }.getOrDefault(mlKitDownloadedLanguageModels)
-                            }
-                        },
-                        label = { Text(stringResource(R.string.settings_on_device_translation_more)) },
-                    )
-                }
-                if (showMlKitMoreLanguages) {
-                    LanguagePickerSheet(
-                        currentCode = sourceLang,
-                        pinned = pinnedLanguages,
-                        allowAuto = false,
-                        allowedLanguageCodes = mlKitLanguagePickerCodes,
-                        priorityCodes = downloadedMlKitPickerCodes,
-                        badgedLanguageCodes = downloadedMlKitPickerCodes.toSet(),
-                        badgeLabel = stringResource(R.string.settings_mlkit_model_downloaded_short),
-                        unbadgedStatusLabel = stringResource(R.string.settings_mlkit_model_download_short),
-                        disabledLanguageCodes = setOf(targetLang),
-                        disabledStatusLabel = stringResource(R.string.lang_picker_already_target),
-                        onDisabledSelect = {
-                            pendingLanguageSwapOrigin = LanguageSwapRequestOrigin.SOURCE_PICKER
-                            showMlKitMoreLanguages = false
-                        },
-                        onSelect = { languageTag ->
-                            selectMlKitSourceLanguage(languageTag)
-                            showMlKitMoreLanguages = false
-                        },
-                        onTogglePin = null,
-                        onDismiss = { showMlKitMoreLanguages = false },
-                    )
-                }
-                Text(
-                    stringResource(R.string.settings_translator_group_cloud_llm),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    EngineChip(translatorEngine, TranslatorEngine.REMOTE_PC, stringResource(R.string.settings_engine_remote_pc)) { translatorEngine = it }
-                    EngineChip(translatorEngine, TranslatorEngine.OPENAI, stringResource(R.string.settings_engine_openai_llm)) { translatorEngine = it }
-                    EngineChip(translatorEngine, TranslatorEngine.ANTHROPIC, stringResource(R.string.settings_engine_anthropic_llm)) { translatorEngine = it }
-                }
-                Text(
-                    stringResource(R.string.settings_translator_group_cloud),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    EngineChip(translatorEngine, TranslatorEngine.DEEPL, stringResource(R.string.settings_engine_deepl)) { translatorEngine = it }
-                    EngineChip(translatorEngine, TranslatorEngine.GOOGLE, stringResource(R.string.settings_engine_google)) { translatorEngine = it }
-                    EngineChip(translatorEngine, TranslatorEngine.VOLC, stringResource(R.string.settings_engine_volc)) { translatorEngine = it }
-                    EngineChip(translatorEngine, TranslatorEngine.BAIDU_FANYI, stringResource(R.string.settings_engine_baidu_fanyi)) { translatorEngine = it }
-                    EngineChip(translatorEngine, TranslatorEngine.TENCENT, stringResource(R.string.settings_engine_tencent)) { translatorEngine = it }
-                    EngineChip(translatorEngine, TranslatorEngine.YOUDAO_PICTRANS, stringResource(R.string.settings_engine_youdao_pictrans)) { translatorEngine = it }
-                }
-                LaunchedEffect(translatorEngine) {
-                    testMessage = null
-                    testSuccess = false
-                    fetchedModels = emptyList()
-                    modelPickerExpanded = false
-                }
-
-
-                if (translatorEngine == TranslatorEngine.REMOTE_PC) {
-                    OutlinedTextField(
-                        value = remotePcBaseUrl,
-                        onValueChange = { remotePcBaseUrl = it },
-                        label = { Text(stringResource(R.string.settings_remote_pc_base_url)) },
-                        placeholder = { Text("http://203.0.113.10:8765 or https://example.com") },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
-                    )
-                    SecretTextField(
-                        value = remotePcApiKey,
-                        onValueChange = { remotePcApiKey = it },
-                        label = stringResource(R.string.settings_remote_pc_api_key),
-                        placeholder = stringResource(R.string.settings_remote_pc_api_key_placeholder),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = remotePcSessionId,
-                        onValueChange = { remotePcSessionId = it },
-                        label = { Text(stringResource(R.string.settings_remote_pc_session_id)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                    )
-                    OutlinedTextField(
-                        value = remotePcImageQuality,
-                        onValueChange = { remotePcImageQuality = it.filter(Char::isDigit).take(3) },
-                        label = { Text(stringResource(R.string.settings_remote_pc_image_quality)) },
-                        supportingText = { Text(stringResource(R.string.settings_remote_pc_hint)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                    )
-                } else if (translatorEngine == TranslatorEngine.OPENAI) {
-                    SettingsSearchTarget(
-                        searchTargetRegistry,
-                        R.string.settings_search_item_base_url,
-                        R.string.settings_search_item_api_key,
-                        R.string.settings_search_item_model_name,
-                    ) {
-                    OutlinedTextField(
-                        value = baseUrl, onValueChange = { baseUrl = it },
-                        label = { Text(stringResource(R.string.settings_base_url)) },
-                        placeholder = { Text(stringResource(R.string.settings_base_url_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    SecretTextField(
-                        value = apiKey, onValueChange = { apiKey = it },
-                        label = stringResource(R.string.settings_api_key),
-                        placeholder = stringResource(R.string.settings_api_key_placeholder),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = model, onValueChange = { model = it },
-                        label = { Text(stringResource(R.string.settings_model)) },
-                        placeholder = { Text(stringResource(R.string.settings_model_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
-                    // жµ‹иЇ•иїћжЋҐж€ђеЉџж—¶пјЊдё‹йќўиї™еќ—е…Ѓи®ёд»Ћж‹‰е€°зљ„ model е€—иЎЁй‡ЊйЂ‰дёЂдёЄе›ћеЎ«е€° model е­—ж®µгЂ‚
-                    if (fetchedModels.isNotEmpty()) {
-                        ExposedDropdownMenuBox(
-                            expanded = modelPickerExpanded,
-                            onExpandedChange = { modelPickerExpanded = !modelPickerExpanded }
-                        ) {
-                            OutlinedTextField(
-                                value = "",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text(stringResource(R.string.settings_test_pick_model)) },
-                                placeholder = { Text("${fetchedModels.size} models") },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = modelPickerExpanded) },
-                                modifier = Modifier.menuAnchor().fillMaxWidth()
-                            )
-                            ExposedDropdownMenu(
-                                expanded = modelPickerExpanded,
-                                onDismissRequest = { modelPickerExpanded = false }
-                            ) {
-                                fetchedModels.forEach { id ->
-                                    DropdownMenuItem(
-                                        text = { Text(id) },
-                                        onClick = {
-                                            model = id
-                                            modelPickerExpanded = false
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    }
-                } else if (translatorEngine == TranslatorEngine.ANTHROPIC) {
-                    SettingsSearchTarget(
-                        searchTargetRegistry,
-                        R.string.settings_search_item_anthropic_base_url,
-                        R.string.settings_search_item_anthropic_api_key,
-                        R.string.settings_search_item_anthropic_model,
-                    ) {
-                    OutlinedTextField(
-                        value = anthropicBaseUrl,
-                        onValueChange = { anthropicBaseUrl = it },
-                        label = { Text(stringResource(R.string.settings_base_url)) },
-                        placeholder = { Text(stringResource(R.string.settings_anthropic_base_url_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                    )
-                    SecretTextField(
-                        value = anthropicApiKey,
-                        onValueChange = { anthropicApiKey = it },
-                        label = stringResource(R.string.settings_api_key),
-                        placeholder = stringResource(R.string.settings_anthropic_api_key_placeholder),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    OutlinedTextField(
-                        value = anthropicModel,
-                        onValueChange = { anthropicModel = it },
-                        label = { Text(stringResource(R.string.settings_model)) },
-                        placeholder = { Text(stringResource(R.string.settings_anthropic_model_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                    )
-                    Text(
-                        stringResource(R.string.settings_anthropic_compatibility_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    if (fetchedModels.isNotEmpty()) {
-                        ExposedDropdownMenuBox(
-                            expanded = modelPickerExpanded,
-                            onExpandedChange = { modelPickerExpanded = !modelPickerExpanded },
-                        ) {
-                            OutlinedTextField(
-                                value = "",
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text(stringResource(R.string.settings_test_pick_model)) },
-                                placeholder = { Text("${fetchedModels.size} models") },
-                                trailingIcon = {
-                                    ExposedDropdownMenuDefaults.TrailingIcon(
-                                        expanded = modelPickerExpanded
-                                    )
-                                },
-                                modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            )
-                            ExposedDropdownMenu(
-                                expanded = modelPickerExpanded,
-                                onDismissRequest = { modelPickerExpanded = false },
-                            ) {
-                                fetchedModels.forEach { id ->
-                                    DropdownMenuItem(
-                                        text = { Text(id) },
-                                        onClick = {
-                                            anthropicModel = id
-                                            modelPickerExpanded = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    }
-                } else if (translatorEngine == TranslatorEngine.DEEPL) {
-                    SettingsSearchTarget(
-                        searchTargetRegistry,
-                        R.string.settings_search_item_deepl_api_key,
-                        R.string.settings_search_item_deepl_pro,
-                        R.string.settings_search_item_deepl_advanced,
-                    ) {
-                    SecretTextField(
-                        value = deeplKey, onValueChange = { deeplKey = it },
-                        label = stringResource(R.string.settings_deepl_api_key),
-                        placeholder = stringResource(R.string.settings_deepl_key_placeholder),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    SwitchRow(
-                        stringResource(R.string.settings_deepl_use_pro),
-                        deeplPro,
-                        // OFFICIAL / AUTO еЌЏи®®йѓЅдјљиµ°е®ж–№з«Їз‚№пј€AUTO з”ЁдЅњ fallbackпј‰пјЊPro йѓЅз”џж•€пј›зєЇ DEEPLX еЌЏи®®дё‹ Pro ж— ж„Џд№‰
-                        enabled = deeplProtocol != com.gameocr.app.data.DeeplProtocol.DEEPLX
-                    ) { deeplPro = it }
-                    Text(
-                        stringResource(R.string.settings_deepl_tip),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    // вЂ”вЂ” й«зє§пј€и‡Єжћ¶ / deeplxпј‰вЂ”вЂ”
-                    // жЉеЏ жЋ‰йЃїе…Ќеђ“е€°еЏЄз”Ёе®ж–№ DeepL зљ„з”Ёж€·пј›е±•ејЂжњ‰и‡Єе®љд№‰ URL + Bearer
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { deeplAdvancedExpanded = !deeplAdvancedExpanded }
-                            .padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            (if (deeplAdvancedExpanded) "в–ј " else "в–¶ ") +
-                                stringResource(R.string.settings_deepl_advanced_header),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    if (deeplAdvancedExpanded) {
-                        Text(
-                            stringResource(R.string.settings_deepl_protocol_label),
-                            style = MaterialTheme.typography.labelLarge
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            EngineChip(deeplProtocol, com.gameocr.app.data.DeeplProtocol.OFFICIAL,
-                                stringResource(R.string.settings_deepl_protocol_official)) { deeplProtocol = it }
-                            EngineChip(deeplProtocol, com.gameocr.app.data.DeeplProtocol.DEEPLX,
-                                stringResource(R.string.settings_deepl_protocol_deeplx)) { deeplProtocol = it }
-                            EngineChip(deeplProtocol, com.gameocr.app.data.DeeplProtocol.AUTO,
-                                stringResource(R.string.settings_deepl_protocol_auto)) { deeplProtocol = it }
-                        }
-                        Text(
-                            stringResource(when (deeplProtocol) {
-                                com.gameocr.app.data.DeeplProtocol.OFFICIAL -> R.string.settings_deepl_protocol_official_hint
-                                com.gameocr.app.data.DeeplProtocol.DEEPLX -> R.string.settings_deepl_protocol_deeplx_hint
-                                com.gameocr.app.data.DeeplProtocol.AUTO -> R.string.settings_deepl_protocol_auto_hint
-                            }),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-
-                        OutlinedTextField(
-                            value = deeplBaseUrl,
-                            onValueChange = { deeplBaseUrl = it },
-                            label = { Text(stringResource(R.string.settings_deepl_base_url)) },
-                            placeholder = { Text(stringResource(R.string.settings_deepl_base_url_placeholder)) },
-                            modifier = Modifier.fillMaxWidth(), singleLine = true
-                        )
-                        Text(
-                            stringResource(R.string.settings_deepl_base_url_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        SecretTextField(
-                            value = deeplCustomToken,
-                            onValueChange = { deeplCustomToken = it },
-                            label = stringResource(R.string.settings_deepl_custom_token),
-                            placeholder = stringResource(R.string.settings_deepl_custom_token_placeholder),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Text(
-                            stringResource(R.string.settings_deepl_custom_token_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        SwitchRow(
-                            stringResource(R.string.settings_deepl_bearer_label),
-                            deeplBearerAuth,
-                            // DEEPLX / AUTO йѓЅз”Ё customTokenпјЊBearer ж‰Ќжњ‰ж„Џд№‰пј›OFFICIAL дёЌиЇ»
-                            enabled = deeplProtocol != com.gameocr.app.data.DeeplProtocol.OFFICIAL
-                        ) { deeplBearerAuth = it }
-                        Text(
-                            stringResource(R.string.settings_deepl_bearer_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.alpha(
-                                if (deeplProtocol != com.gameocr.app.data.DeeplProtocol.OFFICIAL) 1f else 0.4f
-                            )
-                        )
-                    }
-                    }
-                } else if (translatorEngine == TranslatorEngine.YOUDAO_PICTRANS) {
-                    SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_youdao_pictrans) {
-                    SecretTextField(
-                        value = youdaoAppKey, onValueChange = { youdaoAppKey = it },
-                        label = stringResource(R.string.settings_youdao_app_key),
-                        placeholder = stringResource(R.string.settings_youdao_app_key_placeholder),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    SecretTextField(
-                        value = youdaoAppSecret, onValueChange = { youdaoAppSecret = it },
-                        label = stringResource(R.string.settings_youdao_app_secret),
-                        placeholder = stringResource(R.string.settings_youdao_app_secret_placeholder),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        stringResource(R.string.settings_youdao_pictrans_tip),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    }
-                } else if (translatorEngine == TranslatorEngine.VOLC) {
-                    SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_volc) {
-                    // зЃ«е±±еј•ж“Ћжњєе™Ёзї»иЇ‘пјљAK + SK + regionпј›SignV4 й‰ґжќѓ
-                    SecretTextField(
-                        value = volcAk, onValueChange = { volcAk = it },
-                        label = stringResource(R.string.settings_volc_access_key_id),
-                        placeholder = stringResource(R.string.settings_volc_ak_placeholder),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    SecretTextField(
-                        value = volcSk, onValueChange = { volcSk = it },
-                        label = stringResource(R.string.settings_volc_secret_access_key),
-                        placeholder = stringResource(R.string.settings_volc_sk_placeholder),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = volcRegion, onValueChange = { volcRegion = it },
-                        label = { Text(stringResource(R.string.settings_volc_region)) },
-                        placeholder = { Text("cn-north-1") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        stringResource(R.string.settings_volc_tip),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    }
-                } else if (translatorEngine == TranslatorEngine.BAIDU_FANYI) {
-                    SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_baidu_fanyi) {
-                    // з™ѕеє¦зї»иЇ‘ејЂж”ѕе№іеЏ°пј€fanyi-api.baidu.comпј‰вЂ”вЂ” дёЋз™ѕеє¦ж™єиѓЅдє‘ OCR дёЌжЇдёЂе›ћдє‹
-                    OutlinedTextField(
-                        value = baiduFanyiAppId, onValueChange = { baiduFanyiAppId = it },
-                        label = { Text(stringResource(R.string.settings_baidu_fanyi_app_id)) },
-                        placeholder = { Text(stringResource(R.string.settings_baidu_fanyi_app_id_placeholder)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    SecretTextField(
-                        value = baiduFanyiSecret, onValueChange = { baiduFanyiSecret = it },
-                        label = stringResource(R.string.settings_baidu_fanyi_secret_key),
-                        placeholder = stringResource(R.string.settings_baidu_fanyi_secret_key_placeholder),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Text(
-                        stringResource(R.string.settings_baidu_fanyi_tip),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    }
-                } else if (translatorEngine == TranslatorEngine.TENCENT) {
-                    SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_tencent_translator) {
-                    // и…ѕи®Їдє‘зї»иЇ‘пјљдёЋ OCR е…±з”ЁеђЊдёЂеҐ— SecretId/Key/Regionпј€state еЏЊеђ‘з»‘е®љпјЊ
-                    // ењЁиї™й‡Њж”№е’ЊењЁ OCR еЊєж”№е®Ње…Ёз­‰д»·пј‰гЂ‚region й»и®¤ ap-guangzhouпјЊTMT еђ„ењ°еџџйЂљз”ЁгЂ‚
-                    OutlinedTextField(
-                        value = tencentId, onValueChange = { tencentId = it },
-                        label = { Text(stringResource(R.string.settings_tencent_id_label)) },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
-                    )
-                    SecretTextField(
-                        value = tencentKey, onValueChange = { tencentKey = it },
-                        label = stringResource(R.string.settings_tencent_key_label),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = tencentRegion, onValueChange = { tencentRegion = it },
-                        label = { Text(stringResource(R.string.settings_tencent_region)) },
-                        placeholder = { Text("ap-guangzhou") },
-                        modifier = Modifier.fillMaxWidth(), singleLine = true
-                    )
-                    Text(
-                        stringResource(R.string.settings_tencent_trans_tip),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    }
-                } else if (translatorEngine == TranslatorEngine.GOOGLE_ML_KIT) {
-                    SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_google_mlkit) {
-                    Text(
-                        stringResource(R.string.settings_google_mlkit_tip),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        stringResource(R.string.settings_mlkit_data_disclosure),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    val sourceSelected = sourceLang.isNotBlank() &&
-                        !sourceLang.equals(Languages.AUTO.code, ignoreCase = true)
-                    val targetSelected = targetLang.isNotBlank() &&
-                        !targetLang.equals(Languages.AUTO.code, ignoreCase = true)
-                    val sourceSupported = sourceSelected &&
-                        MlKitLanguagePolicy.isSupportedLanguageTag(sourceLang)
-                    val targetSupported = targetSelected &&
-                        MlKitLanguagePolicy.isSupportedLanguageTag(targetLang)
-                    val currentPair = sourceLang to targetLang
-                    val currentPairReady = mlKitModelStatePair == currentPair &&
-                        mlKitModelsReady == true
-                    val currentPairChecked = mlKitModelStatePair == currentPair &&
-                        mlKitModelsReady != null
-                    when {
-                        !sourceSupported -> Text(
-                            text = stringResource(
-                                R.string.settings_mlkit_unsupported_source_language,
-                                Languages.nameOf(context, sourceLang),
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        !targetSupported -> Text(
-                            text = stringResource(
-                                R.string.settings_mlkit_unsupported_target_language,
-                                Languages.nameOf(context, targetLang),
-                            ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                        !currentPairChecked -> {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                            )
-                        }
-                        currentPairReady -> Text(
-                            text = stringResource(R.string.settings_mlkit_model_ready),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary,
-                        )
-                        else -> Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            OutlinedButton(
-                                enabled = !mlKitModelDownloadRunning,
-                                onClick = { startMlKitModelDownload(currentPair) },
-                            ) {
-                                Text(
-                                    if (mlKitModelDownloadRunning) {
-                                        stringResource(R.string.settings_mlkit_model_downloading)
-                                    } else {
-                                        stringResource(
-                                            R.string.settings_mlkit_download_pair,
-                                            Languages.nameOf(context, sourceLang),
-                                            Languages.nameOf(context, targetLang),
-                                        )
-                                    }
-                                )
-                            }
-                            if (mlKitModelDownloadRunning) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                )
-                            }
-                        }
-                    }
-                    mlKitModelDownloadMessage?.let { message ->
-                        Text(
-                            text = message,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    }
-                    }
-                } else if (translatorEngine == TranslatorEngine.GOOGLE) {
-                    SettingsSearchTarget(searchTargetRegistry, R.string.settings_search_item_google) {
-                    // GOOGLEпјљж—  keyпјЊд»…жЏђз¤єйЈЋй™©гЂ‚ж”№ else if жЋзЎ®еЊ№й…ЌвЂ”вЂ”йЃїе…ЌеђЋз»­ж–°еўћжћљдёѕпј€е¦‚ LOCAL_*пј‰
-                    // иђЅе…Ґ else е…њеє•пјЊй”™иЇЇжѕз¤є Google ж–‡жЎ€гЂ‚
-                    Text(
-                        stringResource(R.string.settings_google_tip),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    }
-                }
-
-                // вЂ”вЂ” жµ‹иЇ•иїћжЋҐ вЂ”вЂ”
-                // йЄЊиЇЃ baseUrl/key/modelпј€ж€– DeepL key/endpointпј‰иѓЅдёЌиѓЅз”Ёпј›DeepL йЎєдѕїиї”е›ће‰©дЅ™йўќеє¦пјЊ
-                // OpenAI йЎєдѕїж‹‰ model е€—иЎЁе›ћеЎ«е€°дёЉж–№дё‹ж‹‰гЂ‚зЉ¶жЂЃж–‡е­—жЊ‰ж€ђеЉџ/е¤±иґҐзќЂи‰ІпјЊдё‹ж¬Ўз‚№е‡»и¦†з›–гЂ‚
-                if (translatorEngine != TranslatorEngine.GOOGLE_ML_KIT) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedButton(
-                        enabled = !testRunning,
-                        onClick = {
-                            testRunning = true
-                            testMessage = null
-                            scope.launch {
-                                try {
-                                    val result = viewModel.testTranslator(
-                                        translatorEngine = translatorEngine,
-                                        remotePcBaseUrl = remotePcBaseUrl,
-                                        remotePcApiKey = remotePcApiKey,
-                                        remotePcSessionId = remotePcSessionId,
-                                        remotePcImageQuality = remotePcImageQuality.toIntOrNull() ?: 85,
-                                        baseUrl = baseUrl,
-                                        apiKey = apiKey,
-                                        model = model,
-                                        anthropicBaseUrl = anthropicBaseUrl,
-                                        anthropicApiKey = anthropicApiKey,
-                                        anthropicModel = anthropicModel,
-                                        deeplKey = deeplKey,
-                                        deeplPro = deeplPro,
-                                        deeplProtocol = deeplProtocol,
-                                        deeplBaseUrl = deeplBaseUrl,
-                                        deeplBearerAuth = deeplBearerAuth,
-                                        deeplCustomToken = deeplCustomToken,
-                                        youdaoAppKey = youdaoAppKey,
-                                        youdaoAppSecret = youdaoAppSecret,
-                                        apiTimeoutSeconds = apiTimeoutSec.toInt(),
-                                        volcAccessKeyId = volcAk,
-                                        volcSecretAccessKey = volcSk,
-                                        volcRegion = volcRegion,
-                                        baiduFanyiAppId = baiduFanyiAppId,
-                                        baiduFanyiSecretKey = baiduFanyiSecret,
-                                        tencentSecretId = tencentId,
-                                        tencentSecretKey = tencentKey,
-                                        tencentRegion = tencentRegion
-                                    )
-                                    testSuccess = result.success
-                                    testMessage = result.message
-                                    if (result.success && result.models.isNotEmpty()) {
-                                        fetchedModels = result.models
-                                    }
-                                } catch (error: CancellationException) {
-                                    throw error
-                                } catch (error: Exception) {
-                                    testSuccess = false
-                                    testMessage = error.message ?: error.javaClass.simpleName
-                                } finally {
-                                    testRunning = false
-                                }
-                            }
-                        }
-                    ) {
-                        Text(
-                            if (testRunning) stringResource(R.string.settings_test_testing)
-                            else stringResource(R.string.settings_test_connection)
-                        )
-                    }
-                    if (testRunning) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-                }
-                testMessage?.let { msg ->
-                    Text(
-                        msg,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (testSuccess) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.error
-                    )
-                }
-                }
-                    // д№ђи§‚ж›ґж–°жњ¬ењ° + еј‚ж­ҐиђЅз›гЂ‚togglePinLanguage е†…йѓЁз”Ё repo.update жЇеЋџе­ђзљ„гЂ‚
-                // Prompt / жµЃејЏејЂе…іеЏЄеЇ№ LLM з±»пј€OpenAI е…је®№пј‰зї»иЇ‘еј•ж“Ћжњ‰ж„Џд№‰пј›
-                // DeepL жЇжњєе™Ёзї»иЇ‘ APIпјЊдёЌиЇ» promptгЂЃд№џдёЌиµ° SSEпјЊйљђи—ЏйЃїе…ЌиЇЇеЇјгЂ‚
-                }
-                }
-                }
-                */
                 OutlinedTextField(
                     value = remotePcBaseUrl,
                     onValueChange = { remotePcBaseUrl = it },
@@ -2308,7 +1642,7 @@ fun SettingsScreen(
                     },
                     pinned = pinnedLanguages,
                     onTogglePin = onTogglePin,
-                    allowAuto = translatorEngine != TranslatorEngine.GOOGLE_ML_KIT,
+                    allowAuto = true,
                     disabledLanguageCodes = setOf(targetLang),
                     disabledStatusLabel = stringResource(R.string.lang_picker_already_target),
                     onDisabledSelect = {
@@ -2339,7 +1673,6 @@ fun SettingsScreen(
                     allowedLanguageCodes = null,
                 )
                 }
-                if (translatorEngine != TranslatorEngine.REMOTE_PC) {
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TRANSLATION_ASSISTANCE) {
                 TranslationAssistanceSettings(
                     searchTargetRegistry = searchTargetRegistry,
@@ -2366,42 +1699,20 @@ fun SettingsScreen(
                     onRetryEmptyTranslationChange = { retryEmptyTranslation = it },
                 )
                 }
-                }
-                if (translatorEngine == TranslatorEngine.OPENAI ||
-                    translatorEngine == TranslatorEngine.ANTHROPIC
-                ) {
-                    SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_PROMPTS) {
-                    OpenAiPromptSettings(
-                        prompt = prompt,
-                        onPromptChange = { prompt = it },
-                        sourceLang = sourceLang,
-                        targetLang = targetLang,
-                        dictionaryPrompt = dictionaryPrompt,
-                        onDictionaryPromptChange = { value ->
-                            dictionaryPrompt = value
-                            scope.launch { viewModel.saveDictionaryPrompt(value) }
-                        },
-                    )
-                    }
-                }
             }
 
-            // вЂ”вЂ” OCR еј•ж“Ћ вЂ”вЂ”
-            // з«Їе€°з«Їзї»иЇ‘еј•ж“Ћпј€жњ‰йЃ“е›ѕзї»пј‰дјљи·іиї‡ OCR й¶ж®µпјЊж•ґдёЄ OCR и®ѕзЅ®еЊєеЅ“е‰Ќдјљиў«ж— и§†вЂ”вЂ”
-            // зЃ°жѕ + з¦Ѓз”Ё chip и®©з”Ёж€·дёЂзњјжЋз™Ѕ + дёЌиѓЅиЇЇж“ЌдЅњгЂ‚
+            // РІР‚вЂќРІР‚вЂќ OCR РµСвЂўР¶вЂњР‹ РІР‚вЂќРІР‚вЂќ
+            // Р·В«Р‡Рµв‚¬В°Р·В«Р‡Р·С—В»РёР‡вЂРµСвЂўР¶вЂњР‹РїСв‚¬Р¶СљвЂ°Р№РѓвЂњРµвЂєС•Р·С—В»РїСвЂ°РґСС™РёВ·С–РёС—вЂЎ OCR Р№ВВ¶Р¶В®ВµРїСРЉР¶вЂўТ‘РґС‘Р„ OCR РёВ®С•Р·Р…В®РµРЉС”РµР…вЂњРµвЂ°РЊРґСС™РёСћВ«Р¶вЂ”В РёВ§вЂ РІР‚вЂќРІР‚вЂќ
+            // Р·РѓВ°Р¶ВС• + Р·В¦РѓР·вЂќРЃ chip РёВ®В©Р·вЂќРЃР¶в‚¬В·РґС‘Р‚Р·СљСР¶ВР‹Р·в„ўР… + РґС‘РЊРёС“Р…РёР‡Р‡Р¶вЂњРЊРґР…СљРіР‚вЂљ
             }
 
-
-            if (translatorEngine != TranslatorEngine.REMOTE_PC) {
-
-            }
 
             item(key = SectionKeys.TEXT_ORIENTATION) {
                 textOrientationSection()
             }
 
-            // вЂ”вЂ” жѕз¤є вЂ”вЂ”
-            // йў„и§€жЇжњ¬ section з¬¬дёЂйЎ№пј›ж»љиї‡йЎµйќўйЎ¶йѓЁеђЋеђёй™„пјЊsection з¦»ејЂж—¶и‡ЄеЉЁи§Јй™¤гЂ‚
+            // РІР‚вЂќРІР‚вЂќ Р¶ВС•Р·В¤С” РІР‚вЂќРІР‚вЂќ
+            // Р№СћвЂћРёВ§в‚¬Р¶ВР‡Р¶СљВ¬ section Р·В¬В¬РґС‘Р‚Р№РЋв„–РїСвЂєР¶В»С™РёС—вЂЎР№РЋВµР№СњСћР№РЋВ¶Р№С“РЃРµС’Р‹РµС’С‘Р№в„ўвЂћРїСРЉsection Р·В¦В»РµСР‚Р¶вЂ”В¶РёвЂЎР„РµР‰РЃРёВ§Р€Р№в„ўВ¤РіР‚вЂљ
             item(key = SectionKeys.OVERLAY) {
             SectionCard(
                 title = stringResource(R.string.settings_section_overlay),
@@ -2429,7 +1740,7 @@ fun SettingsScreen(
                     )
                 }
 
-                // вЂ”вЂ” еЅ±е“Ќйў„и§€зљ„ж ·ејЏйЎ№ вЂ”вЂ”
+                // РІР‚вЂќРІР‚вЂќ РµР…В±РµвЂњРЊР№СћвЂћРёВ§в‚¬Р·С™вЂћР¶В В·РµСРЏР№РЋв„– РІР‚вЂќРІР‚вЂќ
                 SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_OVERLAY_THEME) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(stringResource(R.string.settings_overlay_theme_label), style = MaterialTheme.typography.labelLarge)
@@ -2450,7 +1761,7 @@ fun SettingsScreen(
                         border = customBorder, onBorderChange = { customBorder = it },
                         borderW = customBorderW, onBorderWChange = { customBorderW = it }
                     )
-                    // иѕ№жЎ†ж ·ејЏпјљд»…ењЁ CUSTOM дё»йўдё‹жѕз¤єгЂ‚SOLID/DASHED/DOTTED дёЂиЎЊпјЊDOUBLE/GROOVE дёЂиЎЊпј€йЃїејЂ ExperimentalLayoutApiпј‰гЂ‚
+                    // РёС•в„–Р¶РЋвЂ Р¶В В·РµСРЏРїСС™РґВ»вЂ¦РµСљРЃ CUSTOM РґС‘В»Р№СћВРґС‘вЂ№Р¶ВС•Р·В¤С”РіР‚вЂљSOLID/DASHED/DOTTED РґС‘Р‚РёРЋРЉРїСРЉDOUBLE/GROOVE РґС‘Р‚РёРЋРЉРїСв‚¬Р№РѓС—РµСР‚ ExperimentalLayoutApiРїСвЂ°РіР‚вЂљ
                     Text(stringResource(R.string.settings_floating_window_border_style_label), style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         EngineChip(customBorderStyle, com.gameocr.app.data.BorderStyle.SOLID, stringResource(R.string.settings_border_style_solid)) {
@@ -2583,7 +1894,7 @@ fun SettingsScreen(
                 }
                 }
 
-                // вЂ”вЂ” е‡ дЅ•йЎ№пј€йў„и§€зњ‹дёЌе€°пјЊеЏЄиѓЅе®ћй™…и§¦еЏ‘зї»иЇ‘ж—¶зњ‹е€°ж•€жћњпј‰вЂ”вЂ”
+                // РІР‚вЂќРІР‚вЂќ РµвЂЎВ РґР…вЂўР№РЋв„–РїСв‚¬Р№СћвЂћРёВ§в‚¬Р·СљвЂ№РґС‘РЊРµв‚¬В°РїСРЉРµРЏР„РёС“Р…РµВ®С›Р№в„ўвЂ¦РёВ§В¦РµРЏвЂР·С—В»РёР‡вЂР¶вЂ”В¶Р·СљвЂ№Рµв‚¬В°Р¶вЂўв‚¬Р¶С›СљРїСвЂ°РІР‚вЂќРІР‚вЂќ
                 SettingsSearchTarget(
                     searchTargetRegistry,
                     *(SEARCH_TARGET_OVERLAY_DISPLAY + SEARCH_TARGET_OVERLAY_WINDOW + SEARCH_TARGET_OVERLAY_LAYOUT),
@@ -2636,7 +1947,7 @@ fun SettingsScreen(
                 }
 
                 if (renderMode == RenderMode.FLOATING_WINDOW) {
-                    // ж‚¬жµ®зЄ—еЏЈе†…е®№еЅўжЂЃпјљеЋџж–‡+иЇ‘ж–‡ / д»…иЇ‘ж–‡гЂ‚з«‹еЌіз”џж•€пјЊдёЌиї› save жµЃзЁ‹гЂ‚
+                    // Р¶вЂљВ¬Р¶ВµВ®Р·Р„вЂ”РµРЏР€РµвЂ вЂ¦РµВ®в„–РµР…СћР¶Р‚РѓРїСС™РµР‹СџР¶вЂ“вЂЎ+РёР‡вЂР¶вЂ“вЂЎ / РґВ»вЂ¦РёР‡вЂР¶вЂ“вЂЎРіР‚вЂљР·В«вЂ№РµРЊС–Р·вЂќСџР¶вЂўв‚¬РїСРЉРґС‘РЊРёС—вЂє save Р¶ВµРѓР·РЃвЂ№РіР‚вЂљ
                     Text(stringResource(R.string.settings_floating_window_content_label), style = MaterialTheme.typography.labelLarge)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         EngineChip(
@@ -2830,10 +2141,10 @@ fun SettingsScreen(
 
             }
 
-            // вЂ”вЂ” ж‚¬жµ®жЊ‰й’® вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ Р¶вЂљВ¬Р¶ВµВ®Р¶РЉвЂ°Р№вЂ™В® РІР‚вЂќРІР‚вЂќ
             }
 
-            // вЂ”вЂ” еѕЄзЋЇи§¦еЏ‘е™Ё вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ РµС•Р„Р·Р‹Р‡РёВ§В¦РµРЏвЂРµв„ўРЃ РІР‚вЂќРІР‚вЂќ
             item(key = SectionKeys.TRIGGER) {
             SettingsSearchTarget(searchTargetRegistry, *SEARCH_TARGET_TRIGGER) {
             SectionCard(title = stringResource(R.string.settings_section_trigger)) {
@@ -3015,7 +2326,7 @@ fun SettingsScreen(
                 }
             }
 
-            // вЂ”вЂ” ж‚¬жµ®жЊ‰й’® вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ Р¶вЂљВ¬Р¶ВµВ®Р¶РЉвЂ°Р№вЂ™В® РІР‚вЂќРІР‚вЂќ
             }
 
             }
@@ -3096,7 +2407,7 @@ fun SettingsScreen(
                 }
             }
 
-            // вЂ”вЂ” еј§иЏњеЌ•жЊ‰й’®йЎєеєЏ вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ РµСВ§РёРЏСљРµРЊвЂўР¶РЉвЂ°Р№вЂ™В®Р№РЋС”РµС”РЏ РІР‚вЂќРІР‚вЂќ
             }
 
             }
@@ -3145,7 +2456,7 @@ fun SettingsScreen(
                 )
             }
 
-            // вЂ”вЂ” ејЂеЏ‘иЂ…иЇЉж–­ вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ РµСР‚РµРЏвЂРёР‚вЂ¦РёР‡Р‰Р¶вЂ“В­ РІР‚вЂќРІР‚вЂќ
             }
 
             }
@@ -3183,7 +2494,7 @@ fun SettingsScreen(
                 }
             }
 
-            // вЂ”вЂ” зЅ‘з»њпј€е…Ёе±ЂпјЊи·Ё OCR / зї»иЇ‘пј‰вЂ”вЂ”
+            // РІР‚вЂќРІР‚вЂќ Р·Р…вЂР·В»СљРїСв‚¬РµвЂ¦РЃРµВ±Р‚РїСРЉРёВ·РЃ OCR / Р·С—В»РёР‡вЂРїСвЂ°РІР‚вЂќРІР‚вЂќ
             }
 
             }
@@ -3235,7 +2546,7 @@ fun SettingsScreen(
 
             }
 
-            // з»™ FAB з•™е‡єеє•йѓЁз©єй—ґпјЊйЃїе…ЌжњЂеђЋдёЂйЎ№иў«йЃ®жЊЎ
+            // Р·В»в„ў FAB Р·вЂўв„ўРµвЂЎС”РµС”вЂўР№С“РЃР·В©С”Р№вЂ”Т‘РїСРЉР№РѓС—РµвЂ¦РЊР¶СљР‚РµС’Р‹РґС‘Р‚Р№РЋв„–РёСћВ«Р№РѓВ®Р¶РЉРЋ
             }
 
             }
@@ -3272,10 +2583,9 @@ fun SettingsScreen(
                 }
             }
 
-            // жђњзґўдё‹ж‹‰пјљжµ®ењЁ Column д№‹дёЉгЂ‚еЊ№й…ЌйЎ№з‚№е‡»еђЋж»ље€°еЇ№еє” section йЎ¶йѓЁе№¶е…ій—­жђњзґўгЂ‚
+            // Р¶С’СљР·Т‘СћРґС‘вЂ№Р¶вЂ№вЂ°РїСС™Р¶ВµВ®РµСљРЃ Column Рґв„–вЂ№РґС‘Р‰РіР‚вЂљРµРЉв„–Р№вЂ¦РЊР№РЋв„–Р·вЂљв„–РµвЂЎВ»РµС’Р‹Р¶В»С™Рµв‚¬В°РµР‡в„–РµС”вЂќ section Р№РЋВ¶Р№С“РЃРµв„–В¶РµвЂ¦С–Р№вЂ”В­Р¶С’СљР·Т‘СћРіР‚вЂљ
             if (searchActive && searchQuery.isNotBlank()) {
                 val searchCurrentValues = mapOf(
-                    settingsSearchEntryId(R.string.settings_search_item_translator_engine) to translatorEngine.name,
                     settingsSearchEntryId(R.string.settings_search_item_source_lang) to sourceLang,
                     settingsSearchEntryId(R.string.settings_search_item_target_lang) to targetLang,
                     settingsSearchEntryId(R.string.settings_translation_output_layout_label) to
@@ -3318,7 +2628,7 @@ fun SettingsScreen(
                                             listOfNotNull(
                                                 stringResource(entry.sectionLabelRes),
                                                 searchCurrentValues[entry.entryId]?.takeIf(String::isNotBlank),
-                                            ).joinToString(" В· ")
+                                            ).joinToString(" Р’В· ")
                                         )
                                     },
                                     colors = ListItemDefaults.colors(
@@ -3395,9 +2705,6 @@ internal val SEARCH_TARGET_THEME_MODE = intArrayOf(R.string.settings_section_the
 internal val SEARCH_TARGET_PRESETS = intArrayOf(
     R.string.settings_section_translation_presets,
     R.string.settings_search_item_preset_transfer,
-)
-internal val SEARCH_TARGET_TRANSLATOR_ENGINE = intArrayOf(
-    R.string.settings_search_item_translator_engine,
 )
 private val SEARCH_TARGET_TRANSLATOR_PROVIDERS = intArrayOf(
     R.string.settings_search_item_base_url,
@@ -3513,7 +2820,6 @@ internal val SETTINGS_SEARCH_TARGET_RES_IDS: Set<Int> = listOf(
     SEARCH_TARGET_APP_LANGUAGE,
     SEARCH_TARGET_THEME_MODE,
     SEARCH_TARGET_PRESETS,
-    SEARCH_TARGET_TRANSLATOR_ENGINE,
     SEARCH_TARGET_TRANSLATOR_PROVIDERS,
     SEARCH_TARGET_SOURCE_LANGUAGE,
     SEARCH_TARGET_TARGET_LANGUAGE,
@@ -3535,10 +2841,10 @@ internal val SETTINGS_SEARCH_TARGET_RES_IDS: Set<Int> = listOf(
 ).flatMap { it.asIterable() }.toSet()
 
 /**
- * жђњзґўзґўеј•жќЎз›®гЂ‚sectionLabel/itemLabel иµ° res id и·џйљЏзі»з»џиЇ­иЁЂпј›keywords еђЊж—¶еЎћдё­и‹±ж–‡пјЊ
- * и®©з”Ёж€·з”Ёд»»дЅ•дёЂз§ЌиЇ­иЁЂжђњзґўйѓЅиѓЅе‘Ѕдё­пј€i18n еђЋз”Ёж€·еЏЇиѓЅд№ жѓЇиѕ“е…Ґе“Єз§ЌйѓЅиЇґдёЌе®љпј‰гЂ‚
+ * Р¶С’СљР·Т‘СћР·Т‘СћРµСвЂўР¶СњРЋР·вЂєВ®РіР‚вЂљsectionLabel/itemLabel РёВµВ° res id РёВ·СџР№С™РЏР·С–В»Р·В»СџРёР‡В­РёРЃР‚РїСвЂєkeywords РµС’РЉР¶вЂ”В¶РµРЋС›РґС‘В­РёвЂ№В±Р¶вЂ“вЂЎРїСРЉ
+ * РёВ®В©Р·вЂќРЃР¶в‚¬В·Р·вЂќРЃРґВ»В»РґР…вЂўРґС‘Р‚Р·В§РЊРёР‡В­РёРЃР‚Р¶С’СљР·Т‘СћР№С“Р…РёС“Р…РµвЂР…РґС‘В­РїСв‚¬i18n РµС’Р‹Р·вЂќРЃР¶в‚¬В·РµРЏР‡РёС“Р…Рґв„–В Р¶С“Р‡РёС•вЂњРµвЂ¦ТђРµвЂњР„Р·В§РЊР№С“Р…РёР‡Т‘РґС‘РЊРµВ®С™РїСвЂ°РіР‚вЂљ
  */
-/** жЉЉ UI е¤љиЎЊиѕ“е…ҐжЎ†ж–‡жњ¬ж‹†ж€ђ host е€—иЎЁпјЊtrim жЇЏиЎЊгЂЃеЋ»з©єгЂ‚дїќе­ / snapshot еЇ№жЇ”йѓЅиµ°иї™й‡ЊдїќиЇЃдёЂи‡ґгЂ‚ */
+/** Р¶Р‰Р‰ UI РµВ¤С™РёРЋРЉРёС•вЂњРµвЂ¦ТђР¶РЋвЂ Р¶вЂ“вЂЎР¶СљВ¬Р¶вЂ№вЂ Р¶в‚¬С’ host Рµв‚¬вЂ”РёРЋРЃРїСРЉtrim Р¶Р‡РЏРёРЋРЉРіР‚РѓРµР‹В»Р·В©С”РіР‚вЂљРґС—СњРµВ­В / snapshot РµР‡в„–Р¶Р‡вЂќР№С“Р…РёВµВ°РёС—в„ўР№вЂЎРЉРґС—СњРёР‡РѓРґС‘Р‚РёвЂЎТ‘РіР‚вЂљ */
 private fun parseCleartextHosts(text: String): List<String> =
     text.split('\n').map { it.trim() }.filter { it.isNotEmpty() }
 
@@ -3617,54 +2923,54 @@ internal fun settingsSearchMatches(query: String, searchableTexts: List<String>)
     ) != null
 
 /**
- * и®ѕзЅ®йЎ№еЏЇжђњзґўзґўеј•гЂ‚ж–°еўћи®ѕзЅ®йЎ№ж—¶еђЊж­ҐеЉ дёЂиЎЊпј›еЊ№й…ЌеђЋи·іе€°ж‰ЂењЁ section йЎ¶йѓЁгЂ‚
- * keywords ж··еђ€дё­и‹±ж–‡пјљи‹±ж–‡зі»з»џдё‹з”Ёж€·з”Ёи‹±ж–‡иѕ“е…Ґд»ЌиѓЅжђње€°дё­ж–‡ section / еЏЌд№‹дє¦з„¶гЂ‚
+ * РёВ®С•Р·Р…В®Р№РЋв„–РµРЏР‡Р¶С’СљР·Т‘СћР·Т‘СћРµСвЂўРіР‚вЂљР¶вЂ“В°РµСћС›РёВ®С•Р·Р…В®Р№РЋв„–Р¶вЂ”В¶РµС’РЉР¶В­ТђРµР‰В РґС‘Р‚РёРЋРЉРїСвЂєРµРЉв„–Р№вЂ¦РЊРµС’Р‹РёВ·С–Рµв‚¬В°Р¶вЂ°Р‚РµСљРЃ section Р№РЋВ¶Р№С“РЃРіР‚вЂљ
+ * keywords Р¶В·В·РµС’в‚¬РґС‘В­РёвЂ№В±Р¶вЂ“вЂЎРїСС™РёвЂ№В±Р¶вЂ“вЂЎР·С–В»Р·В»СџРґС‘вЂ№Р·вЂќРЃР¶в‚¬В·Р·вЂќРЃРёвЂ№В±Р¶вЂ“вЂЎРёС•вЂњРµвЂ¦ТђРґВ»РЊРёС“Р…Р¶С’СљРµв‚¬В°РґС‘В­Р¶вЂ“вЂЎ section / РµРЏРЊРґв„–вЂ№РґС”В¦Р·вЂћВ¶РіР‚вЂљ
  */
 internal val SETTINGS_SEARCH_TRANSFER_KEYWORDS = listOf(
     "settings import", "settings export", "preset import", "preset export", "font backup",
-    "configuration backup", "backup", "restore", "и®ѕзЅ®еЇје…Ґ", "и®ѕзЅ®еЇје‡є", "йў„и®ѕеЇје…Ґ",
-    "йў„и®ѕеЇје‡є", "е­—дЅ“е¤‡д»Ѕ", "й…ЌзЅ®е¤‡д»Ѕ", "е¤‡д»Ѕ", "жЃўе¤Ќ",
+    "configuration backup", "backup", "restore", "РёВ®С•Р·Р…В®РµР‡СРµвЂ¦Тђ", "РёВ®С•Р·Р…В®РµР‡СРµвЂЎС”", "Р№СћвЂћРёВ®С•РµР‡СРµвЂ¦Тђ",
+    "Р№СћвЂћРёВ®С•РµР‡СРµвЂЎС”", "РµВ­вЂ”РґР…вЂњРµВ¤вЂЎРґВ»Р…", "Р№вЂ¦РЊР·Р…В®РµВ¤вЂЎРґВ»Р…", "РµВ¤вЂЎРґВ»Р…", "Р¶РѓСћРµВ¤РЊ",
 )
 
 internal val SETTINGS_SEARCH_COLOR_KEYWORDS = listOf(
     "custom", "color", "colour", "background color", "text color", "border color", "hue",
-    "saturation", "brightness", "opacity", "border", "и‡Єе®љд№‰", "й…Ќи‰І", "йўњи‰І", "иѓЊж™Їи‰І",
-    "ж–‡е­—и‰І", "ж–‡е­—йўњи‰І", "иѕ№жЎ†и‰І", "иѕ№жЎ†йўњи‰І", "и‰Із›ё", "йІњи‰іеє¦", "йҐ±е’Њеє¦", "дє®еє¦",
-    "йЂЏжЋеє¦", "иѕ№жЎ†",
+    "saturation", "brightness", "opacity", "border", "РёвЂЎР„РµВ®С™Рґв„–вЂ°", "Р№вЂ¦РЊРёвЂ°Р†", "Р№СћСљРёвЂ°Р†", "РёС“РЉР¶в„ўР‡РёвЂ°Р†",
+    "Р¶вЂ“вЂЎРµВ­вЂ”РёвЂ°Р†", "Р¶вЂ“вЂЎРµВ­вЂ”Р№СћСљРёвЂ°Р†", "РёС•в„–Р¶РЋвЂ РёвЂ°Р†", "РёС•в„–Р¶РЋвЂ Р№СћСљРёвЂ°Р†", "РёвЂ°Р†Р·вЂєС‘", "Р№Р†СљРёвЂ°С–РµС”В¦", "Р№ТђВ±РµвЂ™РЉРµС”В¦", "РґС”В®РµС”В¦",
+    "Р№Р‚РЏР¶ВР‹РµС”В¦", "РёС•в„–Р¶РЋвЂ ",
 )
 
 internal val SETTINGS_SEARCH_EMPTY_TRANSLATION_RETRY_KEYWORDS = listOf(
     "empty translation", "blank translation", "empty response", "blank response", "retry",
-    "з©єиЇ‘ж–‡", "з©єзї»иЇ‘", "з©єе“Ќеє”", "и‡ЄеЉЁй‡ЌиЇ•", "й‡ЌиЇ•",
+    "Р·В©С”РёР‡вЂР¶вЂ“вЂЎ", "Р·В©С”Р·С—В»РёР‡вЂ", "Р·В©С”РµвЂњРЊРµС”вЂќ", "РёвЂЎР„РµР‰РЃР№вЂЎРЊРёР‡вЂў", "Р№вЂЎРЊРёР‡вЂў",
 )
 
 internal val SETTINGS_SEARCH_TRANSLATION_BLOCK_INTERACTION_KEYWORDS = listOf(
     "translation block", "copy translation", "long press", "selection handles", "select text", "copy panel",
-    "tap translation", "иЇ‘ж–‡еќ—", "е¤Ќе€¶иЇ‘ж–‡", "й•їжЊ‰", "йЂ‰ж‹©жЉЉж‰‹", "йЂ‰ж‹©ж–‡е­—", "йЂ‰ж‹©е¤Ќе€¶", "з‚№е‡»иЇ‘ж–‡",
+    "tap translation", "РёР‡вЂР¶вЂ“вЂЎРµСњвЂ”", "РµВ¤РЊРµв‚¬В¶РёР‡вЂР¶вЂ“вЂЎ", "Р№вЂўС—Р¶РЉвЂ°", "Р№Р‚вЂ°Р¶вЂ№В©Р¶Р‰Р‰Р¶вЂ°вЂ№", "Р№Р‚вЂ°Р¶вЂ№В©Р¶вЂ“вЂЎРµВ­вЂ”", "Р№Р‚вЂ°Р¶вЂ№В©РµВ¤РЊРµв‚¬В¶", "Р·вЂљв„–РµвЂЎВ»РёР‡вЂР¶вЂ“вЂЎ",
 )
 
 internal val SETTINGS_SEARCH_LOOP_SIMILARITY_KEYWORDS = listOf(
     "loop", "frame", "image", "hash", "similarity", "threshold", "skip", "duplicate",
-    "еѕЄзЋЇ", "з”»йќў", "е›ѕз‰‡", "з›ёдјјеє¦", "й€еЂј", "еЋ»й‡Ќ", "и·іиї‡", "й‡Ќе¤Ќзї»иЇ‘",
+    "РµС•Р„Р·Р‹Р‡", "Р·вЂќВ»Р№СњСћ", "РµвЂєС•Р·вЂ°вЂЎ", "Р·вЂєС‘РґССРµС”В¦", "Р№Вв‚¬РµР‚С", "РµР‹В»Р№вЂЎРЊ", "РёВ·С–РёС—вЂЎ", "Р№вЂЎРЊРµВ¤РЊР·С—В»РёР‡вЂ",
 )
 
 internal val SETTINGS_SEARCH_LOOP_TRIGGER_KEYWORDS = listOf(
     "loop trigger", "fixed interval", "wait for text", "text complete", "text stability",
-    "stable duration", "typing", "dialogue", "subtitle", "еѕЄзЋЇи§¦еЏ‘", "е›єе®љй—ґйљ”",
-    "ж™єиѓЅз­‰еѕ…", "ж–‡е­—е®Њж€ђ", "ж–‡е­—зЁіе®љ", "зЁіе®љз­‰еѕ…", "жЉҐе№•", "еЇ№иЇќ", "е­—е№•",
+    "stable duration", "typing", "dialogue", "subtitle", "РµС•Р„Р·Р‹Р‡РёВ§В¦РµРЏвЂ", "РµвЂєС”РµВ®С™Р№вЂ”Т‘Р№С™вЂќ",
+    "Р¶в„ўС”РёС“Р…Р·В­вЂ°РµС•вЂ¦", "Р¶вЂ“вЂЎРµВ­вЂ”РµВ®РЉР¶в‚¬С’", "Р¶вЂ“вЂЎРµВ­вЂ”Р·РЃС–РµВ®С™", "Р·РЃС–РµВ®С™Р·В­вЂ°РµС•вЂ¦", "Р¶Р‰ТђРµв„–вЂў", "РµР‡в„–РёР‡Сњ", "РµВ­вЂ”Рµв„–вЂў",
 )
 
 internal val SETTINGS_SEARCH_LOOP_REGION_KEYWORDS = listOf(
     "dialogue region", "subtitle region", "text region", "lower screen", "anywhere",
-    "region only", "translate all text", "жЉҐе№•еЊєеџџ", "е­—е№•еЊєеџџ", "ж–‡е­—еЊєеџџ", "дё‹еЌЉе±Џ",
-    "е…Ёе±Џи‡Єз”±", "д»…зї»иЇ‘жЉҐе№•еЊєеџџ", "зї»иЇ‘е…ЁйѓЁж–‡е­—",
+    "region only", "translate all text", "Р¶Р‰ТђРµв„–вЂўРµРЉС”РµСџСџ", "РµВ­вЂ”Рµв„–вЂўРµРЉС”РµСџСџ", "Р¶вЂ“вЂЎРµВ­вЂ”РµРЉС”РµСџСџ", "РґС‘вЂ№РµРЊР‰РµВ±РЏ",
+    "РµвЂ¦РЃРµВ±РЏРёвЂЎР„Р·вЂќВ±", "РґВ»вЂ¦Р·С—В»РёР‡вЂР¶Р‰ТђРµв„–вЂўРµРЉС”РµСџСџ", "Р·С—В»РёР‡вЂРµвЂ¦РЃР№С“РЃР¶вЂ“вЂЎРµВ­вЂ”",
 )
 
 internal val SETTINGS_SEARCH_DEVELOPER_OCR_KEYWORDS = listOf(
     "developer", "developer mode", "debug", "diagnostic", "ocr box", "red box",
     "bounding box", "source text", "translation text", "screenshot", "save screenshot",
-    "translation cache", "disable cache", "ејЂеЏ‘иЂ…", "ејЂеЏ‘иЂ…жЁЎејЏ", "и°ѓиЇ•", "иЇЉж–­",
-    "OCR зєўжЎ†", "зєўжЎ†", "иѕ№з•ЊжЎ†", "еЋџж–‡", "иЇ‘ж–‡", "ж€Єе›ѕдїќе­", "зї»иЇ‘зј“е­", "з¦Ѓз”Ёзј“е­",
+    "translation cache", "disable cache", "РµСР‚РµРЏвЂРёР‚вЂ¦", "РµСР‚РµРЏвЂРёР‚вЂ¦Р¶РЃРЋРµСРЏ", "РёВ°С“РёР‡вЂў", "РёР‡Р‰Р¶вЂ“В­",
+    "OCR Р·С”СћР¶РЋвЂ ", "Р·С”СћР¶РЋвЂ ", "РёС•в„–Р·вЂўРЉР¶РЋвЂ ", "РµР‹СџР¶вЂ“вЂЎ", "РёР‡вЂР¶вЂ“вЂЎ", "Р¶в‚¬Р„РµвЂєС•РґС—СњРµВ­В", "Р·С—В»РёР‡вЂР·СвЂњРµВ­В", "Р·В¦РѓР·вЂќРЃР·СвЂњРµВ­В",
 )
 
 private val SETTING_ITEMS: List<SearchEntry> = listOf(
@@ -3674,68 +2980,46 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
         R.string.settings_search_item_empty_translation_retry,
         SETTINGS_SEARCH_EMPTY_TRANSLATION_RETRY_KEYWORDS,
     ),
-    SearchEntry(SectionKeys.PRESETS, R.string.settings_section_translation_presets, R.string.settings_section_translation_presets, listOf("preset", "presets", "profile", "mode", "зі»з»џйў„и®ѕж–№жЎ€", "зї»иЇ‘йў„и®ѕ", "йў„и®ѕ", "жЁЎејЏ")),
+    SearchEntry(SectionKeys.PRESETS, R.string.settings_section_translation_presets, R.string.settings_section_translation_presets, listOf("preset", "presets", "profile", "mode", "Р·С–В»Р·В»СџР№СћвЂћРёВ®С•Р¶вЂ“в„–Р¶РЋв‚¬", "Р·С—В»РёР‡вЂР№СћвЂћРёВ®С•", "Р№СћвЂћРёВ®С•", "Р¶РЃРЋРµСРЏ")),
     SearchEntry(SectionKeys.PRESETS, R.string.settings_section_translation_presets, R.string.settings_search_item_preset_transfer, SETTINGS_SEARCH_TRANSFER_KEYWORDS),
 
-    // вЂ”вЂ” зї»иЇ‘еђЋз«Ї вЂ”вЂ”
-    SearchEntry(
-        SectionKeys.TRANSLATE,
-        R.string.settings_section_translator,
-        R.string.settings_search_item_translator_engine,
-        listOf("OpenAI", "DeepL", "LLM", "зї»иЇ‘еј•ж“Ћ"),
-        optionLabelResIds = listOf(
-            R.string.settings_engine_openai_llm,
-            R.string.settings_engine_anthropic_llm,
-            R.string.settings_engine_deepl,
-            R.string.settings_engine_youdao_pictrans,
-            R.string.settings_engine_google,
-            R.string.settings_on_device_translation_english,
-            R.string.settings_ocr_chip_chinese,
-            R.string.settings_ocr_chip_japanese,
-            R.string.settings_ocr_chip_korean,
-            R.string.settings_engine_volc,
-            R.string.settings_engine_baidu_fanyi,
-            R.string.settings_engine_tencent,
-            R.string.settings_engine_local_sakura,
-            R.string.settings_engine_local_hymt2,
-        ),
-    ),
+    // РІР‚вЂќРІР‚вЂќ Р·С—В»РёР‡вЂРµС’Р‹Р·В«Р‡ РІР‚вЂќРІР‚вЂќ
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_base_url, listOf("base url"), requiredTranslatorEngine = TranslatorEngine.OPENAI),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_api_key, listOf("api key"), requiredTranslatorEngine = TranslatorEngine.OPENAI),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_model_name, listOf("model", "жЁЎећ‹еђЌ"), requiredTranslatorEngine = TranslatorEngine.OPENAI),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_model_name, listOf("model", "Р¶РЃРЋРµС›вЂ№РµС’РЊ"), requiredTranslatorEngine = TranslatorEngine.OPENAI),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_anthropic_base_url, listOf("anthropic", "claude", "messages api", "base url"), requiredTranslatorEngine = TranslatorEngine.ANTHROPIC),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_anthropic_api_key, listOf("anthropic", "claude", "x-api-key"), requiredTranslatorEngine = TranslatorEngine.ANTHROPIC),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_anthropic_model, listOf("anthropic", "claude", "model", "жЁЎећ‹еђЌ"), requiredTranslatorEngine = TranslatorEngine.ANTHROPIC),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_anthropic_model, listOf("anthropic", "claude", "model", "Р¶РЃРЋРµС›вЂ№РµС’РЊ"), requiredTranslatorEngine = TranslatorEngine.ANTHROPIC),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_api_key, listOf("deepl"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_pro, listOf("deepl pro"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_advanced, listOf("deeplx", "bearer", "official", "protocol", "и‡Єжћ¶", "й«зє§", "еЌЏи®®", "deepl base url"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_youdao_pictrans, listOf("youdao", "жњ‰йЃ“", "е›ѕз‰‡зї»иЇ‘", "pictrans", "ocrtransapi", "з«Їе€°з«Ї"), requiredTranslatorEngine = TranslatorEngine.YOUDAO_PICTRANS),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_google, listOf("google", "и°·ж­Њ", "translate"), requiredTranslatorEngine = TranslatorEngine.GOOGLE),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_google_mlkit, listOf("google ml kit", "mlkit", "on-device", "offline", "з«Їдѕ§", "з¦»зєї"), requiredTranslatorEngine = TranslatorEngine.GOOGLE_ML_KIT),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_volc, listOf("volc", "volcengine", "зЃ«е±±", "е­—иЉ‚", "doubao", "bytedance", "access key", "AK", "SK", "region", "еЊєеџџ"), requiredTranslatorEngine = TranslatorEngine.VOLC),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_baidu_fanyi, listOf("baidu fanyi", "з™ѕеє¦зї»иЇ‘", "fanyi-api", "appid", "ејЂж”ѕе№іеЏ°"), requiredTranslatorEngine = TranslatorEngine.BAIDU_FANYI),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_tencent_translator, listOf("tencent", "и…ѕи®Ї", "tmt", "tmtcloud", "и…ѕи®Їдє‘зї»иЇ‘"), requiredTranslatorEngine = TranslatorEngine.TENCENT),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_source_lang, listOf("source", "жєђиЇ­иЁЂ")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_target_lang, listOf("target", "з›®ж ‡иЇ­иЁЂ")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_prompt, listOf("prompt", "жЏђз¤єиЇЌ", "system")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_dictionary_prompt, listOf("dictionary", "иЇЌе…ё", "е€’иЇЌ", "word select", "phonetic", "йџіж ‡", "й‡Љд№‰", "definition", "prompt")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_streaming, listOf("streaming", "жµЃејЏ")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_cross_line_context, listOf("cross context", "cross line", "дёЉдё‹ж–‡", "и·ЁдёЉдё‹ж–‡", "ж®µиђЅ")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_send_app_name, listOf("send app name", "prompt app context", "еЏ‘йЂЃеє”з”ЁеђЌз§°", "жЁЎећ‹еє”з”ЁеђЌз§°")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_foreground_app_detection, listOf("app detection", "foreground app", "accessibility", "usage access", "еє”з”ЁиЇ†е€«", "е‰ЌеЏ°еє”з”Ё")),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_grant_usage_access, listOf("usage permission", "usage access", "permission", "дЅїз”Ёжѓ…е†µжќѓй™ђ", "дЅїз”Ёжѓ…е†µи®їй—®", "жЋ€жќѓ")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_advanced, listOf("deeplx", "bearer", "official", "protocol", "РёвЂЎР„Р¶С›В¶", "Р№В«ВР·С”В§", "РµРЊРЏРёВ®В®", "deepl base url"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_youdao_pictrans, listOf("youdao", "Р¶СљвЂ°Р№РѓвЂњ", "РµвЂєС•Р·вЂ°вЂЎР·С—В»РёР‡вЂ", "pictrans", "ocrtransapi", "Р·В«Р‡Рµв‚¬В°Р·В«Р‡"), requiredTranslatorEngine = TranslatorEngine.YOUDAO_PICTRANS),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_google, listOf("google", "РёВ°В·Р¶В­РЉ", "translate"), requiredTranslatorEngine = TranslatorEngine.GOOGLE),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_google_mlkit, listOf("google ml kit", "mlkit", "on-device", "offline", "Р·В«Р‡РґС•В§", "Р·В¦В»Р·С”С—"), requiredTranslatorEngine = TranslatorEngine.GOOGLE_ML_KIT),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_volc, listOf("volc", "volcengine", "Р·РѓВ«РµВ±В±", "РµВ­вЂ”РёР‰вЂљ", "doubao", "bytedance", "access key", "AK", "SK", "region", "РµРЉС”РµСџСџ"), requiredTranslatorEngine = TranslatorEngine.VOLC),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_baidu_fanyi, listOf("baidu fanyi", "Р·в„ўС•РµС”В¦Р·С—В»РёР‡вЂ", "fanyi-api", "appid", "РµСР‚Р¶вЂќС•Рµв„–С–РµРЏВ°"), requiredTranslatorEngine = TranslatorEngine.BAIDU_FANYI),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_tencent_translator, listOf("tencent", "РёвЂ¦С•РёВ®Р‡", "tmt", "tmtcloud", "РёвЂ¦С•РёВ®Р‡РґС”вЂР·С—В»РёР‡вЂ"), requiredTranslatorEngine = TranslatorEngine.TENCENT),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_source_lang, listOf("source", "Р¶С”С’РёР‡В­РёРЃР‚")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_target_lang, listOf("target", "Р·вЂєВ®Р¶В вЂЎРёР‡В­РёРЃР‚")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_prompt, listOf("prompt", "Р¶РЏС’Р·В¤С”РёР‡РЊ", "system")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_dictionary_prompt, listOf("dictionary", "РёР‡РЊРµвЂ¦С‘", "Рµв‚¬вЂ™РёР‡РЊ", "word select", "phonetic", "Р№СџС–Р¶В вЂЎ", "Р№вЂЎР‰Рґв„–вЂ°", "definition", "prompt")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_streaming, listOf("streaming", "Р¶ВµРѓРµСРЏ")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_cross_line_context, listOf("cross context", "cross line", "РґС‘Р‰РґС‘вЂ№Р¶вЂ“вЂЎ", "РёВ·РЃРґС‘Р‰РґС‘вЂ№Р¶вЂ“вЂЎ", "Р¶В®ВµРёС’Р…")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_send_app_name, listOf("send app name", "prompt app context", "РµРЏвЂР№Р‚РѓРµС”вЂќР·вЂќРЃРµС’РЊР·В§В°", "Р¶РЃРЋРµС›вЂ№РµС”вЂќР·вЂќРЃРµС’РЊР·В§В°")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_foreground_app_detection, listOf("app detection", "foreground app", "accessibility", "usage access", "РµС”вЂќР·вЂќРЃРёР‡вЂ Рµв‚¬В«", "РµвЂ°РЊРµРЏВ°РµС”вЂќР·вЂќРЃ")),
+    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_grant_usage_access, listOf("usage permission", "usage access", "permission", "РґР…С—Р·вЂќРЃР¶С“вЂ¦РµвЂ ВµР¶СњС“Р№в„ўС’", "РґР…С—Р·вЂќРЃР¶С“вЂ¦РµвЂ ВµРёВ®С—Р№вЂ”В®", "Р¶Р‹в‚¬Р¶СњС“")),
     SearchEntry(
         SectionKeys.TEXT_ORIENTATION,
         R.string.settings_text_orientation_section_title,
         R.string.settings_translation_output_follow_title,
-        listOf("follow recognition", "recognized layout", "и·џйљЏиЇ†е€«", "иЇ†е€«ж–‡е­—жЋ’е€—"),
+        listOf("follow recognition", "recognized layout", "РёВ·СџР№С™РЏРёР‡вЂ Рµв‚¬В«", "РёР‡вЂ Рµв‚¬В«Р¶вЂ“вЂЎРµВ­вЂ”Р¶Р‹вЂ™Рµв‚¬вЂ”"),
         optionLabelResIds = listOf(R.string.settings_translation_output_follow),
     ),
     SearchEntry(
         SectionKeys.TEXT_ORIENTATION,
         R.string.settings_text_orientation_section_title,
         R.string.settings_translation_output_layout_label,
-        listOf("output direction", "translation layout", "writing mode", "иЇ‘ж–‡ж–№еђ‘", "иЇ‘ж–‡жЋ’е€—"),
+        listOf("output direction", "translation layout", "writing mode", "РёР‡вЂР¶вЂ“вЂЎР¶вЂ“в„–РµС’вЂ", "РёР‡вЂР¶вЂ“вЂЎР¶Р‹вЂ™Рµв‚¬вЂ”"),
         optionLabelResIds = listOf(
             R.string.settings_translation_output_follow_title,
             R.string.settings_translation_output_follow,
@@ -3746,18 +3030,18 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
         ),
     ),
 
-    SearchEntry(SectionKeys.TEXT_ORIENTATION, R.string.settings_text_orientation_section_title, R.string.settings_orient_auto_detect_title, listOf("orientation", "text orientation", "direction", "vertical", "horizontal", "и‡ЄеЉЁе€¤е€«", "ж–№еђ‘", "ж–‡жњ¬ж–№еђ‘", "з«–жЋ’", "жЁЄжЋ’")),
-    SearchEntry(SectionKeys.TEXT_ORIENTATION, R.string.settings_text_orientation_section_title, R.string.settings_search_item_manual_orientation, listOf("manual", "lock", "orientation", "vertical", "horizontal", "stacked", "ж‰‹еЉЁ", "й”Ѓе®љ", "ж–№еђ‘", "з«–жЋ’", "жЁЄжЋ’", "йЂђе­—")),
-    SearchEntry(SectionKeys.TEXT_ORIENTATION, R.string.settings_text_orientation_section_title, R.string.settings_search_item_orientation_model, listOf("orientation model", "doc orientation", "direction model", "ONNX", "ж–№еђ‘жЁЎећ‹", "ж–‡жњ¬ж–№еђ‘жЁЎећ‹", "жЁЎећ‹", "download", "дё‹иЅЅ", "жњ¬ењ°еЇје…Ґ", "local import", "еЇје…Ґ", "delete", "е€ й™¤")),
+    SearchEntry(SectionKeys.TEXT_ORIENTATION, R.string.settings_text_orientation_section_title, R.string.settings_orient_auto_detect_title, listOf("orientation", "text orientation", "direction", "vertical", "horizontal", "РёвЂЎР„РµР‰РЃРµв‚¬В¤Рµв‚¬В«", "Р¶вЂ“в„–РµС’вЂ", "Р¶вЂ“вЂЎР¶СљВ¬Р¶вЂ“в„–РµС’вЂ", "Р·В«вЂ“Р¶Р‹вЂ™", "Р¶РЃР„Р¶Р‹вЂ™")),
+    SearchEntry(SectionKeys.TEXT_ORIENTATION, R.string.settings_text_orientation_section_title, R.string.settings_search_item_manual_orientation, listOf("manual", "lock", "orientation", "vertical", "horizontal", "stacked", "Р¶вЂ°вЂ№РµР‰РЃ", "Р№вЂќРѓРµВ®С™", "Р¶вЂ“в„–РµС’вЂ", "Р·В«вЂ“Р¶Р‹вЂ™", "Р¶РЃР„Р¶Р‹вЂ™", "Р№Р‚С’РµВ­вЂ”")),
+    SearchEntry(SectionKeys.TEXT_ORIENTATION, R.string.settings_text_orientation_section_title, R.string.settings_search_item_orientation_model, listOf("orientation model", "doc orientation", "direction model", "ONNX", "Р¶вЂ“в„–РµС’вЂР¶РЃРЋРµС›вЂ№", "Р¶вЂ“вЂЎР¶СљВ¬Р¶вЂ“в„–РµС’вЂР¶РЃРЋРµС›вЂ№", "Р¶РЃРЋРµС›вЂ№", "download", "РґС‘вЂ№РёР…Р…", "Р¶СљВ¬РµСљВ°РµР‡СРµвЂ¦Тђ", "local import", "РµР‡СРµвЂ¦Тђ", "delete", "Рµв‚¬В Р№в„ўВ¤")),
 
-    // вЂ”вЂ” е›ѕеѓЏйў„е¤„зђ†пј€ењЁ OCR section е†…пј‰вЂ”вЂ”
+    // РІР‚вЂќРІР‚вЂќ РµвЂєС•РµС“РЏР№СћвЂћРµВ¤вЂћР·С’вЂ РїСв‚¬РµСљРЃ OCR section РµвЂ вЂ¦РїСвЂ°РІР‚вЂќРІР‚вЂќ
 
-    // вЂ”вЂ” жѕз¤є вЂ”вЂ”
+    // РІР‚вЂќРІР‚вЂќ Р¶ВС•Р·В¤С” РІР‚вЂќРІР‚вЂќ
     SearchEntry(
         SectionKeys.OVERLAY,
         R.string.settings_section_overlay,
         R.string.settings_search_item_render_mode,
-        listOf("зґ§иґґ", "жЁЄе№…", "banner", "render", "display mode", "floating window", "ж‚¬жµ®зЄ—"),
+        listOf("Р·Т‘В§РёТ‘Т‘", "Р¶РЃР„Рµв„–вЂ¦", "banner", "render", "display mode", "floating window", "Р¶вЂљВ¬Р¶ВµВ®Р·Р„вЂ”"),
         optionLabelResIds = listOf(
             R.string.settings_render_blocks_chip,
             R.string.settings_render_banner_chip,
@@ -3769,19 +3053,19 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
         SectionKeys.OVERLAY,
         R.string.settings_section_overlay,
         R.string.settings_search_item_placement,
-        listOf("дё‹ж–№", "дёЉж–№", "и¦†з›–", "below", "above", "overlap", "placement"),
+        listOf("РґС‘вЂ№Р¶вЂ“в„–", "РґС‘Р‰Р¶вЂ“в„–", "РёВ¦вЂ Р·вЂєвЂ“", "below", "above", "overlap", "placement"),
         optionLabelResIds = listOf(
             R.string.settings_placement_below_chip,
             R.string.settings_placement_overlap_chip,
             R.string.settings_placement_above_chip,
         ),
     ),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_offset, listOf("offset", "еѕ®и°ѓ")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_offset, listOf("offset", "РµС•В®РёВ°С“")),
     SearchEntry(
         SectionKeys.OVERLAY,
         R.string.settings_section_overlay,
         R.string.settings_search_item_overlay_theme,
-        listOf("ж·±и‰І", "жµ…и‰І", "зєёеј ", "йњњзЋ»з’ѓ", "зђҐзЏЂ", "theme", "dark", "light", "frost", "amber"),
+        listOf("Р¶В·В±РёвЂ°Р†", "Р¶ВµвЂ¦РёвЂ°Р†", "Р·С”С‘РµСВ ", "Р№СљСљР·Р‹В»Р·вЂ™С“", "Р·С’ТђР·РЏР‚", "theme", "dark", "light", "frost", "amber"),
         optionLabelResIds = listOf(
             R.string.settings_theme_classic_dark,
             R.string.settings_theme_amber_gold,
@@ -3791,33 +3075,33 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
         ),
     ),
     SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_custom_theme, SETTINGS_SEARCH_COLOR_KEYWORDS),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_border_style, listOf("solid", "dashed", "dotted", "double", "groove", "е®ћзєї", "и™љзєї", "з‚№зєї", "еЏЊзєї", "е‡№ж§Ѕ", "иѕ№жЎ†ж ·ејЏ")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_text_size, listOf("font size", "е­—еЏ·", "е­—дЅ“е¤§е°Џ")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_text_style, listOf("bold", "italic", "underline", "letter spacing", "line spacing", "alignment", "outline", "stroke", "shadow", "еЉ зІ—", "еЂѕж–њ", "дё‹е€’зєї", "е­—з¬¦й—ґи·ќ", "иЎЊи·ќ", "еЇ№йЅђ", "жЏЏиѕ№", "йґеЅ±")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_overlay_font, listOf("font", "ttf", "е­—дЅ“", "и‡Єе®љд№‰е­—дЅ“", "иЇ‘ж–‡е­—дЅ“")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_alpha, listOf("alpha", "opacity", "йЂЏжЋеє¦")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_floating_window_content, listOf("floating window", "ж‚¬жµ®зЄ—", "еЋџж–‡+иЇ‘ж–‡", "д»…иЇ‘ж–‡", "src dst", "content mode")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_floating_window_locked, listOf("lock", "й”Ѓе®љ", "ж‚¬жµ®зЄ—")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_floating_window_reset, listOf("reset", "й‡ЌзЅ®", "иїеЋџ", "й»и®¤", "default", "floating window", "ж‚¬жµ®зЄ—", "geometry", "е‡ дЅ•", "дЅЌзЅ®", "е°єеЇё", "size")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_allow_wrap, listOf("wrap", "жЌўиЎЊ", "single line", "е¤љиЎЊ")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_avoid_collision, listOf("collision", "зў°ж’ћ", "йЃїж’ћ", "й‡ЌеЏ ")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_merge_adjacent, listOf("merge", "еђ€е№¶", "й‡ЌеЏ ", "ж‹†ж®µ")),
-    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_merge_strength, listOf("strength", "ејєеє¦", "дїќе®€", "ж ‡е‡†", "жїЂиї›", "conservative", "standard", "aggressive")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_border_style, listOf("solid", "dashed", "dotted", "double", "groove", "РµВ®С›Р·С”С—", "Рёв„ўС™Р·С”С—", "Р·вЂљв„–Р·С”С—", "РµРЏРЉР·С”С—", "РµвЂЎв„–Р¶В§Р…", "РёС•в„–Р¶РЋвЂ Р¶В В·РµСРЏ")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_text_size, listOf("font size", "РµВ­вЂ”РµРЏВ·", "РµВ­вЂ”РґР…вЂњРµВ¤В§РµВ°РЏ")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_text_style, listOf("bold", "italic", "underline", "letter spacing", "line spacing", "alignment", "outline", "stroke", "shadow", "РµР‰В Р·Р†вЂ”", "РµР‚С•Р¶вЂ“Сљ", "РґС‘вЂ№Рµв‚¬вЂ™Р·С”С—", "РµВ­вЂ”Р·В¬В¦Р№вЂ”Т‘РёВ·Сњ", "РёРЋРЉРёВ·Сњ", "РµР‡в„–Р№Р…С’", "Р¶РЏРЏРёС•в„–", "Р№ВТ‘РµР…В±")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_overlay_font, listOf("font", "ttf", "РµВ­вЂ”РґР…вЂњ", "РёвЂЎР„РµВ®С™Рґв„–вЂ°РµВ­вЂ”РґР…вЂњ", "РёР‡вЂР¶вЂ“вЂЎРµВ­вЂ”РґР…вЂњ")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_alpha, listOf("alpha", "opacity", "Р№Р‚РЏР¶ВР‹РµС”В¦")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_floating_window_content, listOf("floating window", "Р¶вЂљВ¬Р¶ВµВ®Р·Р„вЂ”", "РµР‹СџР¶вЂ“вЂЎ+РёР‡вЂР¶вЂ“вЂЎ", "РґВ»вЂ¦РёР‡вЂР¶вЂ“вЂЎ", "src dst", "content mode")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_floating_window_locked, listOf("lock", "Р№вЂќРѓРµВ®С™", "Р¶вЂљВ¬Р¶ВµВ®Р·Р„вЂ”")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_floating_window_reset, listOf("reset", "Р№вЂЎРЊР·Р…В®", "РёС—ВРµР‹Сџ", "Р№В»ВРёВ®В¤", "default", "floating window", "Р¶вЂљВ¬Р¶ВµВ®Р·Р„вЂ”", "geometry", "РµвЂЎВ РґР…вЂў", "РґР…РЊР·Р…В®", "РµВ°С”РµР‡С‘", "size")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_allow_wrap, listOf("wrap", "Р¶РЊСћРёРЋРЉ", "single line", "РµВ¤С™РёРЋРЉ")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_avoid_collision, listOf("collision", "Р·СћВ°Р¶вЂ™С›", "Р№РѓС—Р¶вЂ™С›", "Р№вЂЎРЊРµРЏВ ")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_merge_adjacent, listOf("merge", "РµС’в‚¬Рµв„–В¶", "Р№вЂЎРЊРµРЏВ ", "Р¶вЂ№вЂ Р¶В®Вµ")),
+    SearchEntry(SectionKeys.OVERLAY, R.string.settings_section_overlay, R.string.settings_search_item_merge_strength, listOf("strength", "РµСС”РµС”В¦", "РґС—СњРµВ®в‚¬", "Р¶В вЂЎРµвЂЎвЂ ", "Р¶С—Р‚РёС—вЂє", "conservative", "standard", "aggressive")),
 
-    // вЂ”вЂ” ж‚¬жµ®жЊ‰й’® вЂ”вЂ”
-    // жіЁж„Џпјљfloating_size еЋ†еЏІиЇЇжЊ‡ OVERLAYпјЊ0.3.x иµ·ж”№ж€ђ FLOATINGпј€е®ћй™…жЋ§д»¶ењЁ floating sectionпј‰гЂ‚
-    SearchEntry(SectionKeys.FLOATING, R.string.settings_section_floating, R.string.settings_search_item_floating_size, listOf("floating", "ењ†зђѓ", "ж‚¬жµ®", "size", "е¤§е°Џ")),
-    SearchEntry(SectionKeys.FLOATING, R.string.settings_section_floating, R.string.settings_search_item_floating_snap, listOf("snap", "иґґиѕ№", "edge")),
-    SearchEntry(SectionKeys.FLOATING, R.string.settings_section_floating, R.string.settings_search_item_floating_auto_dock, listOf("auto dock", "и‡ЄеЉЁеЃњйќ ", "еЃњйќ ", "и—Џиѕ№")),
-    SearchEntry(SectionKeys.FLOATING, R.string.settings_section_floating, R.string.settings_search_item_floating_dock_inset, listOf("inset", "иґґиѕ№и·ќз¦»", "ж‰‹еЉї", "е…Ёйќўе±Џ", "gesture")),
+    // РІР‚вЂќРІР‚вЂќ Р¶вЂљВ¬Р¶ВµВ®Р¶РЉвЂ°Р№вЂ™В® РІР‚вЂќРІР‚вЂќ
+    // Р¶С–РЃР¶вЂћРЏРїСС™floating_size РµР‹вЂ РµРЏР†РёР‡Р‡Р¶РЉвЂЎ OVERLAYРїСРЉ0.3.x РёВµВ·Р¶вЂќв„–Р¶в‚¬С’ FLOATINGРїСв‚¬РµВ®С›Р№в„ўвЂ¦Р¶Р‹В§РґВ»В¶РµСљРЃ floating sectionРїСвЂ°РіР‚вЂљ
+    SearchEntry(SectionKeys.FLOATING, R.string.settings_section_floating, R.string.settings_search_item_floating_size, listOf("floating", "РµСљвЂ Р·С’С“", "Р¶вЂљВ¬Р¶ВµВ®", "size", "РµВ¤В§РµВ°РЏ")),
+    SearchEntry(SectionKeys.FLOATING, R.string.settings_section_floating, R.string.settings_search_item_floating_snap, listOf("snap", "РёТ‘Т‘РёС•в„–", "edge")),
+    SearchEntry(SectionKeys.FLOATING, R.string.settings_section_floating, R.string.settings_search_item_floating_auto_dock, listOf("auto dock", "РёвЂЎР„РµР‰РЃРµРѓСљР№СњВ ", "РµРѓСљР№СњВ ", "РёвЂ”РЏРёС•в„–")),
+    SearchEntry(SectionKeys.FLOATING, R.string.settings_section_floating, R.string.settings_search_item_floating_dock_inset, listOf("inset", "РёТ‘Т‘РёС•в„–РёВ·СњР·В¦В»", "Р¶вЂ°вЂ№РµР‰С—", "РµвЂ¦РЃР№СњСћРµВ±РЏ", "gesture")),
 
-    // вЂ”вЂ” еј§иЏњеЌ•жЊ‰й’®йЎєеєЏ вЂ”вЂ”
-    SearchEntry(SectionKeys.ARC_MENU, R.string.settings_section_arc_menu, R.string.settings_search_item_arc_menu_order, listOf("arc menu", "еј§иЏњеЌ•", "еј§еЅў", "йЎєеєЏ", "order", "reorder", "жЋ’еєЏ", "ж‹–еЉЁ", "menu", "жЊ‰й’®", "page", "page size", "е€†йЎµ", "жЇЏйЎµ", "зї»йЎµ", "loop", "region", "home", "skill", "жЉЂиѓЅ", "е€’иЇЌ", "language", "иЇ­иЁЂ", "жєђиЇ­иЁЂ", "з›®ж ‡иЇ­иЁЂ")),
+    // РІР‚вЂќРІР‚вЂќ РµСВ§РёРЏСљРµРЊвЂўР¶РЉвЂ°Р№вЂ™В®Р№РЋС”РµС”РЏ РІР‚вЂќРІР‚вЂќ
+    SearchEntry(SectionKeys.ARC_MENU, R.string.settings_section_arc_menu, R.string.settings_search_item_arc_menu_order, listOf("arc menu", "РµСВ§РёРЏСљРµРЊвЂў", "РµСВ§РµР…Сћ", "Р№РЋС”РµС”РЏ", "order", "reorder", "Р¶Р‹вЂ™РµС”РЏ", "Р¶вЂ№вЂ“РµР‰РЃ", "menu", "Р¶РЉвЂ°Р№вЂ™В®", "page", "page size", "Рµв‚¬вЂ Р№РЋВµ", "Р¶Р‡РЏР№РЋВµ", "Р·С—В»Р№РЋВµ", "loop", "region", "home", "skill", "Р¶Р‰Р‚РёС“Р…", "Рµв‚¬вЂ™РёР‡РЊ", "language", "РёР‡В­РёРЃР‚", "Р¶С”С’РёР‡В­РёРЃР‚", "Р·вЂєВ®Р¶В вЂЎРёР‡В­РёРЃР‚")),
 
-    // вЂ”вЂ” е€’иЇЌзї»иЇ‘ вЂ”вЂ”
+    // РІР‚вЂќРІР‚вЂќ Рµв‚¬вЂ™РёР‡РЊР·С—В»РёР‡вЂ РІР‚вЂќРІР‚вЂќ
 
-    // вЂ”вЂ” и§¦еЏ‘е™Ё вЂ”вЂ”
-    SearchEntry(SectionKeys.TRIGGER, R.string.settings_section_trigger, R.string.settings_search_item_loop_interval, listOf("loop", "еѕЄзЋЇ", "interval", "й—ґйљ”")),
+    // РІР‚вЂќРІР‚вЂќ РёВ§В¦РµРЏвЂРµв„ўРЃ РІР‚вЂќРІР‚вЂќ
+    SearchEntry(SectionKeys.TRIGGER, R.string.settings_section_trigger, R.string.settings_search_item_loop_interval, listOf("loop", "РµС•Р„Р·Р‹Р‡", "interval", "Р№вЂ”Т‘Р№С™вЂќ")),
     SearchEntry(
         SectionKeys.TRIGGER,
         R.string.settings_section_trigger,
@@ -3840,9 +3124,9 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
             R.string.settings_loop_text_region_anywhere,
         ),
     ),
-    SearchEntry(SectionKeys.TRIGGER, R.string.settings_section_trigger, R.string.settings_search_item_a11y_volume, listOf("ж— йљњзўЌ", "a11y", "accessibility", "volume", "йџій‡Џ")),
+    SearchEntry(SectionKeys.TRIGGER, R.string.settings_section_trigger, R.string.settings_search_item_a11y_volume, listOf("Р¶вЂ”В Р№С™СљР·СћРЊ", "a11y", "accessibility", "volume", "Р№СџС–Р№вЂЎРЏ")),
 
-    // вЂ”вЂ” ејЂеЏ‘иЂ…иЇЉж–­ вЂ”вЂ”
+    // РІР‚вЂќРІР‚вЂќ РµСР‚РµРЏвЂРёР‚вЂ¦РёР‡Р‰Р¶вЂ“В­ РІР‚вЂќРІР‚вЂќ
     SearchEntry(
         SectionKeys.DEVELOPER,
         R.string.settings_section_developer,
@@ -3850,13 +3134,13 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
         SETTINGS_SEARCH_DEVELOPER_OCR_KEYWORDS,
     ),
 
-    // вЂ”вЂ” зЅ‘з»њ вЂ”вЂ”
-    SearchEntry(SectionKeys.NETWORK, R.string.settings_section_network, R.string.settings_search_item_api_timeout, listOf("timeout", "и¶…ж—¶", "зЅ‘з»њ", "network")),
-    SearchEntry(SectionKeys.NETWORK, R.string.settings_section_network, R.string.settings_search_item_cleartext_hosts, listOf("cleartext", "http", "жЋж–‡", "з™ЅеђЌеЌ•", "host", "и‡Єжћ¶", "з§Ѓжњ‰")),
+    // РІР‚вЂќРІР‚вЂќ Р·Р…вЂР·В»Сљ РІР‚вЂќРІР‚вЂќ
+    SearchEntry(SectionKeys.NETWORK, R.string.settings_section_network, R.string.settings_search_item_api_timeout, listOf("timeout", "РёВ¶вЂ¦Р¶вЂ”В¶", "Р·Р…вЂР·В»Сљ", "network")),
+    SearchEntry(SectionKeys.NETWORK, R.string.settings_section_network, R.string.settings_search_item_cleartext_hosts, listOf("cleartext", "http", "Р¶ВР‹Р¶вЂ“вЂЎ", "Р·в„ўР…РµС’РЊРµРЊвЂў", "host", "РёвЂЎР„Р¶С›В¶", "Р·В§РѓР¶СљвЂ°")),
 
-    SearchEntry(SectionKeys.APP_LANG, R.string.settings_section_app_lang, R.string.settings_section_app_lang, listOf("language", "locale", "иЇ­иЁЂ", "дё­ж–‡", "english", "i18n")),
+    SearchEntry(SectionKeys.APP_LANG, R.string.settings_section_app_lang, R.string.settings_section_app_lang, listOf("language", "locale", "РёР‡В­РёРЃР‚", "РґС‘В­Р¶вЂ“вЂЎ", "english", "i18n")),
 
-    SearchEntry(SectionKeys.THEME_MODE, R.string.settings_section_theme_mode, R.string.settings_section_theme_mode, listOf("theme", "е¤њй—ґ", "з™Ѕе¤©", "ж·±и‰І", "жµ…и‰І", "dark", "light", "night")),
+    SearchEntry(SectionKeys.THEME_MODE, R.string.settings_section_theme_mode, R.string.settings_section_theme_mode, listOf("theme", "РµВ¤СљР№вЂ”Т‘", "Р·в„ўР…РµВ¤В©", "Р¶В·В±РёвЂ°Р†", "Р¶ВµвЂ¦РёвЂ°Р†", "dark", "light", "night")),
 )
 
 internal fun settingsSearchSectionKeys(): Set<String> = SETTING_ITEMS.mapTo(linkedSetOf()) { it.sectionKey }
@@ -3880,7 +3164,7 @@ private val APP_LANGUAGE_OPTIONS = listOf(
 
 @Composable
 private fun AppLanguageSelector() {
-    // еЅ’дёЂеЊ–зі»з»џиї”е›ћзљ„ BCP-47пј€"zh-Hans-CN" / "zh" / "en-US" з­‰пј‰е€° options й‡ЊзІѕзЎ® tagгЂ‚
+    // РµР…вЂ™РґС‘Р‚РµРЉвЂ“Р·С–В»Р·В»СџРёС—вЂќРµвЂєС›Р·С™вЂћ BCP-47РїСв‚¬"zh-Hans-CN" / "zh" / "en-US" Р·В­вЂ°РїСвЂ°Рµв‚¬В° options Р№вЂЎРЉР·Р†С•Р·РЋВ® tagРіР‚вЂљ
     fun normalize(raw: String): String {
         if (raw.isEmpty()) return ""
         val exact = APP_LANGUAGE_OPTIONS.firstOrNull {
@@ -3905,8 +3189,8 @@ private fun AppLanguageSelector() {
     val apply: (String) -> Unit = { newTag ->
         if (newTag != tag) {
             tag = newTag
-            // и‡Єз®ЎжЊЃд№…еЊ–пјљMainActivity.attachBaseContext дјљењЁ recreate еђЋиЇ» prefs е№¶еЊ…иЈ…
-            // Configuration localeпјЊз»•ејЂ AppCompatDelegate ењЁ ComponentActivity дёЉзљ„жЊЃд№…еЊ–дёЌзЁій—®йўгЂ‚
+            // РёвЂЎР„Р·В®РЋР¶РЉРѓРґв„–вЂ¦РµРЉвЂ“РїСС™MainActivity.attachBaseContext РґСС™РµСљРЃ recreate РµС’Р‹РёР‡В» prefs Рµв„–В¶РµРЉвЂ¦РёР€вЂ¦
+            // Configuration localeРїСРЉР·В»вЂўРµСР‚ AppCompatDelegate РµСљРЃ ComponentActivity РґС‘Р‰Р·С™вЂћР¶РЉРѓРґв„–вЂ¦РµРЉвЂ“РґС‘РЊР·РЃС–Р№вЂ”В®Р№СћВРіР‚вЂљ
             com.gameocr.app.data.AppLocalePrefs.write(context, newTag)
             (context as? android.app.Activity)?.recreate()
         }
