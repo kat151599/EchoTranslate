@@ -150,12 +150,6 @@ class SettingsViewModel @Inject constructor(
 
     @Suppress("LongParameterList")
     suspend fun save(
-        baseUrl: String,
-        apiKey: String,
-        model: String,
-        anthropicBaseUrl: String,
-        anthropicApiKey: String,
-        anthropicModel: String,
         targetLang: String,
         sourceLang: String,
         prompt: String,
@@ -220,12 +214,6 @@ class SettingsViewModel @Inject constructor(
     ) {
         repo.update {
             it.copy(
-                baseUrl = baseUrl.trim(),
-                apiKey = apiKey.trim(),
-                model = model.trim(),
-                anthropicBaseUrl = anthropicBaseUrl.trim(),
-                anthropicApiKey = anthropicApiKey.trim(),
-                anthropicModel = anthropicModel.trim(),
                 targetLang = targetLang.trim(),
                 sourceLang = sourceLang.trim(),
                 promptTemplate = prompt,
@@ -512,12 +500,6 @@ class SettingsViewModel @Inject constructor(
         remotePcApiKey: String,
         remotePcSessionId: String,
         remotePcImageQuality: Int,
-        baseUrl: String,
-        apiKey: String,
-        model: String,
-        anthropicBaseUrl: String,
-        anthropicApiKey: String,
-        anthropicModel: String,
         deeplKey: String,
         deeplPro: Boolean,
         deeplProtocol: com.gameocr.app.data.DeeplProtocol,
@@ -548,12 +530,6 @@ class SettingsViewModel @Inject constructor(
                 base.cleartextAllowedHosts,
                 normalizedRemotePcBaseUrl,
             ),
-            baseUrl = baseUrl.trim(),
-            apiKey = apiKey.trim(),
-            model = model.trim(),
-            anthropicBaseUrl = anthropicBaseUrl.trim(),
-            anthropicApiKey = anthropicApiKey.trim(),
-            anthropicModel = anthropicModel.trim(),
             deeplApiKey = deeplKey.trim(),
             deeplPro = deeplPro,
             deeplProtocol = deeplProtocol,

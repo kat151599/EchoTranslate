@@ -245,12 +245,6 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val usageAccessGranted = rememberUsageAccessGranted(context)
 
-    var baseUrl by remember { mutableStateOf("") }
-    var apiKey by remember { mutableStateOf("") }
-    var model by remember { mutableStateOf("") }
-    var anthropicBaseUrl by remember { mutableStateOf("") }
-    var anthropicApiKey by remember { mutableStateOf("") }
-    var anthropicModel by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     var targetLang by remember { mutableStateOf("zh-CN") }
     var sourceLang by remember { mutableStateOf("auto") }
@@ -490,12 +484,6 @@ fun SettingsScreen(
     }
 
     fun applyPresetSettingsToUi(s: Settings) {
-        baseUrl = s.baseUrl
-        apiKey = s.apiKey
-        model = s.model
-        anthropicBaseUrl = s.anthropicBaseUrl
-        anthropicApiKey = s.anthropicApiKey
-        anthropicModel = s.anthropicModel
         prompt = s.promptTemplate
         sourceLang = s.sourceLang
         targetLang = s.targetLang
@@ -792,12 +780,6 @@ fun SettingsScreen(
     // РµР‡СРµвЂЎС”РґСС™Р¶Р‰Р‰Р№СћвЂћРёВ®С•РіР‚РѓРµвЂєС”РµВ®С™РёР‡В­РёРЃР‚РіР‚РѓР¶вЂљВ¬Р¶ВµВ®Р·Р„вЂ”Р·Р‰В¶Р¶Р‚РѓРµвЂ™РЉР¶СљВ¬РµСљВ° LLM РµРЏвЂљР¶вЂўВ°Р·В­вЂ°Р№СњС›РµР…вЂњРµвЂ°РЊРёРЋРЃРµРЊвЂўРµВ­вЂ”Р¶В®ВµР№Сњв„ўР№В»ВР№вЂЎРЊР·Р…В®РіР‚вЂљ
     // Р·В±В»РµС›вЂ№РёР…В¬Р¶РЊСћРёВ·Сџ doSave РґС—СњР¶РЉРѓРґС‘Р‚РёвЂЎТ‘РїСв‚¬textSize.toInt() / loopInterval.toLongOrNull() Р·В­вЂ°РїСвЂ°РіР‚вЂљ
     fun buildSnapshot(): Settings = (initialSettings ?: Settings()).copy(
-        baseUrl = baseUrl,
-        apiKey = apiKey,
-        model = model,
-        anthropicBaseUrl = anthropicBaseUrl,
-        anthropicApiKey = anthropicApiKey,
-        anthropicModel = anthropicModel,
         sourceLang = sourceLang,
         targetLang = targetLang,
         promptTemplate = prompt,
@@ -898,10 +880,6 @@ fun SettingsScreen(
 
     val doSave: suspend () -> Unit = {
         viewModel.save(
-            baseUrl = baseUrl, apiKey = apiKey, model = model,
-            anthropicBaseUrl = anthropicBaseUrl,
-            anthropicApiKey = anthropicApiKey,
-            anthropicModel = anthropicModel,
             targetLang = targetLang, sourceLang = sourceLang, prompt = prompt,
             textSize = textSize.toInt(), alpha = alpha,
             overlayTextStyle = overlayTextStyle,
@@ -1350,12 +1328,6 @@ fun SettingsScreen(
         // РґС‘Р‚Р¶В¬РЋ observer Р№Р‚С™Р·СџТђРїСРЉР№РѓС—РµвЂ¦РЊ Compose РµСљРЃР¶Р‡РЏРґС‘Р„ state РµРЏВРµРЉвЂ“Р¶вЂ”В¶ schedule РґС‘Р‚Р¶В¬РЋ recomposition
         // / derivedStateOf Р№вЂЎРЊР·В®вЂ”РїСРЉРёС—вЂєРёВ®С•Р·Р…В®Р№РЋВµР№вЂљР€Р¶В®Вµ"РµРЊРЋРґС‘Р‚РґС‘вЂ№"РґС‘В»РёВ¦РѓР¶СњТђРёвЂЎР„РёС—в„ўР№вЂЎРЉРіР‚вЂљ
         androidx.compose.runtime.snapshots.Snapshot.withMutableSnapshot {
-            baseUrl = s.baseUrl
-            apiKey = s.apiKey
-            model = s.model
-            anthropicBaseUrl = s.anthropicBaseUrl
-            anthropicApiKey = s.anthropicApiKey
-            anthropicModel = s.anthropicModel
             prompt = migratedPrompt
             targetLang = s.targetLang
             sourceLang = s.sourceLang
@@ -2707,12 +2679,6 @@ internal val SEARCH_TARGET_PRESETS = intArrayOf(
     R.string.settings_search_item_preset_transfer,
 )
 private val SEARCH_TARGET_TRANSLATOR_PROVIDERS = intArrayOf(
-    R.string.settings_search_item_base_url,
-    R.string.settings_search_item_api_key,
-    R.string.settings_search_item_model_name,
-    R.string.settings_search_item_anthropic_base_url,
-    R.string.settings_search_item_anthropic_api_key,
-    R.string.settings_search_item_anthropic_model,
     R.string.settings_search_item_deepl_api_key,
     R.string.settings_search_item_deepl_pro,
     R.string.settings_search_item_deepl_advanced,
@@ -2984,12 +2950,6 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
     SearchEntry(SectionKeys.PRESETS, R.string.settings_section_translation_presets, R.string.settings_search_item_preset_transfer, SETTINGS_SEARCH_TRANSFER_KEYWORDS),
 
     // РІР‚вЂќРІР‚вЂќ Р·С—В»РёР‡вЂРµС’Р‹Р·В«Р‡ РІР‚вЂќРІР‚вЂќ
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_base_url, listOf("base url"), requiredTranslatorEngine = TranslatorEngine.OPENAI),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_api_key, listOf("api key"), requiredTranslatorEngine = TranslatorEngine.OPENAI),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_model_name, listOf("model", "Р¶РЃРЋРµС›вЂ№РµС’РЊ"), requiredTranslatorEngine = TranslatorEngine.OPENAI),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_anthropic_base_url, listOf("anthropic", "claude", "messages api", "base url"), requiredTranslatorEngine = TranslatorEngine.ANTHROPIC),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_anthropic_api_key, listOf("anthropic", "claude", "x-api-key"), requiredTranslatorEngine = TranslatorEngine.ANTHROPIC),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_anthropic_model, listOf("anthropic", "claude", "model", "Р¶РЃРЋРµС›вЂ№РµС’РЊ"), requiredTranslatorEngine = TranslatorEngine.ANTHROPIC),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_api_key, listOf("deepl"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_pro, listOf("deepl pro"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_advanced, listOf("deeplx", "bearer", "official", "protocol", "РёвЂЎР„Р¶С›В¶", "Р№В«ВР·С”В§", "РµРЊРЏРёВ®В®", "deepl base url"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
