@@ -236,10 +236,6 @@ data class Settings(
      * 释义 / 难点解释 / 例句；解析失败回退到 [promptTemplate]。读取时若 key 缺省，按 UI locale 给出本地化默认。
      */
     val dictionaryPrompt: String = DEFAULT_DICTIONARY_PROMPT,
-    /** 端侧 LLM 上下文窗口大小（token）。屏译 OCR 段落短，2048 足够；越大越占内存。 */
-    val localLlmContextSize: Int = 2048,
-    /** 端侧 LLM 单次最长生成 token 数。屏译场景译文很少超过 256 token。 */
-    val localLlmMaxNewTokens: Int = 256,
     /**
      * PaddleOCR / MangaOCR 共用 DBNet 检测的二值化阈值。prob map > 此值视为前景。
      * 主线 PaddleOCR 默认 0.3；屏译降到 0.25 让漫画小气泡、淡色字、长竖排能稳定捕获。
@@ -257,19 +253,6 @@ data class Settings(
      * manga-ocr 专用 DBNet 外扩比例。manga-ocr 识别整气泡 crop，竖排/手绘字体更怕首尾字被裁；
      * 1.65 比 PaddleOCR 常见 1.5 默认值多一点裁剪余量，同时仍避免过度吞邻泡。
      */
-    /** 兼容旧存档保留的退役字段；读取、保存和运行时始终强制为 0。 */
-    /** 兼容旧存档保留的退役字段；读取、保存和运行时始终强制为 0。 */
-    /**
-     * 端侧 LLM 下载源选择。默认 [LlmMirrorChoice.HF_MIRROR]——国内用户绝大多数直连可达：
-     * - Hy-MT2 / Sakura 在此模式下走 hf-mirror.com。
-     * 选 [LlmMirrorChoice.CUSTOM] 时使用 [localLlmMirrorUrl] 作 base URL。
-     */
-    val localLlmMirror: LlmMirrorChoice = LlmMirrorChoice.HF_MIRROR,
-    /**
-     * [LlmMirrorChoice.CUSTOM] 模式下的自定义 base URL（含末尾 `/`，例如
-     * `https://my-cdn.example/llm/`）。拼接规则为 `<base>/<kind.fileName>`。其它模式不读此字段。
-     */
-    val localLlmMirrorUrl: String = "",
     val translationPresets: List<TranslationPreset> = emptyList(),
     val activeTranslationPresetId: String = "",
     @kotlinx.serialization.Transient
@@ -382,8 +365,6 @@ data class TranslationPreset(
     val translationOutputDirection: TranslationOutputDirection = TranslationOutputDirection.FOLLOW_RECOGNITION,
     val translationGlossaryEnabled: Boolean = true,
     val sendAppNameToTranslator: Boolean = false,
-    val localLlmContextSize: Int = 2048,
-    val localLlmMaxNewTokens: Int = 256,
     val settingsHash: String = ""
 ) {
     fun applyTo(settings: Settings): Settings {
@@ -436,8 +417,6 @@ data class TranslationPreset(
         translationOutputDirection = output.direction,
         translationGlossaryEnabled = translationGlossaryEnabled,
         sendAppNameToTranslator = sendAppNameToTranslator,
-        localLlmContextSize = localLlmContextSize,
-        localLlmMaxNewTokens = localLlmMaxNewTokens,
         )
     }
 }
@@ -510,8 +489,6 @@ object TranslationPresetCatalog {
             translationOutputDirection = output.direction,
             translationGlossaryEnabled = settings.translationGlossaryEnabled,
             sendAppNameToTranslator = settings.sendAppNameToTranslator,
-            localLlmContextSize = settings.localLlmContextSize,
-            localLlmMaxNewTokens = settings.localLlmMaxNewTokens,
         )
         return preset.copy(settingsHash = settingsHash(preset))
     }
@@ -593,9 +570,6 @@ object TranslationPresetCatalog {
             output.direction.name,
             preset.translationGlossaryEnabled,
             preset.sendAppNameToTranslator,
-            preset.localLlmContextSize,
-            preset.localLlmMaxNewTokens,
-            preset.localLlmMaxNewTokens
         )
     }
 
@@ -812,20 +786,6 @@ enum class TranslatorEngine {
     LOCAL_HY_MT2
 }
 
-/** 端侧 LLM 下载源选择。see [Settings.localLlmMirror]。 */
-@Serializable
-enum class LlmMirrorChoice {
-    /** huggingface.co 官方原站，海外或带代理时首选。 */
-    HF_OFFICIAL,
-    /**
-     * 国内可直连镜像源：
-     * - Hy-MT2 / Sakura → hf-mirror.com。
-     */
-    HF_MIRROR,
-    /** 用户自定义 base URL，配 [Settings.localLlmMirrorUrl] 用。 */
-    CUSTOM,
-}
-
 /** 常用目标语言预设（也允许 settings.targetLang 自由填）。 */
 object TargetLangPresets {
     val ALL: List<Pair<String, String>> = listOf(
@@ -970,6 +930,5 @@ enum class OverlayTheme {
     /** 自定义：bg/fg/border/border 粗细全由用户设置。 */
     CUSTOM
 }
-
 
 

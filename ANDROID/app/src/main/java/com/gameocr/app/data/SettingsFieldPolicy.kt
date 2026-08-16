@@ -174,10 +174,6 @@ object SettingsFieldPolicy {
         portable("arcMenuPageSize", R.string.settings_search_item_arc_menu_order),
         portable("floatingButtonSkill", R.string.settings_search_item_arc_menu_order),
         portable("dictionaryPrompt", R.string.settings_search_item_dictionary_prompt, SettingsDiagnostic.SUMMARY),
-        portable("localLlmContextSize", R.string.settings_search_item_local_llm_model),
-        portable("localLlmMaxNewTokens", R.string.settings_search_item_local_llm_model),
-        portable("localLlmMirror", R.string.settings_search_item_llm_mirror),
-        privateConnection("localLlmMirrorUrl", R.string.settings_search_item_llm_mirror),
         portable("translationPresets", R.string.settings_section_translation_presets, SettingsDiagnostic.SUMMARY),
         portable("activeTranslationPresetId", R.string.settings_section_translation_presets, SettingsDiagnostic.SUMMARY),
         SettingsFieldRule(

@@ -27,19 +27,13 @@ import com.gameocr.app.data.TranslationPresetCatalog
 import com.gameocr.app.data.TranslationPresetImportResult
 import com.gameocr.app.data.TranslationPresetTransfer
 import com.gameocr.app.data.TranslatorEngine
-import com.gameocr.app.download.ModelDownloadManager
-import com.gameocr.app.download.ModelDownloadSpec
-import com.gameocr.app.llm.LlmModelInstaller
-import com.gameocr.app.llm.LlmModelKind
 import com.gameocr.app.translate.RoutingTranslator
 import com.gameocr.app.translate.TestResult
-import androidx.work.WorkInfo
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import java.io.File
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
 
 @HiltViewModel
@@ -47,12 +41,8 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val appContext: Context,
     private val repo: SettingsRepository,
     private val routingTranslator: RoutingTranslator,
-    private val llmInstaller: LlmModelInstaller,
     private val overlayFontManager: OverlayFontManager,
-    private val modelDownloadManager: ModelDownloadManager,
 ) : ViewModel() {
-
-    val modelDownloadWorkInfos: Flow<List<WorkInfo>> = modelDownloadManager.workInfos
 
     suspend fun load(): Settings = repo.get()
 
@@ -510,77 +500,6 @@ class SettingsViewModel @Inject constructor(
             current.copy(pinnedLanguages = next)
         }
     }
-
-    // —— 端侧 LLM 翻译 ——
-
-    fun llmDeviceCapable(): Boolean = false
-
-    data class LlmModelUiState(
-        val status: String,
-        val ready: Boolean,
-    )
-
-    fun llmModelUiState(kind: LlmModelKind): LlmModelUiState {
-        val file = llmInstaller.checkInstalled(kind)
-        return if (file != null) {
-            val mb = (file.length() / 1024 / 1024).toInt()
-            LlmModelUiState(
-                status = appContext.getString(R.string.llm_status_ready, "${kind.displayName} · $mb"),
-                ready = true,
-            )
-        } else {
-            LlmModelUiState(
-                status = appContext.getString(R.string.llm_status_missing),
-                ready = false,
-            )
-        }
-    }
-
-    fun llmStatus(kind: LlmModelKind): String = llmModelUiState(kind).status
-
-    fun llmModelReady(kind: LlmModelKind): Boolean = llmModelUiState(kind).ready
-
-    suspend fun downloadLlmModel(kind: LlmModelKind, onProgress: (String) -> Unit) {
-        downloadModels(listOf(ModelDownloadSpec.llm(kind)), onProgress)
-    }
-
-    suspend fun downloadModels(
-        specs: List<ModelDownloadSpec>,
-        onProgress: (String) -> Unit,
-        ownerPresetId: String? = null,
-    ) {
-        modelDownloadManager.enqueueAndAwait(specs, onProgress, ownerPresetId)
-    }
-
-    suspend fun downloadModelsIndependently(
-        specs: List<ModelDownloadSpec>,
-        onProgress: (String) -> Unit,
-        ownerPresetId: String? = null,
-    ) {
-        modelDownloadManager.enqueueIndependentlyAndAwait(specs, onProgress, ownerPresetId)
-    }
-
-    fun cancelModelDownload(workId: java.util.UUID) = modelDownloadManager.cancel(workId)
-
-    fun deleteLlmModel(kind: LlmModelKind): Boolean = llmInstaller.delete(kind)
-
-    suspend fun saveLlmMirror(choice: com.gameocr.app.data.LlmMirrorChoice, customUrl: String) {
-        repo.update { it.copy(localLlmMirror = choice, localLlmMirrorUrl = customUrl.trim()) }
-    }
-
-    suspend fun saveLocalLlmInferenceParams(contextSize: Int, maxNewTokens: Int) {
-        repo.update {
-            it.copy(
-                localLlmContextSize = contextSize.coerceIn(512, 4096),
-                localLlmMaxNewTokens = maxNewTokens.coerceIn(32, 512),
-            )
-        }
-    }
-
-    suspend fun importLlmFromLocal(
-        uris: List<android.net.Uri>,
-        defaultKind: LlmModelKind,
-    ): Int = llmInstaller.importFromLocal(uris, defaultKind)
 
     /**
      * 测试当前 UI 上未保存的翻译引擎配置是否可用。基于已存档的 Settings，把用户在设置页

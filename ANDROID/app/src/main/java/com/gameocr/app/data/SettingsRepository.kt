@@ -128,11 +128,6 @@ class SettingsRepository @Inject constructor(
         val FloatingSkillKey = stringPreferencesKey("floating_button_skill")
         // 划词翻译词典 prompt
         val DictionaryPrompt = stringPreferencesKey("dictionary_prompt")
-        // 端侧 LLM 推理参数
-        val LocalLlmCtxSize = intPreferencesKey("local_llm_ctx_size")
-        val LocalLlmMaxNewTokens = intPreferencesKey("local_llm_max_new_tokens")
-        val LocalLlmMirrorChoice = stringPreferencesKey("local_llm_mirror_choice")
-        val LocalLlmMirror = stringPreferencesKey("local_llm_mirror_url")
         val SharePromptMainEntryCount = intPreferencesKey("share_prompt_main_entry_count")
         val SharePromptShown = booleanPreferencesKey("share_prompt_shown")
         val MainStatusPresetSeen = booleanPreferencesKey("main_status_preset_seen")
@@ -159,7 +154,6 @@ class SettingsRepository @Inject constructor(
         Keys.BaiduFanyiSecretKey,
         Keys.CleartextHosts,
         Keys.DictionaryPrompt,
-        Keys.LocalLlmMirror,
         Keys.TranslationPresets
     )
 
@@ -380,10 +374,6 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.ActiveTranslationPresetId] = next.activeTranslationPresetId
             prefs[Keys.FloatingSkillKey] = next.floatingButtonSkill.name
             prefs.putSecure(Keys.DictionaryPrompt, next.dictionaryPrompt)
-            prefs[Keys.LocalLlmCtxSize] = next.localLlmContextSize
-            prefs[Keys.LocalLlmMaxNewTokens] = next.localLlmMaxNewTokens
-            prefs[Keys.LocalLlmMirrorChoice] = next.localLlmMirror.name
-            prefs.putSecure(Keys.LocalLlmMirror, next.localLlmMirrorUrl)
         }
     }
 
@@ -588,11 +578,6 @@ class SettingsRepository @Inject constructor(
                 Keys.DictionaryPrompt,
                 defaultDictionaryPromptProvider()
             ),
-            localLlmContextSize = this[Keys.LocalLlmCtxSize] ?: default.localLlmContextSize,
-            localLlmMaxNewTokens = this[Keys.LocalLlmMaxNewTokens] ?: default.localLlmMaxNewTokens,
-            localLlmMirror = runCatching { LlmMirrorChoice.valueOf(this[Keys.LocalLlmMirrorChoice] ?: "") }
-                .getOrDefault(default.localLlmMirror),
-            localLlmMirrorUrl = secureString(Keys.LocalLlmMirror, default.localLlmMirrorUrl),
             // runtimeTranslationContext, runtimeTranslationScopePackage, and
             // runtimeTranslationScopeLabel are request-scoped and deliberately never persisted.
         )
