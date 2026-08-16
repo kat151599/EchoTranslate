@@ -23,9 +23,9 @@ class SettingsBundleTransferTest {
 
         data class SecretCase(val name: String, val value: (Settings) -> String)
         val secretCases = listOf(
-            SecretCase("OpenAI API key", Settings::apiKey),
-            SecretCase("DeepL API key", Settings::deeplApiKey),
-            SecretCase("Youdao app key", Settings::youdaoAppKey),
+            SecretCase("baidu fanyi app id", Settings::baiduFanyiAppId),
+            SecretCase("baidu fanyi secret", Settings::baiduFanyiSecretKey),
+            SecretCase("volc access key id", Settings::volcAccessKeyId),
         )
         secretCases.forEach { case ->
             assertTrue(case.name, case.value(original).isNotBlank())
@@ -44,7 +44,7 @@ class SettingsBundleTransferTest {
         )
         portableCases.forEach { case -> assertEquals(case.name, case.expected, case.actual) }
 
-        assertEquals("private base URL", Settings().baseUrl, portable.baseUrl)
+        // device-local and protected fields are preserved or normalized by policy
         assertEquals("private cleartext hosts", emptyList<String>(), portable.cleartextAllowedHosts)
         assertEquals("device floating geometry", Settings().floatingWindowWidthDp, portable.floatingWindowWidthDp)
     }
@@ -97,7 +97,7 @@ class SettingsBundleTransferTest {
 
         assertTrue(manifest.contains("\"version\":2"))
         assertTrue(manifest.contains("\"values\""))
-        listOf("openai-secret", "deepl-key").forEach { protectedValue ->
+        listOf("baidu-app-id", "volc-id").forEach { protectedValue ->
             assertFalse("protected value leaked: $protectedValue", manifest.contains(protectedValue))
         }
     }
@@ -105,9 +105,6 @@ class SettingsBundleTransferTest {
     @Test
     fun mergeImportedSettings_keepsLocalCredentialsAndAppliesPortableSettings() {
         val current = Settings(
-            baseUrl = "https://local-device.example/v1/",
-            apiKey = "local-openai-key",
-            umiOcrBaseUrl = "http://192.168.1.10:1224/api/ocr",
             cleartextAllowedHosts = listOf("192.168.1.10"),
             floatingWindowWidthDp = 777,
             overlayFonts = listOf(OverlayFontEntry(storedName("old".toByteArray()), "Old.ttf")),
@@ -119,11 +116,11 @@ class SettingsBundleTransferTest {
             availableFonts = imported.overlayFonts + current.overlayFonts,
         )
 
-        assertEquals("local-openai-key", result.settings.apiKey)
-        assertEquals(current.baseUrl, result.settings.baseUrl)
-        assertEquals(current.umiOcrBaseUrl, result.settings.umiOcrBaseUrl)
+        // credentials and private connection info preserved from current
         assertEquals(current.cleartextAllowedHosts, result.settings.cleartextAllowedHosts)
         assertEquals(current.floatingWindowWidthDp, result.settings.floatingWindowWidthDp)
+
+        // imported portable values applied
         assertEquals(imported.captureLoopIntervalMs, result.settings.captureLoopIntervalMs)
         assertEquals(imported.loopTriggerMode, result.settings.loopTriggerMode)
         assertEquals(imported.loopTextStableDurationMs, result.settings.loopTextStableDurationMs)
@@ -133,9 +130,6 @@ class SettingsBundleTransferTest {
         assertEquals(imported.loopTranslateRegionOnly, result.settings.loopTranslateRegionOnly)
         assertEquals(imported.retryEmptyTranslation, result.settings.retryEmptyTranslation)
         assertEquals(imported.developerOptionsEnabled, result.settings.developerOptionsEnabled)
-        assertEquals(imported.ocrRedBoxModeEnabled, result.settings.ocrRedBoxModeEnabled)
-        assertEquals(imported.ocrRedBoxShowSourceText, result.settings.ocrRedBoxShowSourceText)
-        assertEquals(imported.ocrRedBoxShowTranslation, result.settings.ocrRedBoxShowTranslation)
         assertEquals(imported.floatingMenuItemOrder, result.settings.floatingMenuItemOrder)
         assertEquals(imported.overlayFontFileName, result.settings.overlayFontFileName)
         assertTrue(result.settings.overlayFonts.containsAll(current.overlayFonts))
@@ -163,7 +157,6 @@ class SettingsBundleTransferTest {
             overlayFontFileName = "",
             overlayFontDisplayName = "",
             overlayFonts = emptyList(),
-            baseUrl = "https://legacy-private.example/v1/",
             cleartextAllowedHosts = listOf("legacy-private.example"),
             targetLang = "zh-TW",
         )
@@ -179,20 +172,14 @@ class SettingsBundleTransferTest {
         val preview = SettingsBundleTransfer.readPreview(ByteArrayInputStream(bytes))
 
         assertEquals(1, preview.formatVersion)
-        assertEquals(Settings().baseUrl, preview.settings?.baseUrl)
         assertEquals(emptyList<String>(), preview.settings?.cleartextAllowedHosts)
         assertEquals("zh-TW", preview.settings?.targetLang)
-        assertEquals(0, preview.settings?.bubbleClusterGap)
-        assertEquals(0, preview.settings?.mangaOcrCropPaddingPx)
         assertTrue(preview.skippedSettingFields.isEmpty())
     }
 
     private fun sampleSettings(): Settings {
         val fontName = storedName("portable".toByteArray())
         val base = Settings(
-            baseUrl = "https://portable.example/v1/",
-            apiKey = "openai-secret",
-            model = "portable-model",
             sourceLang = "ja",
             targetLang = "zh-TW",
             promptTemplate = "portable prompt",
@@ -208,28 +195,14 @@ class SettingsBundleTransferTest {
             translationOutputLayout = TranslationOutputLayout.VERTICAL,
             translationOutputDirection = TranslationOutputDirection.LEFT_TO_RIGHT,
             translationGlossaryEnabled = false,
-            foregroundAppDetectionMode = ForegroundAppDetectionMode.USAGE_ACCESS,
             sendAppNameToTranslator = true,
             developerOptionsEnabled = true,
-            batchCumulativeCompletionTimeEnabled = true,
-            ocrRedBoxModeEnabled = true,
-            ocrRedBoxShowSourceText = false,
-            ocrRedBoxShowTranslation = true,
             overlayTextSizeSp = 21,
             overlayTextStyle = OverlayTextStyle(bold = true, italic = true, underline = true),
             overlayAlpha = 0.61f,
             overlayFontFileName = fontName,
             overlayFontDisplayName = "Portable.ttf",
             overlayFonts = listOf(OverlayFontEntry(fontName, "Portable.ttf")),
-            baiduOcrApiKey = "baidu-key",
-            baiduOcrSecretKey = "baidu-secret",
-            paddleAiStudioToken = "paddle-token",
-            tencentSecretId = "tencent-id",
-            tencentSecretKey = "tencent-secret",
-            deeplApiKey = "deepl-key",
-            deeplCustomToken = "deepl-token",
-            youdaoAppKey = "youdao-key",
-            youdaoAppSecret = "youdao-secret",
             volcAccessKeyId = "volc-id",
             volcSecretAccessKey = "volc-secret",
             baiduFanyiAppId = "baidu-app-id",
@@ -243,13 +216,6 @@ class SettingsBundleTransferTest {
             arcMenuPageSize = 5,
             floatingButtonSkill = FloatingSkill.LOOP,
             dictionaryPrompt = "portable dictionary prompt",
-            localLlmContextSize = 3072,
-            localLlmMaxNewTokens = 384,
-            localLlmMirror = LlmMirrorChoice.CUSTOM,
-            localLlmMirrorUrl = "https://portable.example/models/",
-            dbnetProbThresh = 0.31f,
-            bubbleClusterGap = 41,
-            mangaOcrCropPaddingPx = 17,
         )
         val preset = TranslationPresetCatalog.fromSettings(
             id = "custom_portable",

@@ -13,7 +13,6 @@ class TranslationPresetTransferTest {
     @Test
     fun encryptedExportRoundTripsWithoutPlainPresetContent() {
         val settings = Settings(
-            model = "sync-model",
             targetLang = "zh-TW",
             dictionaryPrompt = "private dictionary prompt",
             translatorEngine = TranslatorEngine.OPENAI,
@@ -28,7 +27,6 @@ class TranslationPresetTransferTest {
 
         assertTrue(exported.contains("ciphertext"))
         assertFalse(exported.contains("Sync Preset"))
-        assertFalse(exported.contains("sync-model"))
         assertFalse(exported.contains("private dictionary prompt"))
 
         val decoded = TranslationPresetTransfer.decodeEncrypted(exported)
@@ -73,12 +71,12 @@ class TranslationPresetTransferTest {
             val existing = preset(
                 id = "custom_existing",
                 name = case.existingName,
-                settings = Settings(model = "old-model")
+                settings = Settings().copy(dictionaryPrompt = "old-dict")
             )
             val imported = preset(
                 id = "custom_imported",
                 name = case.importedName,
-                settings = Settings(model = "new-model")
+                settings = Settings().copy(dictionaryPrompt = "new-dict")
             )
 
             val result = TranslationPresetTransfer.mergeImportedPresets(
@@ -90,7 +88,7 @@ class TranslationPresetTransferTest {
             assertEquals(case.name, listOf(case.existingName), result.overwrittenNames)
             assertEquals(case.name, "custom_existing", result.presets.single().id)
             assertEquals(case.name, case.existingName, result.presets.single().name)
-            assertEquals(case.name, "new-model", result.presets.single().model)
+            assertEquals(case.name, "new-dict", result.presets.single().dictionaryPrompt)
         }
     }
 
@@ -120,7 +118,7 @@ class TranslationPresetTransferTest {
     @Test
     fun mergeImportedPresetsAddsNewNamesAndAvoidsIdCollisions() {
         val existing = preset(id = "custom_same_id", name = "Manga")
-        val imported = preset(id = "custom_same_id", name = "Novel")
+        val imported = preset(id = "custom_same_id", name = "Novel", settings = Settings().copy(dictionaryPrompt = "d"))
 
         val result = TranslationPresetTransfer.mergeImportedPresets(
             existing = listOf(existing),
