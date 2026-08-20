@@ -24,11 +24,12 @@ from pydantic import BaseModel
 
 from .bootstrap import configure_paddlex_cache
 from .config import ROOT, load_config, save_config
-from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, history_translation_hits, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message, create_pending_history_correction, pending_history_corrections, resolve_pending_history_correction
+from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, history_translation_hits, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message, create_pending_history_correction, pending_history_corrections, resolve_pending_history_correction, save_llm_test_run, latest_llm_test_run, llm_model_notes, save_llm_model_note
 from .ocr_engine import ocr_engine, merge_ocr_blocks
 from .token_budget import TokenBudget
 from .prompting import glossary_text, game_glossary_text, target_text, build_messages
 from .llm import translate_openai_compatible, extract_glossary_openai_compatible
+from .model_testing import router as model_testing_router
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -58,6 +59,7 @@ class HistoryCorrectionRequest(BaseModel):
     client_request_id: str | None = None
 
 app = FastAPI(title="Overlay Translation Server", version="1.0.0")
+app.include_router(model_testing_router)
 templates = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
 GAME_IMAGES = ROOT / "uploads" / "game-images"
 GAME_IMAGES.mkdir(parents=True, exist_ok=True)
@@ -107,7 +109,14 @@ async def _maybe_scan_glossary(source_id: str, force: bool = False) -> dict:
         existing = game_glossary(source_id)
         records = "\n".join(f"SOURCE: {row['source_text']}\nTRANSLATION: {row['translation']}" for row in rows)
         messages = [
-            {"role": "system", "content": "Extract only stable game entities: PERSON, LOCATION, ORG, TITLE, ITEM, TERM. Return strict JSON {\"entries\":[{\"source\":\"...\",\"translation\":\"...\",\"type\":\"PERSON\"}]}. Do not include ordinary vocabulary."},
+            {"role": "system", "content": (
+                "You curate a localization CONSISTENCY glossary, not a dictionary. Extract ONLY entries whose translation must remain canonical across the game.\n"
+                "Allowed types: PERSON = proper character/person names; LOCATION = named places; ORG = named organizations/factions/companies; TERM = genuinely game-specific invented/lore/mechanic term that needs one fixed translation.\n"
+                "TERM may include a unique named item, ability, rank or title only when it functions as a proper game term. Never include generic items, generic ranks, ordinary vocabulary, common nouns, verbs, adjectives, pronouns, UI words, idioms, descriptive phrases, dialogue fragments or full sentences.\n"
+                "Do not add a word merely because it is capitalized. If unsure, OMIT it. Prefer an empty list over a questionable entry.\n"
+                "For every entry return stable=true only when the same canonical translation should be reused verbatim. For TERM also return special_term=true only when it is genuinely game-specific.\n"
+                "Return strict JSON: {\"entries\":[{\"source\":\"...\",\"translation\":\"...\",\"type\":\"PERSON|LOCATION|ORG|TERM\",\"confidence\":0.98,\"stable\":true,\"special_term\":false}]}."
+            )},
             {"role": "user", "content": "EXISTING_GLOSSARY:\n" + "\n".join(f"{row['source_text']} => {row['translation']}" for row in existing) + "\n\nNEW_HISTORY:\n" + records},
         ]
         entries = await extract_glossary_openai_compatible(cfg=cfg, messages=messages)
@@ -246,8 +255,7 @@ async def translate_screen(
             glossary_text=glossary,
             target_text=target,
             history_newest_first=history_rows,
-            max_request_tokens=int(cfg["max_request_tokens"]),
-            max_output_tokens=int(cfg["max_output_tokens"]),
+            history_token_limit=int(cfg.get("history_token_limit", 3000)),
         )
     except ValueError as e:
         raise HTTPException(422, str(e))
@@ -261,8 +269,9 @@ async def translate_screen(
     if miss_blocks:
         try:
             logger.info(
-                "CALLING LLM:\neffective_source_lang=%s\neffective_target_lang=%s\nblocks=%s\nhistory_items=%s",
+                "CALLING LLM:\neffective_source_lang=%s\neffective_target_lang=%s\nblocks=%s\nhistory_items=%s\nhistory_tokens=%s\nhistory_token_limit=%s\nprompt_tokens=%s",
                 source_lang, target_lang, len(miss_blocks), len(fitted.history),
+                fitted.history_tokens, int(cfg.get("history_token_limit", 3000)), fitted.prompt_tokens,
             )
             logger.info("LLM BATCH BLOCKS: %s", len(miss_blocks))
             llm_start = time.perf_counter()
@@ -317,9 +326,10 @@ async def translate_screen(
             "session_id": session_id,
             "ocr_blocks": len(blocks),
             "history_items_used": len(fitted.history),
+            "history_tokens_used": fitted.history_tokens,
+            "history_token_limit": int(cfg.get("history_token_limit", 3000)),
             "estimated_prompt_tokens": fitted.prompt_tokens,
-            "reserved_total_tokens": fitted.total_reserved_tokens,
-            "max_request_tokens": int(cfg["max_request_tokens"]),
+            "response_token_limit": int(cfg["max_output_tokens"]),
             "ocr": ocr_engine.diagnostics(),
             "timings": {
                 "decode_ms": decode_ms,
@@ -409,7 +419,7 @@ class SettingsUpdate(BaseModel):
     llm_base_url: str | None = None
     llm_api_key: str | None = None
     llm_model: str | None = None
-    max_request_tokens: int | None = None
+    history_token_limit: int | None = None
     max_output_tokens: int | None = None
     tokenizer_encoding: str | None = None
     history_enabled: bool | None = None
@@ -503,7 +513,7 @@ async def history_glossary_save(source_id: str, request: Request):
     form = await request.form()
     source_text, translation = str(form.get("source_text") or "").strip(), str(form.get("translation") or "").strip()
     kind = str(form.get("type") or "TERM").strip().upper()
-    if not source_text or not translation or kind not in {"PERSON", "LOCATION", "ORG", "TITLE", "ITEM", "TERM"}:
+    if not source_text or not translation or kind not in {"PERSON", "LOCATION", "ORG", "TERM"}:
         raise HTTPException(400, "Заполните оригинал, перевод и корректный тип")
     try:
         entry = save_game_glossary(source_id, source_text, translation, kind, int(form["id"]) if form.get("id") else None)
@@ -511,7 +521,7 @@ async def history_glossary_save(source_id: str, request: Request):
         raise HTTPException(409, f"Не удалось сохранить запись: {e}") from e
     if entry is None:
         raise HTTPException(404, "Glossary entry not found")
-    return {"ok": True, "entry": entry}
+    return {"ok": True, "entry": entry, "updated_history": int(entry.get("history_updates", 0)), "updated_occurrences": int(entry.get("history_replacements", 0))}
 
 
 @app.post("/history/{source_id}/glossary/{entry_id}/delete")
@@ -521,107 +531,9 @@ def history_glossary_delete(source_id: str, entry_id: int):
     return {"ok": True}
 
 
-@app.get("/llm-test", response_class=HTMLResponse)
-async def llm_test_page(request: Request):
-    cfg = load_config()
-    base_url = str(cfg.get("llm_base_url", "")).strip().rstrip("/")
-    api_key = str(cfg.get("llm_api_key", "")).strip()
-    models: list[str] = []
-    error = ""
-    if not base_url.startswith(("http://", "https://")):
-        error = "Сначала настройте текущего LLM-провайдера."
-    else:
-        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
-        try:
-            async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.get(f"{base_url}/models", headers=headers)
-            response.raise_for_status()
-            models = sorted(str(item["id"]) for item in response.json().get("data", []) if isinstance(item, dict) and item.get("id"))
-        except (httpx.HTTPError, ValueError, KeyError) as e:
-            active_profile = (cfg.get("llm_profiles") or {}).get(cfg.get("active_llm_profile"), {})
-            models = [str(item) for item in active_profile.get("llm_models", []) if str(item)]
-            error = "" if models else f"Не удалось получить модели: {e}"
-    return templates.TemplateResponse("llm_test.html", {"request": request, "models": models, "selected_model": str(cfg.get("llm_model") or ""), "error": error})
-
-
-@app.get("/llm-test/history-entries")
-def llm_test_history_entries():
-    rows = list_test_history_messages()
-    if not rows:
-        raise HTTPException(404, "История пока пуста")
-    return rows
-
-
-@app.post("/llm-test/select")
-async def llm_test_select_model(request: Request):
-    model = str((await request.json()).get("model") or "").strip()
-    if not model:
-        raise HTTPException(400, "Модель не указана")
-    save_config({"llm_model": model})
-    return {"ok": True, "model": model}
-
-
 def _llm_test_provider_id(cfg: dict) -> str:
     profile = str(cfg.get("active_llm_profile") or "").strip()
     return f"profile:{profile}" if profile else f"base_url:{str(cfg.get('llm_base_url') or '').strip().rstrip('/')}"
-
-
-@app.get("/llm-test/model-history")
-def llm_test_history(model: str):
-    rows = llm_test_model_history(_llm_test_provider_id(load_config()), model)
-    runs: dict[str, dict] = {}
-    for row in rows:
-        run = runs.setdefault(row["test_run_id"], {"test_run_id": row["test_run_id"], "created_at": row["created_at"], "results": []})
-        run["results"].append(row)
-    output = []
-    for run in runs.values():
-        run["results"].reverse()
-        successful = [float(item["duration_ms"]) for item in run["results"] if item["duration_ms"] is not None and not item["error"]]
-        run["phrase_count"] = len(run["results"])
-        run["average_ms"] = round(sum(successful) / len(successful), 2) if successful else None
-        output.append(run)
-    return output
-
-
-@app.post("/llm-test/{message_id}/run")
-async def llm_test_model(message_id: int, request: Request):
-    payload = await request.json()
-    model = str(payload.get("model") or "").strip()
-    test_run_id = str(payload.get("test_run_id") or "").strip()
-    if not model or not test_run_id:
-        raise HTTPException(400, "Модель или test_run_id не указаны")
-    cfg = load_config().copy()
-    row = history_message_by_id(message_id)
-    if row is None:
-        raise HTTPException(404, "Запись истории не найдена")
-    source_lang = str(row.get("language") or "auto")
-    target_lang = str(row.get("target_language") or cfg.get("target_lang", "ru"))
-    target = target_text([SimpleNamespace(source=row["source_text"])], source_lang, target_lang)
-    context_rows = history_context_before(row["source_id"], row["session_id"], message_id, 1000) if cfg.get("history_enabled", True) else []
-    glossary = glossary_text(cfg)
-    started: float | None = None
-    duration_ms: float | None = None
-    translation: str | None = None
-    try:
-        fitted = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).fit_history(
-            system_prompt=cfg["system_prompt"], glossary_text=glossary, target_text=target,
-            history_newest_first=context_rows, max_request_tokens=int(cfg["max_request_tokens"]), max_output_tokens=int(cfg["max_output_tokens"]),
-        )
-        cfg["llm_model"] = model
-        started = time.perf_counter()
-        translations = await translate_openai_compatible(cfg=cfg, messages=build_messages(cfg, fitted.history, glossary, target))
-        duration_ms = round((time.perf_counter() - started) * 1000, 2)
-        translation = str(translations.get(0) or "").strip()
-        if not translation:
-            raise ValueError("Модель не вернула перевод")
-    except Exception as e:
-        if started is not None and duration_ms is None:
-            duration_ms = round((time.perf_counter() - started) * 1000, 2)
-        add_llm_test_result(_llm_test_provider_id(cfg), model, test_run_id, message_id, row["source_text"], None, duration_ms, str(e), row["source_id"], row["session_id"])
-        logger.exception("LLM comparison failed message_id=%s model=%s", message_id, model)
-        raise HTTPException(502, f"LLM request failed: {e}") from e
-    add_llm_test_result(_llm_test_provider_id(cfg), model, test_run_id, message_id, row["source_text"], translation, duration_ms, None, row["source_id"], row["session_id"])
-    return {"translation": translation, "duration_ms": duration_ms}
 
 
 @app.post("/history/{source_id}/clear")
@@ -665,8 +577,7 @@ async def history_retranslate_message(source_id: str, message_id: int):
             glossary_text=glossary_text(cfg),
             target_text=target,
             history_newest_first=history_rows,
-            max_request_tokens=int(cfg["max_request_tokens"]),
-            max_output_tokens=int(cfg["max_output_tokens"]),
+            history_token_limit=int(cfg.get("history_token_limit", 3000)),
         )
         messages = build_messages(cfg, fitted.history, glossary_text(cfg), target)
         if not str(cfg.get("llm_api_key") or "").strip() and "localhost" not in str(cfg.get("llm_base_url", "")) and "127.0.0.1" not in str(cfg.get("llm_base_url", "")):
@@ -702,8 +613,7 @@ async def mobile_history_retranslate(history_id: int, _: None = Security(check_a
     try:
         fitted = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).fit_history(
             system_prompt=cfg["system_prompt"], glossary_text=glossary, target_text=target,
-            history_newest_first=context_rows, max_request_tokens=int(cfg["max_request_tokens"]),
-            max_output_tokens=int(cfg["max_output_tokens"]),
+            history_newest_first=context_rows, history_token_limit=int(cfg.get("history_token_limit", 3000)),
         )
         if not str(cfg.get("llm_api_key") or "").strip() and "localhost" not in str(cfg.get("llm_base_url", "")) and "127.0.0.1" not in str(cfg.get("llm_base_url", "")):
             raise HTTPException(503, "LLM API key is not configured")
@@ -864,7 +774,7 @@ async def admin_settings(request: Request):
         "ocr_backend": str(form.get("ocr_backend", cfg.get("ocr_backend", "paddle_cpu"))).strip(),
         "ocr_fallback_to_paddle": form.get("ocr_fallback_to_paddle") == "on",
         "ocr_merge_horizontal_blocks": form.get("ocr_merge_horizontal_blocks") == "on",
-        "max_request_tokens": int(form.get("max_request_tokens", cfg.get("max_request_tokens", 12000))),
+        "history_token_limit": max(0, int(form.get("history_token_limit", cfg.get("history_token_limit", 3000)))),
         "max_output_tokens": int(form.get("max_output_tokens", cfg.get("max_output_tokens", 1200))),
         "tokenizer_encoding": str(form.get("tokenizer_encoding", cfg.get("tokenizer_encoding", "o200k_base"))).strip(),
         "history_enabled": form.get("history_enabled") == "on",

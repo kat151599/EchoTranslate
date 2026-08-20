@@ -13,7 +13,7 @@
   "llm_api_key": "",
   "llm_model": "gpt-4.1-mini",
   "llm_timeout_seconds": 90,
-  "max_request_tokens": 12000,
+  "history_token_limit": 3000,
   "max_output_tokens": 1200,
   "tokenizer_encoding": "o200k_base",
   "history_enabled": true,

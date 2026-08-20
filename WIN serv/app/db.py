@@ -1,4 +1,6 @@
 from __future__ import annotations
+import json
+import re
 import sqlite3
 import threading
 from pathlib import Path
@@ -67,6 +69,50 @@ def init_db() -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_llm_test_results_lookup
             ON llm_test_results(provider_id, model, test_run_id, id DESC);
+        CREATE TABLE IF NOT EXISTS llm_test_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider_id TEXT NOT NULL,
+            test_run_id TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            models_json TEXT NOT NULL,
+            phrases_json TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            UNIQUE(provider_id, test_run_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_llm_test_runs_restore
+            ON llm_test_runs(provider_id, mode, id DESC);
+        CREATE TABLE IF NOT EXISTS llm_model_notes (
+            provider_id TEXT NOT NULL,
+            model TEXT NOT NULL,
+            note TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY(provider_id, model)
+        );
+        CREATE TABLE IF NOT EXISTS llm_model_metadata (
+            provider_id TEXT NOT NULL,
+            model TEXT NOT NULL,
+            input_price_per_m REAL,
+            output_price_per_m REAL,
+            context_length INTEGER,
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            PRIMARY KEY(provider_id, model)
+        );
+        CREATE TABLE IF NOT EXISTS llm_benchmark_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            provider_id TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            mode TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            status TEXT NOT NULL DEFAULT 'running',
+            settings_json TEXT NOT NULL,
+            state_json TEXT NOT NULL,
+            reserved_cost_usd REAL NOT NULL DEFAULT 0,
+            estimated_actual_cost_usd REAL NOT NULL DEFAULT 0,
+            UNIQUE(provider_id, run_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_llm_benchmark_runs_latest
+            ON llm_benchmark_runs(provider_id, mode, id DESC);
         CREATE TABLE IF NOT EXISTS game_glossary (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             source_id TEXT NOT NULL,
@@ -103,6 +149,13 @@ def init_db() -> None:
         """)
         columns = {row[1] for row in con.execute("PRAGMA table_info(messages)")}
         source_columns = {row[1] for row in con.execute("PRAGMA table_info(history_sources)")}
+        test_result_columns = {row[1] for row in con.execute("PRAGMA table_info(llm_test_results)")}
+        if "history_items" not in test_result_columns:
+            con.execute("ALTER TABLE llm_test_results ADD COLUMN history_items INTEGER")
+        if "history_tokens" not in test_result_columns:
+            con.execute("ALTER TABLE llm_test_results ADD COLUMN history_tokens INTEGER")
+        if "prompt_tokens" not in test_result_columns:
+            con.execute("ALTER TABLE llm_test_results ADD COLUMN prompt_tokens INTEGER")
         if "image_path" not in source_columns:
             con.execute("ALTER TABLE history_sources ADD COLUMN image_path TEXT")
         if "target_language" not in columns:
@@ -312,23 +365,156 @@ def add_llm_test_result(
     provider_id: str, model: str, test_run_id: str, phrase_id: int,
     source_text: str, translation: str | None, duration_ms: float | None,
     error: str | None, source_id: str, session_id: str,
+    history_items: int | None = None, history_tokens: int | None = None,
+    prompt_tokens: int | None = None,
 ) -> None:
     with _lock, connect() as con:
         con.execute(
-            "INSERT INTO llm_test_results(provider_id, model, test_run_id, phrase_id, source_text, translation, duration_ms, error, source_id, session_id) "
-            "VALUES(?,?,?,?,?,?,?,?,?,?)",
-            (provider_id, model, test_run_id, phrase_id, source_text, translation, duration_ms, error, source_id, session_id),
+            "INSERT INTO llm_test_results(provider_id, model, test_run_id, phrase_id, source_text, translation, duration_ms, error, source_id, session_id, history_items, history_tokens, prompt_tokens) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                provider_id, model, test_run_id, phrase_id, source_text, translation,
+                duration_ms, error, source_id, session_id,
+                history_items, history_tokens, prompt_tokens,
+            ),
         )
 
 
 def llm_test_model_history(provider_id: str, model: str) -> list[dict]:
     with connect() as con:
         rows = con.execute(
-            "SELECT test_run_id, created_at, phrase_id, source_text, translation, duration_ms, error "
+            "SELECT test_run_id, created_at, phrase_id, source_text, translation, duration_ms, error, "
+            "history_items, history_tokens, prompt_tokens "
             "FROM llm_test_results WHERE provider_id=? AND model=? ORDER BY id DESC",
             (provider_id, model),
         ).fetchall()
     return [dict(row) for row in rows]
+
+
+def save_llm_test_run(
+    provider_id: str,
+    test_run_id: str,
+    mode: str,
+    models: list[str],
+    phrases: list[dict],
+) -> None:
+    with _lock, connect() as con:
+        con.execute(
+            "INSERT INTO llm_test_runs(provider_id, test_run_id, mode, models_json, phrases_json) "
+            "VALUES(?,?,?,?,?) "
+            "ON CONFLICT(provider_id, test_run_id) DO UPDATE SET "
+            "mode=excluded.mode, models_json=excluded.models_json, phrases_json=excluded.phrases_json",
+            (
+                provider_id,
+                test_run_id,
+                mode,
+                json.dumps(models, ensure_ascii=False),
+                json.dumps(phrases, ensure_ascii=False),
+            ),
+        )
+
+
+def _llm_test_run_results(con: sqlite3.Connection, provider_id: str, test_run_id: str) -> list[dict]:
+    rows = con.execute(
+        "SELECT model, phrase_id, source_text, translation, duration_ms, error, "
+        "history_items, history_tokens, prompt_tokens "
+        "FROM llm_test_results WHERE provider_id=? AND test_run_id=? ORDER BY id",
+        (provider_id, test_run_id),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def latest_llm_test_run(provider_id: str) -> dict | None:
+    with connect() as con:
+        row = con.execute(
+            "SELECT test_run_id, created_at, models_json, phrases_json "
+            "FROM llm_test_runs WHERE provider_id=? AND mode='all' ORDER BY id DESC LIMIT 1",
+            (provider_id,),
+        ).fetchone()
+        if row is not None:
+            return {
+                "test_run_id": row["test_run_id"],
+                "created_at": row["created_at"],
+                "models": json.loads(row["models_json"] or "[]"),
+                "phrases": json.loads(row["phrases_json"] or "[]"),
+                "results": _llm_test_run_results(con, provider_id, row["test_run_id"]),
+                "legacy": False,
+            }
+
+        # Compatibility with test runs created before llm_test_runs existed.
+        legacy = con.execute(
+            "SELECT r.test_run_id, MIN(r.created_at) AS created_at, MAX(r.id) AS last_id "
+            "FROM llm_test_results AS r WHERE r.provider_id=? "
+            "AND NOT EXISTS ("
+            "SELECT 1 FROM llm_test_runs AS saved "
+            "WHERE saved.provider_id=r.provider_id AND saved.test_run_id=r.test_run_id"
+            ") GROUP BY r.test_run_id ORDER BY last_id DESC LIMIT 1",
+            (provider_id,),
+        ).fetchone()
+        if legacy is None:
+            return None
+        results = _llm_test_run_results(con, provider_id, legacy["test_run_id"])
+        models: list[str] = []
+        phrase_ids: list[int] = []
+        for item in results:
+            model = str(item.get("model") or "")
+            if model and model not in models:
+                models.append(model)
+            phrase_id = item.get("phrase_id")
+            if phrase_id is not None and int(phrase_id) not in phrase_ids:
+                phrase_ids.append(int(phrase_id))
+
+        phrase_rows: dict[int, dict] = {}
+        if phrase_ids:
+            placeholders = ",".join("?" for _ in phrase_ids)
+            rows = con.execute(
+                f"SELECT id, source_id, source_name, session_id, source_text, translation "
+                f"FROM messages WHERE id IN ({placeholders})",
+                phrase_ids,
+            ).fetchall()
+            phrase_rows = {int(item["id"]): dict(item) for item in rows}
+        phrases: list[dict] = []
+        for phrase_id in phrase_ids:
+            item = phrase_rows.get(phrase_id)
+            if item is None:
+                old_result = next((r for r in results if int(r.get("phrase_id") or -1) == phrase_id), None)
+                item = {
+                    "id": phrase_id,
+                    "source_id": "",
+                    "source_name": "",
+                    "session_id": "",
+                    "source_text": str((old_result or {}).get("source_text") or ""),
+                    "translation": "",
+                }
+            phrases.append(item)
+        return {
+            "test_run_id": legacy["test_run_id"],
+            "created_at": legacy["created_at"],
+            "models": models,
+            "phrases": phrases,
+            "results": results,
+            "legacy": True,
+        }
+
+
+def llm_model_notes(provider_id: str) -> dict[str, str]:
+    with connect() as con:
+        rows = con.execute(
+            "SELECT model, note FROM llm_model_notes WHERE provider_id=? ORDER BY model",
+            (provider_id,),
+        ).fetchall()
+    return {str(row["model"]): str(row["note"] or "") for row in rows}
+
+
+def save_llm_model_note(provider_id: str, model: str, note: str) -> str:
+    note = str(note).rstrip()
+    with _lock, connect() as con:
+        con.execute(
+            "INSERT INTO llm_model_notes(provider_id, model, note, updated_at) VALUES(?,?,?,datetime('now')) "
+            "ON CONFLICT(provider_id, model) DO UPDATE SET note=excluded.note, updated_at=datetime('now')",
+            (provider_id, model, note),
+        )
+    return note
 
 
 def game_glossary(source_id: str) -> list[dict]:
@@ -357,37 +543,232 @@ def update_glossary_state(source_id: str, checkpoint: int, pending_tokens: int =
         con.execute("INSERT INTO glossary_source_state(source_id, glossary_scanned_until_history_id, glossary_pending_tokens) VALUES(?,?,?) ON CONFLICT(source_id) DO UPDATE SET glossary_scanned_until_history_id=excluded.glossary_scanned_until_history_id, glossary_pending_tokens=excluded.glossary_pending_tokens", (source_id, checkpoint, pending_tokens))
 
 
+AUTO_GLOSSARY_TYPES = {"PERSON", "LOCATION", "ORG", "TERM"}
+MANUAL_GLOSSARY_TYPES = AUTO_GLOSSARY_TYPES
+
+
+def _glossary_term_pattern(term: str, *, ignore_case: bool = False) -> re.Pattern[str]:
+    value = str(term or "").strip()
+    if not value:
+        return re.compile(r"(?!x)x")
+    pattern = re.escape(value)
+    if value[0].isalnum() or value[0] == "_":
+        pattern = r"(?<!\w)" + pattern
+    if value[-1].isalnum() or value[-1] == "_":
+        pattern += r"(?!\w)"
+    flags = re.UNICODE | (re.IGNORECASE if ignore_case else 0)
+    return re.compile(pattern, flags)
+
+
+def _bool_field(value: object) -> bool:
+    if value is True:
+        return True
+    if isinstance(value, str):
+        return value.strip().lower() in {"true", "1", "yes"}
+    return False
+
+
+def _float_field(value: object) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _compact_glossary_value(value: str, max_chars: int = 96, max_words: int = 6) -> bool:
+    text = str(value or "").strip()
+    if not text or len(text) > max_chars or any(ch in text for ch in "\r\n\t"):
+        return False
+    words = re.findall(r"[^\W_]+(?:['’\-][^\W_]+)*", text, flags=re.UNICODE)
+    if not words or len(words) > max_words:
+        return False
+    # Sentences and dialogue fragments do not belong in a consistency glossary.
+    if "?" in text or "!" in text:
+        return False
+    if text.endswith(".") and len(words) > 2:
+        return False
+    return True
+
+
+def _history_term_occurrences(con: sqlite3.Connection, source_id: str, term: str, stop_after: int = 2) -> int:
+    pattern = _glossary_term_pattern(term, ignore_case=True)
+    count = 0
+    rows = con.execute(
+        "SELECT source_text FROM messages WHERE source_id=? AND instr(lower(source_text), lower(?)) > 0 ORDER BY id DESC",
+        (source_id, term),
+    )
+    for row in rows:
+        if pattern.search(str(row["source_text"] or "")):
+            count += 1
+            if count >= stop_after:
+                break
+    return count
+
+
+def _valid_auto_glossary_candidate(con: sqlite3.Connection, source_id: str, entry: dict) -> tuple[str, str, str] | None:
+    source = str(entry.get("source") or "").strip()
+    translation = str(entry.get("translation") or "").strip()
+    kind = str(entry.get("type") or "").strip().upper()
+    if kind not in AUTO_GLOSSARY_TYPES:
+        return None
+    if not _bool_field(entry.get("stable")):
+        return None
+    confidence = _float_field(entry.get("confidence"))
+    required_confidence = 0.93 if kind == "TERM" else 0.88
+    if confidence < required_confidence:
+        return None
+    if not _compact_glossary_value(source) or not _compact_glossary_value(translation, max_chars=120, max_words=8):
+        return None
+    if kind == "TERM":
+        if not _bool_field(entry.get("special_term")):
+            return None
+        # A one-off word does not need a consistency glossary yet. When it appears
+        # again, the full history check below will allow it automatically.
+        if _history_term_occurrences(con, source_id, source, stop_after=2) < 2:
+            return None
+    return source, translation, kind
+
+
+def _propagate_glossary_translation(
+    con: sqlite3.Connection,
+    source_id: str,
+    old_source: str,
+    new_source: str,
+    old_translation: str,
+    new_translation: str,
+) -> tuple[int, int]:
+    if not old_translation or old_translation == new_translation:
+        return 0, 0
+
+    source_patterns = []
+    for term in (old_source, new_source):
+        term = str(term or "").strip()
+        if term and term not in {old_source if source_patterns else ""}:
+            source_patterns.append(_glossary_term_pattern(term, ignore_case=True))
+    translation_pattern = _glossary_term_pattern(old_translation, ignore_case=False)
+    updated_rows = 0
+    replaced_occurrences = 0
+
+    rows = con.execute(
+        "SELECT id, session_id, screen_hash, source_text, translation FROM messages WHERE source_id=? ORDER BY id",
+        (source_id,),
+    ).fetchall()
+    for row in rows:
+        source_text = str(row["source_text"] or "")
+        if source_patterns and not any(pattern.search(source_text) for pattern in source_patterns):
+            continue
+        current_translation = str(row["translation"] or "")
+        changed_translation, replacements = translation_pattern.subn(new_translation, current_translation)
+        if not replacements or changed_translation == current_translation:
+            continue
+        con.execute(
+            "UPDATE messages SET translation=?, token_count=NULL WHERE id=? AND source_id=?",
+            (changed_translation, row["id"], source_id),
+        )
+        if row["screen_hash"]:
+            con.execute(
+                "DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?",
+                (source_id, row["session_id"], row["screen_hash"]),
+            )
+        updated_rows += 1
+        replaced_occurrences += int(replacements)
+    return updated_rows, replaced_occurrences
+
+
 def merge_game_glossary(source_id: str, entries: list[dict]) -> tuple[int, int, list[dict]]:
     added = conflicts = 0
     added_entries: list[dict] = []
     with _lock, connect() as con:
         for entry in entries:
-            source = str(entry.get("source") or "").strip()
-            translation = str(entry.get("translation") or "").strip()
-            kind = str(entry.get("type") or "TERM").strip().upper()
-            if not source or not translation or kind not in {"PERSON", "LOCATION", "ORG", "TITLE", "ITEM", "TERM"}:
+            candidate = _valid_auto_glossary_candidate(con, source_id, entry)
+            if candidate is None:
                 continue
-            old = con.execute("SELECT translation, status FROM game_glossary WHERE source_id=? AND source_text=?", (source_id, source)).fetchone()
+            source, translation, kind = candidate
+            old = con.execute(
+                "SELECT translation, status FROM game_glossary WHERE source_id=? AND source_text=?",
+                (source_id, source),
+            ).fetchone()
             if old is None:
-                cursor = con.execute("INSERT INTO game_glossary(source_id, source_text, translation, type, status) VALUES(?,?,?,?, 'AUTO')", (source_id, source, translation, kind))
+                cursor = con.execute(
+                    "INSERT INTO game_glossary(source_id, source_text, translation, type, status) VALUES(?,?,?,?, 'AUTO')",
+                    (source_id, source, translation, kind),
+                )
                 added += 1
-                added_entries.append({"id": int(cursor.lastrowid), "source_text": source, "translation": translation, "type": kind, "status": "AUTO"})
+                added_entries.append({
+                    "id": int(cursor.lastrowid),
+                    "source_text": source,
+                    "translation": translation,
+                    "type": kind,
+                    "status": "AUTO",
+                })
             elif old["status"] != "LOCKED" and old["translation"] != translation:
-                con.execute("UPDATE game_glossary SET status='CONFLICT', updated_at=datetime('now') WHERE source_id=? AND source_text=?", (source_id, source))
+                con.execute(
+                    "UPDATE game_glossary SET status='CONFLICT', updated_at=datetime('now') WHERE source_id=? AND source_text=?",
+                    (source_id, source),
+                )
                 conflicts += 1
     return added, conflicts, added_entries
 
 
 def save_game_glossary(source_id: str, source_text: str, translation: str, kind: str, entry_id: int | None = None) -> dict | None:
+    source_text = str(source_text or "").strip()
+    translation = str(translation or "").strip()
+    kind = str(kind or "").strip().upper()
+    if not source_text or not translation or kind not in MANUAL_GLOSSARY_TYPES:
+        raise ValueError("Некорректная запись глоссария")
+
     with _lock, connect() as con:
+        previous = None
         if entry_id is None:
-            con.execute("INSERT INTO game_glossary(source_id, source_text, translation, type, status) VALUES(?,?,?,?, 'LOCKED') ON CONFLICT(source_id, source_text) DO UPDATE SET translation=excluded.translation, type=excluded.type, status='LOCKED', updated_at=datetime('now')", (source_id, source_text, translation, kind))
-            row = con.execute("SELECT id, source_text, translation, type, status FROM game_glossary WHERE source_id=? AND source_text=?", (source_id, source_text)).fetchone()
+            previous = con.execute(
+                "SELECT id, source_text, translation FROM game_glossary WHERE source_id=? AND source_text=?",
+                (source_id, source_text),
+            ).fetchone()
+            con.execute(
+                "INSERT INTO game_glossary(source_id, source_text, translation, type, status) "
+                "VALUES(?,?,?,?, 'LOCKED') ON CONFLICT(source_id, source_text) DO UPDATE SET "
+                "translation=excluded.translation, type=excluded.type, status='LOCKED', updated_at=datetime('now')",
+                (source_id, source_text, translation, kind),
+            )
+            row = con.execute(
+                "SELECT id, source_text, translation, type, status FROM game_glossary WHERE source_id=? AND source_text=?",
+                (source_id, source_text),
+            ).fetchone()
         else:
-            if not con.execute("UPDATE game_glossary SET source_text=?, translation=?, type=?, status='LOCKED', updated_at=datetime('now') WHERE id=? AND source_id=?", (source_text, translation, kind, entry_id, source_id)).rowcount:
+            previous = con.execute(
+                "SELECT id, source_text, translation FROM game_glossary WHERE id=? AND source_id=?",
+                (entry_id, source_id),
+            ).fetchone()
+            if previous is None:
                 return None
-            row = con.execute("SELECT id, source_text, translation, type, status FROM game_glossary WHERE id=? AND source_id=?", (entry_id, source_id)).fetchone()
-    return dict(row) if row else None
+            if not con.execute(
+                "UPDATE game_glossary SET source_text=?, translation=?, type=?, status='LOCKED', updated_at=datetime('now') "
+                "WHERE id=? AND source_id=?",
+                (source_text, translation, kind, entry_id, source_id),
+            ).rowcount:
+                return None
+            row = con.execute(
+                "SELECT id, source_text, translation, type, status FROM game_glossary WHERE id=? AND source_id=?",
+                (entry_id, source_id),
+            ).fetchone()
+
+        updated_rows = replaced_occurrences = 0
+        if previous is not None and str(previous["translation"]) != translation:
+            updated_rows, replaced_occurrences = _propagate_glossary_translation(
+                con,
+                source_id,
+                str(previous["source_text"]),
+                source_text,
+                str(previous["translation"]),
+                translation,
+            )
+
+    if row is None:
+        return None
+    result = dict(row)
+    result["history_updates"] = updated_rows
+    result["history_replacements"] = replaced_occurrences
+    return result
 
 
 def delete_game_glossary(source_id: str, entry_id: int) -> bool:

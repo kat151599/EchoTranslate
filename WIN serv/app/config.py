@@ -26,6 +26,9 @@ def _apply_defaults(cfg: dict[str, Any]) -> dict[str, Any]:
     cfg.setdefault("ocr_fallback_to_paddle", True)
     cfg.setdefault("ocr_min_confidence", 0.70)
     cfg.setdefault("ocr_merge_horizontal_blocks", True)
+    # Retire the old global prompt ceiling. Only HISTORY has its own input budget.
+    cfg.pop("max_request_tokens", None)
+    cfg.setdefault("history_token_limit", 3000)
     if not cfg.get("system_prompt_profiles"):
         cfg["system_prompt_profiles"] = [{"id": "default", "name": "Default", "prompt": str(cfg.get("system_prompt") or "")}]
     cfg.setdefault("active_system_prompt_profile_id", cfg["system_prompt_profiles"][0]["id"])
@@ -55,7 +58,7 @@ def save_config(updates: dict[str, Any]) -> dict[str, Any]:
             "ocr_backend", "ocr_fallback_to_paddle", "ocr_merge_horizontal_blocks",
             "llm_base_url", "llm_api_key", "llm_model", "llm_timeout_seconds",
             "llm_profiles", "active_llm_profile",
-            "max_request_tokens", "max_output_tokens", "tokenizer_encoding",
+            "history_token_limit", "max_output_tokens", "tokenizer_encoding",
             "history_enabled", "glossary_enabled", "system_prompt", "glossary",
             "cache_identical_screen", "system_prompt_profiles", "active_system_prompt_profile_id"
         }

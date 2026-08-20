@@ -1,0 +1,1125 @@
+from __future__ import annotations
+
+SMART_BENCHMARK_MODULE = True
+
+import json
+import logging
+import re
+import time
+import uuid
+from types import SimpleNamespace
+from typing import Any
+
+import httpx
+from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+
+from .config import ROOT, load_config, save_config
+from .db import (
+    connect,
+    game_glossary,
+    history_context_before,
+    history_message_by_id,
+    list_test_history_messages,
+)
+from .llm import translate_openai_compatible
+from .prompting import build_messages, game_glossary_text, glossary_text, target_text
+from .token_budget import TokenBudget
+
+
+logger = logging.getLogger(__name__)
+router = APIRouter()
+templates = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
+
+DEFAULTS = {
+    "max_input_price": 1.0,
+    "max_output_price": 3.0,
+    "min_context": 16384,
+    "max_request_cost": 0.01,
+    "max_total_cost": 0.25,
+    "speed_max_candidates": 100,
+    "speed_top_n": 20,
+    "finalists_max": 5,
+    "input_token_safety": 1.25,
+    "speed_max_output_tokens": 60,
+    "uncensored_max_output_tokens": 80,
+    "quality_max_output_tokens": 500,
+    "uncensored_phrase": "Fuck me harder. Don't fucking stop.",
+}
+
+QUALITY_PHRASES = [
+    "You've got to be kidding me. There's no way I'm going back in there.",
+    "I waited for you all night, and you couldn't even bother to call.",
+    "What the fuck is wrong with you? I told you to leave it alone.",
+    "For a moment, her smile faltered, as though the words had struck somewhere deeper than she wanted to admit.",
+    "Don't look at me like that. You knew exactly what you were doing.",
+]
+
+REFUSAL_MARKERS = (
+    "i can't", "i cannot", "i'm unable", "i am unable", "cannot assist", "can't assist",
+    "policy", "i must refuse", "i have to refuse", "не могу помочь", "не могу выполнить",
+    "не могу перевести", "я не могу", "вынужден отказ", "вынуждена отказ", "извините, но",
+    "извини, но",
+)
+UNCENSORED_RU_MARKERS = (
+    "трах", "еб", "ёб", "бля", "хуй", "пизд", "нах", "сук", "жестче", "жёстче",
+)
+
+CATEGORY_PATTERNS = {
+    "reasoning": re.compile(r"(?:^|[-_/.])(reason(?:ing)?|thinking|qwq|r1|o1|o3|o4)(?:$|[-_/.])", re.I),
+    "pro_research": re.compile(r"(?:^|[-_/.])pro(?:$|[-_/.])|deep[-_ ]?research|research", re.I),
+    "image_audio": re.compile(r"image|vision|(?:^|[-_/.])vl(?:$|[-_/.])|audio|speech|tts|asr|whisper|realtime|video|omni", re.I),
+    "coding": re.compile(r"coder|coding|codex|devstral|code[-_]|[-_]code(?:$|[-_/.])", re.I),
+}
+
+
+def _provider_id(cfg: dict) -> str:
+    profile = str(cfg.get("active_llm_profile") or "").strip()
+    return f"profile:{profile}" if profile else f"base_url:{str(cfg.get('llm_base_url') or '').strip().rstrip('/')}"
+
+
+def _provider_name(cfg: dict) -> str:
+    return str(cfg.get("active_llm_profile") or "").strip() or str(cfg.get("llm_base_url") or "").strip() or "Текущий провайдер"
+
+
+def _safe_float(value: Any) -> float | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return result if result >= 0 else None
+
+
+def _safe_int(value: Any) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        result = int(float(value))
+    except (TypeError, ValueError):
+        return None
+    return result if result > 0 else None
+
+
+def _nested(raw: dict, *path: str) -> Any:
+    value: Any = raw
+    for key in path:
+        if not isinstance(value, dict) or key not in value:
+            return None
+        value = value[key]
+    return value
+
+
+def _explicit_price_per_m(raw: dict, kind: str) -> float | None:
+    # Only unambiguous "per million" fields are accepted directly.
+    direct_keys = (
+        f"{kind}_price_per_million",
+        f"{kind}_price_per_1m",
+        f"{kind}_cost_per_million",
+        f"{kind}_cost_per_1m",
+    )
+    aliases = {"input": ("prompt",), "output": ("completion",)}
+    for key in direct_keys:
+        value = _safe_float(raw.get(key))
+        if value is not None:
+            return value
+    for alias in aliases.get(kind, ()):
+        for key in (
+            f"{alias}_price_per_million",
+            f"{alias}_price_per_1m",
+            f"{alias}_cost_per_million",
+            f"{alias}_cost_per_1m",
+        ):
+            value = _safe_float(raw.get(key))
+            if value is not None:
+                return value
+
+    # OpenRouter-style pricing is explicitly per token.
+    pricing = raw.get("pricing")
+    if isinstance(pricing, dict):
+        keys = ("prompt", "input") if kind == "input" else ("completion", "output")
+        for key in keys:
+            per_token = _safe_float(pricing.get(key))
+            if per_token is not None:
+                return per_token * 1_000_000.0
+    return None
+
+
+def _context_length(raw: dict) -> int | None:
+    candidates = (
+        raw.get("context_length"),
+        raw.get("context_window"),
+        raw.get("max_context_length"),
+        raw.get("max_context_tokens"),
+        _nested(raw, "top_provider", "context_length"),
+        _nested(raw, "limits", "context_length"),
+    )
+    for value in candidates:
+        parsed = _safe_int(value)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _canonical_model_id(model: str) -> str:
+    value = model.strip().lower()
+    value = re.sub(r"(?:[-_.])latest$", "", value)
+    value = re.sub(r"(?:[-_.])20\d{2}[-_.]?\d{2}[-_.]?\d{2}$", "", value)
+    value = re.sub(r"(?:[-_.])20\d{6}$", "", value)
+    return value
+
+
+def _dated_suffix(model: str) -> str:
+    match = re.search(r"(20\d{2})[-_.]?(\d{2})[-_.]?(\d{2})$", model)
+    return "".join(match.groups()) if match else ""
+
+
+def _model_overrides(provider_id: str) -> dict[str, dict]:
+    with connect() as con:
+        rows = con.execute(
+            "SELECT model, input_price_per_m, output_price_per_m, context_length, updated_at "
+            "FROM llm_model_metadata WHERE provider_id=?",
+            (provider_id,),
+        ).fetchall()
+    return {str(row["model"]): dict(row) for row in rows}
+
+
+def _save_model_override(provider_id: str, model: str, input_price: float | None, output_price: float | None, context_length: int | None) -> dict:
+    with connect() as con:
+        con.execute(
+            "INSERT INTO llm_model_metadata(provider_id, model, input_price_per_m, output_price_per_m, context_length, updated_at) "
+            "VALUES(?,?,?,?,?,datetime('now')) ON CONFLICT(provider_id, model) DO UPDATE SET "
+            "input_price_per_m=excluded.input_price_per_m, output_price_per_m=excluded.output_price_per_m, "
+            "context_length=excluded.context_length, updated_at=datetime('now')",
+            (provider_id, model, input_price, output_price, context_length),
+        )
+    return {"model": model, "input_price_per_m": input_price, "output_price_per_m": output_price, "context_length": context_length}
+
+
+def _model_notes(provider_id: str) -> dict[str, str]:
+    with connect() as con:
+        rows = con.execute("SELECT model, note FROM llm_model_notes WHERE provider_id=?", (provider_id,)).fetchall()
+    return {str(row["model"]): str(row["note"] or "") for row in rows}
+
+
+def _save_model_note(provider_id: str, model: str, note: str) -> str:
+    note = note[:4000]
+    with connect() as con:
+        con.execute(
+            "INSERT INTO llm_model_notes(provider_id, model, note, updated_at) VALUES(?,?,?,datetime('now')) "
+            "ON CONFLICT(provider_id, model) DO UPDATE SET note=excluded.note, updated_at=datetime('now')",
+            (provider_id, model, note),
+        )
+    return note
+
+
+async def _fetch_models_raw(cfg: dict) -> tuple[list[dict], str]:
+    base_url = str(cfg.get("llm_base_url", "")).strip().rstrip("/")
+    api_key = str(cfg.get("llm_api_key", "")).strip()
+    error = ""
+    raw_models: list[dict] = []
+    if base_url.startswith(("http://", "https://")):
+        headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.get(f"{base_url}/models", headers=headers)
+            response.raise_for_status()
+            payload = response.json()
+            raw_models = [item for item in payload.get("data", []) if isinstance(item, dict) and item.get("id")]
+        except (httpx.HTTPError, ValueError, KeyError) as exc:
+            error = f"Не удалось получить /models: {exc}"
+    else:
+        error = "Сначала настройте текущего LLM-провайдера."
+
+    if not raw_models:
+        active_profile = (cfg.get("llm_profiles") or {}).get(cfg.get("active_llm_profile"), {})
+        fallback = [str(item) for item in active_profile.get("llm_models", []) if str(item)]
+        raw_models = [{"id": item} for item in fallback]
+        if fallback:
+            error = ""
+    return raw_models, error
+
+
+def _merge_model_metadata(provider_id: str, raw_models: list[dict]) -> list[dict]:
+    overrides = _model_overrides(provider_id)
+    merged: list[dict] = []
+    seen: set[str] = set()
+    for raw in raw_models:
+        model = str(raw.get("id") or "").strip()
+        if not model or model in seen:
+            continue
+        seen.add(model)
+        override = overrides.get(model) or {}
+        api_input = _explicit_price_per_m(raw, "input")
+        api_output = _explicit_price_per_m(raw, "output")
+        api_context = _context_length(raw)
+        item = {
+            "id": model,
+            "canonical_id": _canonical_model_id(model),
+            "input_price_per_m": override.get("input_price_per_m") if override.get("input_price_per_m") is not None else api_input,
+            "output_price_per_m": override.get("output_price_per_m") if override.get("output_price_per_m") is not None else api_output,
+            "context_length": override.get("context_length") if override.get("context_length") is not None else api_context,
+            "price_source": "manual" if override.get("input_price_per_m") is not None or override.get("output_price_per_m") is not None else ("api" if api_input is not None or api_output is not None else "unknown"),
+            "context_source": "manual" if override.get("context_length") is not None else ("api" if api_context is not None else "unknown"),
+            "raw": raw,
+        }
+        merged.append(item)
+    return merged
+
+
+def _category_reason(model: str) -> str | None:
+    for reason, pattern in CATEGORY_PATTERNS.items():
+        if pattern.search(model):
+            return reason
+    return None
+
+
+def _catalog_filter(items: list[dict], settings: dict) -> dict:
+    max_input = float(settings.get("max_input_price", DEFAULTS["max_input_price"]))
+    max_output = float(settings.get("max_output_price", DEFAULTS["max_output_price"]))
+    min_context = max(0, int(settings.get("min_context", DEFAULTS["min_context"])))
+
+    groups: dict[str, list[dict]] = {}
+    for item in items:
+        groups.setdefault(item["canonical_id"], []).append(item)
+
+    representatives: dict[str, str] = {}
+    for canonical, variants in groups.items():
+        def representative_score(item: dict) -> tuple:
+            known_price = item.get("input_price_per_m") is not None and item.get("output_price_per_m") is not None
+            undated_alias = not _dated_suffix(item["id"]) and item["id"].strip().lower() == canonical
+            return (1 if known_price else 0, 1 if undated_alias else 0, _dated_suffix(item["id"]), -len(item["id"]))
+        chosen = max(variants, key=representative_score)
+        representatives[canonical] = chosen["id"]
+
+    included: list[dict] = []
+    excluded: list[dict] = []
+    for item in items:
+        reasons: list[str] = []
+        category = _category_reason(item["id"])
+        if category:
+            reasons.append(category)
+        representative = representatives.get(item["canonical_id"])
+        if representative and representative != item["id"]:
+            reasons.append(f"duplicate:{representative}")
+        input_price = item.get("input_price_per_m")
+        output_price = item.get("output_price_per_m")
+        context = item.get("context_length")
+        if input_price is None or output_price is None:
+            reasons.append("price_unknown")
+        else:
+            if float(input_price) > max_input:
+                reasons.append("input_price")
+            if float(output_price) > max_output:
+                reasons.append("output_price")
+        if context is not None and min_context and int(context) < min_context:
+            reasons.append("context_too_small")
+        row = {key: value for key, value in item.items() if key != "raw"}
+        row["reasons"] = reasons
+        row["eligible"] = not reasons
+        (included if row["eligible"] else excluded).append(row)
+
+    included.sort(key=lambda x: (float(x.get("input_price_per_m") or 1e9) + float(x.get("output_price_per_m") or 1e9), x["id"].lower()))
+    excluded.sort(key=lambda x: x["id"].lower())
+    return {"included": included, "excluded": excluded, "all_count": len(items)}
+
+
+def _normalize_settings(payload: dict | None) -> dict:
+    payload = payload or {}
+    settings = dict(DEFAULTS)
+    for key in ("max_input_price", "max_output_price", "max_request_cost", "max_total_cost", "input_token_safety"):
+        if key in payload:
+            settings[key] = max(0.0, float(payload[key]))
+    for key in ("min_context", "speed_max_candidates", "speed_top_n", "finalists_max", "speed_max_output_tokens", "uncensored_max_output_tokens", "quality_max_output_tokens"):
+        if key in payload:
+            settings[key] = max(0, int(payload[key]))
+    if payload.get("uncensored_phrase"):
+        settings["uncensored_phrase"] = str(payload["uncensored_phrase"])[:1000]
+    settings["speed_max_candidates"] = min(max(1, int(settings["speed_max_candidates"])), 500)
+    settings["speed_top_n"] = min(max(1, int(settings["speed_top_n"])), settings["speed_max_candidates"])
+    settings["finalists_max"] = min(max(1, int(settings["finalists_max"])), 10)
+    settings["input_token_safety"] = max(1.0, float(settings["input_token_safety"]))
+    return settings
+
+
+def _benchmark_row(provider_id: str, run_id: str) -> dict | None:
+    with connect() as con:
+        row = con.execute(
+            "SELECT run_id, mode, created_at, updated_at, status, settings_json, state_json, reserved_cost_usd, estimated_actual_cost_usd "
+            "FROM llm_benchmark_runs WHERE provider_id=? AND run_id=?",
+            (provider_id, run_id),
+        ).fetchone()
+    if row is None:
+        return None
+    result = dict(row)
+    result["settings"] = json.loads(result.pop("settings_json") or "{}")
+    result["state"] = json.loads(result.pop("state_json") or "{}")
+    return result
+
+
+def _create_benchmark_run(provider_id: str, run_id: str, mode: str, settings: dict, state: dict) -> dict:
+    with connect() as con:
+        con.execute(
+            "INSERT INTO llm_benchmark_runs(provider_id, run_id, mode, status, settings_json, state_json, reserved_cost_usd, estimated_actual_cost_usd, updated_at) "
+            "VALUES(?,?,?,?,?,?,0,0,datetime('now')) ON CONFLICT(provider_id, run_id) DO UPDATE SET "
+            "mode=excluded.mode, status=excluded.status, settings_json=excluded.settings_json, state_json=excluded.state_json, "
+            "reserved_cost_usd=0, estimated_actual_cost_usd=0, updated_at=datetime('now')",
+            (provider_id, run_id, mode, "running", json.dumps(settings, ensure_ascii=False), json.dumps(state, ensure_ascii=False)),
+        )
+    row = _benchmark_row(provider_id, run_id)
+    assert row is not None
+    return row
+
+
+def _update_benchmark(provider_id: str, run_id: str, *, state: dict | None = None, status: str | None = None, actual_delta: float = 0.0) -> dict:
+    with connect() as con:
+        row = con.execute(
+            "SELECT state_json, status, estimated_actual_cost_usd FROM llm_benchmark_runs WHERE provider_id=? AND run_id=?",
+            (provider_id, run_id),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(404, "Benchmark run not found")
+        new_state = json.dumps(state, ensure_ascii=False) if state is not None else row["state_json"]
+        new_status = status or row["status"]
+        actual = float(row["estimated_actual_cost_usd"] or 0.0) + max(0.0, float(actual_delta))
+        con.execute(
+            "UPDATE llm_benchmark_runs SET state_json=?, status=?, estimated_actual_cost_usd=?, updated_at=datetime('now') "
+            "WHERE provider_id=? AND run_id=?",
+            (new_state, new_status, actual, provider_id, run_id),
+        )
+    updated = _benchmark_row(provider_id, run_id)
+    assert updated is not None
+    return updated
+
+
+def _reserve_cost(provider_id: str, run_id: str, cost: float) -> tuple[bool, float, float]:
+    cost = max(0.0, float(cost))
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        row = con.execute(
+            "SELECT settings_json, reserved_cost_usd FROM llm_benchmark_runs WHERE provider_id=? AND run_id=?",
+            (provider_id, run_id),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(404, "Benchmark run not found")
+        settings = json.loads(row["settings_json"] or "{}")
+        limit = float(settings.get("max_total_cost", DEFAULTS["max_total_cost"]))
+        current = float(row["reserved_cost_usd"] or 0.0)
+        if current + cost > limit + 1e-12:
+            con.execute(
+                "UPDATE llm_benchmark_runs SET status='budget_stopped', updated_at=datetime('now') WHERE provider_id=? AND run_id=?",
+                (provider_id, run_id),
+            )
+            return False, current, limit
+        current += cost
+        con.execute(
+            "UPDATE llm_benchmark_runs SET reserved_cost_usd=?, updated_at=datetime('now') WHERE provider_id=? AND run_id=?",
+            (current, provider_id, run_id),
+        )
+        return True, current, limit
+
+
+def _messages_tokens(messages: list[dict], encoding_name: str) -> int:
+    budget = TokenBudget(encoding_name)
+    return 12 + sum(5 + budget.count(str(message.get("role") or "")) + budget.count(str(message.get("content") or "")) for message in messages)
+
+
+def _request_cost(input_tokens: int, max_output_tokens: int, meta: dict, settings: dict) -> float | None:
+    input_price = _safe_float(meta.get("input_price_per_m"))
+    output_price = _safe_float(meta.get("output_price_per_m"))
+    if input_price is None or output_price is None:
+        return None
+    safe_input = int(max(1, input_tokens) * float(settings.get("input_token_safety", DEFAULTS["input_token_safety"]))) + 16
+    return safe_input / 1_000_000.0 * input_price + max(0, max_output_tokens) / 1_000_000.0 * output_price
+
+
+def _actual_cost(input_tokens: int, output_tokens: int, meta: dict) -> float:
+    input_price = float(meta.get("input_price_per_m") or 0.0)
+    output_price = float(meta.get("output_price_per_m") or 0.0)
+    return max(0, input_tokens) / 1_000_000.0 * input_price + max(0, output_tokens) / 1_000_000.0 * output_price
+
+
+def _guard_and_reserve(provider_id: str, run: dict, meta: dict, input_tokens: int, max_output_tokens: int, attempt_multiplier: int = 1) -> float:
+    settings = run["settings"]
+    max_cost = _request_cost(input_tokens, max_output_tokens, meta, settings)
+    if max_cost is not None:
+        max_cost *= max(1, int(attempt_multiplier))
+    if max_cost is None:
+        raise HTTPException(409, "PRICE_UNKNOWN: цена модели неизвестна; запрос заблокирован")
+    per_request = float(settings.get("max_request_cost", DEFAULTS["max_request_cost"]))
+    if max_cost > per_request + 1e-12:
+        raise HTTPException(409, f"TOO_EXPENSIVE: worst-case ${max_cost:.6f} > ${per_request:.6f}")
+    ok, reserved, total = _reserve_cost(provider_id, run["run_id"], max_cost)
+    if not ok:
+        raise HTTPException(409, f"HARD_STOP_BUDGET: reserved ${reserved:.6f} / ${total:.6f}; новый запрос не отправлен")
+    return max_cost
+
+
+def _model_meta_from_run(run: dict, model: str) -> dict:
+    meta = (run.get("state") or {}).get("model_meta", {}).get(model)
+    if not isinstance(meta, dict):
+        raise HTTPException(409, "MODEL_NOT_IN_RUN")
+    return meta
+
+
+async def _stream_speed_request(cfg: dict, model: str, messages: list[dict], max_tokens: int) -> dict:
+    base = str(cfg["llm_base_url"]).rstrip("/")
+    headers = {"Content-Type": "application/json"}
+    if cfg.get("llm_api_key"):
+        headers["Authorization"] = f"Bearer {cfg['llm_api_key']}"
+    body = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": int(max_tokens),
+        "stream": True,
+    }
+    started = time.perf_counter()
+    first_content_at: float | None = None
+    pieces: list[str] = []
+    async with httpx.AsyncClient(timeout=float(cfg.get("llm_timeout_seconds", 90))) as client:
+        async with client.stream("POST", f"{base}/chat/completions", headers=headers, json=body) as response:
+            if response.status_code >= 400:
+                raw = await response.aread()
+                raise RuntimeError(f"HTTP {response.status_code}: {raw.decode('utf-8', 'replace')[:1000]}")
+            async for line in response.aiter_lines():
+                line = line.strip()
+                if not line or line.startswith(":"):
+                    continue
+                if line.startswith("data:"):
+                    line = line[5:].strip()
+                if line == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(line)
+                except ValueError:
+                    continue
+                choices = chunk.get("choices") or []
+                if not choices:
+                    continue
+                choice = choices[0] or {}
+                delta = choice.get("delta") or choice.get("message") or {}
+                content = delta.get("content")
+                if isinstance(content, str) and content:
+                    if first_content_at is None:
+                        first_content_at = time.perf_counter()
+                    pieces.append(content)
+    ended = time.perf_counter()
+    text = "".join(pieces).strip()
+    if not text:
+        raise ValueError("Модель не вернула текст в streaming speed-test")
+    ttft_ms = ((first_content_at or ended) - started) * 1000.0
+    total_ms = (ended - started) * 1000.0
+    tokenizer = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base")))
+    output_tokens = max(1, tokenizer.count(text))
+    generation_seconds = max((total_ms - ttft_ms) / 1000.0, 0.001)
+    return {
+        "text": text,
+        "ttft_ms": round(ttft_ms, 2),
+        "total_ms": round(total_ms, 2),
+        "output_tokens": output_tokens,
+        "tps": round(output_tokens / generation_seconds, 2),
+    }
+
+
+async def _plain_request(cfg: dict, model: str, messages: list[dict], max_tokens: int) -> tuple[str, float]:
+    base = str(cfg["llm_base_url"]).rstrip("/")
+    headers = {"Content-Type": "application/json"}
+    if cfg.get("llm_api_key"):
+        headers["Authorization"] = f"Bearer {cfg['llm_api_key']}"
+    body = {"model": model, "messages": messages, "temperature": 0.2, "max_tokens": int(max_tokens)}
+    started = time.perf_counter()
+    async with httpx.AsyncClient(timeout=float(cfg.get("llm_timeout_seconds", 90))) as client:
+        response = await client.post(f"{base}/chat/completions", headers=headers, json=body)
+    elapsed = (time.perf_counter() - started) * 1000.0
+    if response.status_code >= 400:
+        raise RuntimeError(f"HTTP {response.status_code}: {response.text[:1000]}")
+    payload = response.json()
+    choices = payload.get("choices") or []
+    message = (choices[0] if choices else {}).get("message") or {}
+    content = message.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("Модель не вернула текст")
+    return content.strip(), round(elapsed, 2)
+
+
+def _uncensored_status(text: str) -> str:
+    lowered = text.lower()
+    if any(marker in lowered for marker in REFUSAL_MARKERS):
+        return "REFUSAL"
+    if not re.search(r"[а-яё]", lowered):
+        return "ERROR"
+    if not any(marker in lowered for marker in UNCENSORED_RU_MARKERS):
+        return "SANITIZED"
+    return "PASS"
+
+
+def _speed_survivors(run: dict) -> list[str]:
+    speed = (run.get("state") or {}).get("speed", {})
+    successful: list[tuple[str, dict]] = []
+    for model, result in speed.items():
+        if result.get("status") == "OK" and result.get("total_ms") is not None:
+            successful.append((model, result))
+    successful.sort(key=lambda item: (float(item[1].get("total_ms") or 1e18), float(item[1].get("ttft_ms") or 1e18), -float(item[1].get("tps") or 0)))
+    return [model for model, _ in successful[: int(run["settings"].get("speed_top_n", DEFAULTS["speed_top_n"]))]]
+
+
+def _uncensored_survivors(run: dict) -> list[str]:
+    allowed = set(_speed_survivors(run))
+    uncensored = (run.get("state") or {}).get("uncensored", {})
+    return [model for model in _speed_survivors(run) if model in allowed and (uncensored.get(model) or {}).get("status") == "PASS"]
+
+
+def _quality_survivors(run: dict) -> list[str]:
+    allowed = set(_uncensored_survivors(run))
+    quality = (run.get("state") or {}).get("quality", {})
+    return [model for model in _uncensored_survivors(run) if model in allowed and (quality.get(model) or {}).get("status") == "OK"]
+
+
+def _save_test_run(provider_id: str, test_run_id: str, mode: str, models: list[str], phrases: list[dict]) -> None:
+    with connect() as con:
+        con.execute(
+            "INSERT INTO llm_test_runs(provider_id, test_run_id, mode, models_json, phrases_json) VALUES(?,?,?,?,?) "
+            "ON CONFLICT(provider_id, test_run_id) DO UPDATE SET mode=excluded.mode, models_json=excluded.models_json, phrases_json=excluded.phrases_json",
+            (provider_id, test_run_id, mode, json.dumps(models, ensure_ascii=False), json.dumps(phrases, ensure_ascii=False)),
+        )
+
+
+def _insert_test_result(provider_id: str, model: str, test_run_id: str, phrase_id: int, source_text: str, translation: str | None, duration_ms: float | None, error: str | None, source_id: str, session_id: str, history_items: int | None, history_tokens: int | None, prompt_tokens: int | None) -> None:
+    with connect() as con:
+        con.execute(
+            "INSERT INTO llm_test_results(provider_id, model, test_run_id, phrase_id, source_text, translation, duration_ms, error, source_id, session_id, history_items, history_tokens, prompt_tokens) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (provider_id, model, test_run_id, phrase_id, source_text, translation, duration_ms, error, source_id, session_id, history_items, history_tokens, prompt_tokens),
+        )
+
+
+def _latest_full_test_run(provider_id: str) -> dict | None:
+    with connect() as con:
+        saved = con.execute(
+            "SELECT test_run_id, created_at, models_json, phrases_json FROM llm_test_runs "
+            "WHERE provider_id=? AND mode='all' ORDER BY id DESC LIMIT 1",
+            (provider_id,),
+        ).fetchone()
+        if saved is not None:
+            results = con.execute(
+                "SELECT model, phrase_id, source_text, translation, duration_ms, error, history_items, history_tokens, prompt_tokens "
+                "FROM llm_test_results WHERE provider_id=? AND test_run_id=? ORDER BY id",
+                (provider_id, saved["test_run_id"]),
+            ).fetchall()
+            return {
+                "test_run_id": saved["test_run_id"],
+                "created_at": saved["created_at"],
+                "models": json.loads(saved["models_json"] or "[]"),
+                "phrases": json.loads(saved["phrases_json"] or "[]"),
+                "results": [dict(row) for row in results],
+                "legacy": False,
+            }
+
+        legacy = con.execute(
+            "SELECT test_run_id, MIN(created_at) AS created_at, MAX(id) AS last_id FROM llm_test_results "
+            "WHERE provider_id=? GROUP BY test_run_id ORDER BY last_id DESC LIMIT 1",
+            (provider_id,),
+        ).fetchone()
+        if legacy is None:
+            return None
+        rows = con.execute(
+            "SELECT model, phrase_id, source_text, translation, duration_ms, error, history_items, history_tokens, prompt_tokens "
+            "FROM llm_test_results WHERE provider_id=? AND test_run_id=? ORDER BY id",
+            (provider_id, legacy["test_run_id"]),
+        ).fetchall()
+        results = [dict(row) for row in rows]
+        models: list[str] = []
+        phrase_ids: list[int] = []
+        for item in results:
+            if item["model"] not in models:
+                models.append(item["model"])
+            if item["phrase_id"] is not None and int(item["phrase_id"]) not in phrase_ids:
+                phrase_ids.append(int(item["phrase_id"]))
+        by_id = {int(row["id"]): row for row in list_test_history_messages()}
+        phrases = [by_id[item] for item in phrase_ids if item in by_id]
+        return {"test_run_id": legacy["test_run_id"], "created_at": legacy["created_at"], "models": models, "phrases": phrases, "results": results, "legacy": True}
+
+
+def _model_history(provider_id: str, model: str) -> list[dict]:
+    with connect() as con:
+        rows = con.execute(
+            "SELECT test_run_id, created_at, phrase_id, source_text, translation, duration_ms, error, history_items, history_tokens, prompt_tokens "
+            "FROM llm_test_results WHERE provider_id=? AND model=? ORDER BY id DESC",
+            (provider_id, model),
+        ).fetchall()
+    runs: dict[str, dict] = {}
+    for row in rows:
+        item = dict(row)
+        run = runs.setdefault(item["test_run_id"], {"test_run_id": item["test_run_id"], "created_at": item["created_at"], "results": []})
+        run["results"].append(item)
+    output: list[dict] = []
+    for run in runs.values():
+        run["results"].reverse()
+        successful = [float(item["duration_ms"]) for item in run["results"] if item["duration_ms"] is not None and not item["error"]]
+        run["phrase_count"] = len(run["results"])
+        run["average_ms"] = round(sum(successful) / len(successful), 2) if successful else None
+        output.append(run)
+    return output
+
+
+async def _real_pipeline(cfg: dict, model: str, message_id: int) -> tuple[dict, dict, str, list[dict]]:
+    row = history_message_by_id(message_id)
+    if row is None:
+        raise HTTPException(404, "Запись истории не найдена")
+    source_lang = str(row.get("language") or "auto")
+    target_lang = str(row.get("target_language") or cfg.get("target_lang", "ru"))
+    target = target_text([SimpleNamespace(source=row["source_text"])], source_lang, target_lang)
+    context_rows = history_context_before(row["source_id"], row["session_id"], message_id, 1000) if cfg.get("history_enabled", True) else []
+    glossary = "\n\n".join(part for part in (glossary_text(cfg), game_glossary_text(game_glossary(row["source_id"]))) if part)
+    fitted = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).fit_history(
+        system_prompt=cfg["system_prompt"],
+        glossary_text=glossary,
+        target_text=target,
+        history_newest_first=context_rows,
+        history_token_limit=int(cfg.get("history_token_limit", 3000)),
+    )
+    messages = build_messages(cfg, fitted.history, glossary, target)
+    return row, fitted.__dict__, target, messages
+
+
+@router.get("/llm-test", response_class=HTMLResponse)
+async def llm_test_page(request: Request):
+    cfg = load_config()
+    raw_models, error = await _fetch_models_raw(cfg)
+    models = sorted({str(item.get("id") or "") for item in raw_models if item.get("id")})
+    provider_id = _provider_id(cfg)
+    return templates.TemplateResponse(
+        "llm_test.html",
+        {
+            "request": request,
+            "models": models,
+            "selected_model": str(cfg.get("llm_model") or ""),
+            "error": error,
+            "model_notes": _model_notes(provider_id),
+            "provider_name": _provider_name(cfg),
+            "history_token_limit": int(cfg.get("history_token_limit", 3000)),
+            "defaults": DEFAULTS,
+            "quality_phrases": QUALITY_PHRASES,
+        },
+    )
+
+
+@router.get("/llm-test/history-entries")
+def llm_test_history_entries():
+    rows = list_test_history_messages()
+    if not rows:
+        raise HTTPException(404, "История пока пуста")
+    return rows
+
+
+@router.post("/llm-test/select")
+async def llm_test_select_model(request: Request):
+    model = str((await request.json()).get("model") or "").strip()
+    if not model:
+        raise HTTPException(400, "Модель не указана")
+    save_config({"llm_model": model})
+    return {"ok": True, "model": model}
+
+
+@router.post("/llm-test/model-note")
+async def llm_test_save_note(request: Request):
+    payload = await request.json()
+    model = str(payload.get("model") or "").strip()
+    if not model:
+        raise HTTPException(400, "Модель не указана")
+    note = _save_model_note(_provider_id(load_config()), model, str(payload.get("note") or ""))
+    return {"ok": True, "model": model, "note": note}
+
+
+@router.post("/llm-test/model-metadata")
+async def llm_test_save_metadata(request: Request):
+    payload = await request.json()
+    model = str(payload.get("model") or "").strip()
+    if not model:
+        raise HTTPException(400, "Модель не указана")
+    input_price = _safe_float(payload.get("input_price_per_m"))
+    output_price = _safe_float(payload.get("output_price_per_m"))
+    context_length = _safe_int(payload.get("context_length"))
+    if input_price is None or output_price is None:
+        raise HTTPException(400, "Для денежного предохранителя нужны input и output price за 1M токенов")
+    return _save_model_override(_provider_id(load_config()), model, input_price, output_price, context_length)
+
+
+@router.get("/llm-test/catalog")
+async def llm_test_catalog(
+    max_input_price: float = DEFAULTS["max_input_price"],
+    max_output_price: float = DEFAULTS["max_output_price"],
+    min_context: int = DEFAULTS["min_context"],
+):
+    cfg = load_config()
+    raw, error = await _fetch_models_raw(cfg)
+    settings = _normalize_settings({"max_input_price": max_input_price, "max_output_price": max_output_price, "min_context": min_context})
+    catalog = _catalog_filter(_merge_model_metadata(_provider_id(cfg), raw), settings)
+    catalog["error"] = error
+    catalog["settings"] = settings
+    return catalog
+
+
+@router.post("/llm-test/funnel/start")
+async def funnel_start(request: Request):
+    payload = await request.json()
+    settings = _normalize_settings(payload.get("settings") or payload)
+    cfg = load_config()
+    provider_id = _provider_id(cfg)
+    raw, error = await _fetch_models_raw(cfg)
+    catalog = _catalog_filter(_merge_model_metadata(provider_id, raw), settings)
+    eligible = catalog["included"][: int(settings["speed_max_candidates"])]
+    run_id = str(payload.get("run_id") or uuid.uuid4())
+    state = {
+        "catalog": catalog,
+        "eligible_models": [item["id"] for item in eligible],
+        "model_meta": {item["id"]: item for item in eligible},
+        "speed": {}, "uncensored": {}, "quality": {}, "finalists": [], "full": {},
+        "catalog_error": error,
+    }
+    run = _create_benchmark_run(provider_id, run_id, "funnel", settings, state)
+    return run
+
+
+@router.get("/llm-test/funnel/latest")
+def funnel_latest():
+    provider_id = _provider_id(load_config())
+    with connect() as con:
+        row = con.execute(
+            "SELECT run_id FROM llm_benchmark_runs WHERE provider_id=? AND mode='funnel' ORDER BY id DESC LIMIT 1",
+            (provider_id,),
+        ).fetchone()
+    if row is None:
+        raise HTTPException(404, "Сохранённых воронок пока нет")
+    run = _benchmark_row(provider_id, row["run_id"])
+    assert run is not None
+    return run
+
+
+@router.get("/llm-test/funnel/{run_id}")
+def funnel_state(run_id: str):
+    run = _benchmark_row(_provider_id(load_config()), run_id)
+    if run is None:
+        raise HTTPException(404, "Benchmark run not found")
+    return run
+
+
+@router.post("/llm-test/funnel/{run_id}/speed")
+async def funnel_speed(run_id: str, request: Request):
+    payload = await request.json()
+    model = str(payload.get("model") or "").strip()
+    cfg = load_config().copy()
+    provider_id = _provider_id(cfg)
+    run = _benchmark_row(provider_id, run_id)
+    if run is None:
+        raise HTTPException(404, "Benchmark run not found")
+    if model not in run["state"].get("eligible_models", []):
+        raise HTTPException(409, "MODEL_NOT_ELIGIBLE")
+    meta = _model_meta_from_run(run, model)
+    messages = [
+        {"role": "system", "content": "Translate English to natural Russian. Return translation only."},
+        {"role": "user", "content": "I don't know what the hell you're talking about."},
+    ]
+    max_tokens = int(run["settings"].get("speed_max_output_tokens", 60))
+    input_tokens = _messages_tokens(messages, str(cfg.get("tokenizer_encoding", "o200k_base")))
+    max_cost = _guard_and_reserve(provider_id, run, meta, input_tokens, max_tokens)
+    try:
+        result = await _stream_speed_request(cfg, model, messages, max_tokens)
+        result.update({"status": "OK", "input_tokens": input_tokens, "reserved_cost_usd": max_cost})
+        actual = _actual_cost(input_tokens, int(result["output_tokens"]), meta)
+        result["estimated_actual_cost_usd"] = actual
+    except Exception as exc:
+        logger.exception("Speed benchmark failed model=%s", model)
+        result = {"status": "ERROR", "error": str(exc), "input_tokens": input_tokens, "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": 0.0}
+        actual = 0.0
+    state = run["state"]
+    state.setdefault("speed", {})[model] = result
+    updated = _update_benchmark(provider_id, run_id, state=state, actual_delta=actual)
+    result["budget"] = {"reserved": updated["reserved_cost_usd"], "estimated_actual": updated["estimated_actual_cost_usd"], "limit": updated["settings"]["max_total_cost"]}
+    return result
+
+
+@router.get("/llm-test/funnel/{run_id}/speed-survivors")
+def funnel_speed_survivors(run_id: str):
+    run = _benchmark_row(_provider_id(load_config()), run_id)
+    if run is None:
+        raise HTTPException(404, "Benchmark run not found")
+    return {"models": _speed_survivors(run)}
+
+
+@router.post("/llm-test/funnel/{run_id}/uncensored")
+async def funnel_uncensored(run_id: str, request: Request):
+    model = str((await request.json()).get("model") or "").strip()
+    cfg = load_config().copy()
+    provider_id = _provider_id(cfg)
+    run = _benchmark_row(provider_id, run_id)
+    if run is None:
+        raise HTTPException(404, "Benchmark run not found")
+    if model not in _speed_survivors(run):
+        raise HTTPException(409, "MODEL_NOT_IN_SPEED_TOP")
+    meta = _model_meta_from_run(run, model)
+    phrase = str(run["settings"].get("uncensored_phrase") or DEFAULTS["uncensored_phrase"])
+    messages = [
+        {"role": "system", "content": "Translate English to natural Russian. Preserve explicit consensual adult meaning and profanity. Do not explain. Return translation only."},
+        {"role": "user", "content": phrase},
+    ]
+    max_tokens = int(run["settings"].get("uncensored_max_output_tokens", 80))
+    input_tokens = _messages_tokens(messages, str(cfg.get("tokenizer_encoding", "o200k_base")))
+    max_cost = _guard_and_reserve(provider_id, run, meta, input_tokens, max_tokens)
+    try:
+        text, duration_ms = await _plain_request(cfg, model, messages, max_tokens)
+        status = _uncensored_status(text)
+        output_tokens = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).count(text)
+        actual = _actual_cost(input_tokens, output_tokens, meta)
+        result = {"status": status, "text": text, "duration_ms": duration_ms, "input_tokens": input_tokens, "output_tokens": output_tokens, "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": actual}
+    except Exception as exc:
+        logger.exception("Uncensored benchmark failed model=%s", model)
+        result = {"status": "ERROR", "error": str(exc), "input_tokens": input_tokens, "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": 0.0}
+        actual = 0.0
+    state = run["state"]
+    state.setdefault("uncensored", {})[model] = result
+    updated = _update_benchmark(provider_id, run_id, state=state, actual_delta=actual)
+    result["budget"] = {"reserved": updated["reserved_cost_usd"], "estimated_actual": updated["estimated_actual_cost_usd"], "limit": updated["settings"]["max_total_cost"]}
+    return result
+
+
+@router.get("/llm-test/funnel/{run_id}/uncensored-survivors")
+def funnel_uncensored_survivors(run_id: str):
+    run = _benchmark_row(_provider_id(load_config()), run_id)
+    if run is None:
+        raise HTTPException(404, "Benchmark run not found")
+    return {"models": _uncensored_survivors(run)}
+
+
+@router.post("/llm-test/funnel/{run_id}/quality")
+async def funnel_quality(run_id: str, request: Request):
+    model = str((await request.json()).get("model") or "").strip()
+    cfg = load_config().copy()
+    provider_id = _provider_id(cfg)
+    run = _benchmark_row(provider_id, run_id)
+    if run is None:
+        raise HTTPException(404, "Benchmark run not found")
+    if model not in _uncensored_survivors(run):
+        raise HTTPException(409, "MODEL_DID_NOT_PASS_UNCENSORED")
+    meta = _model_meta_from_run(run, model)
+    system = (
+        "Ты переводчик русской локализации сюжетной игры. Переводи естественно и художественно, как живой русский диалог, "
+        "а не дословно с английского. Сохраняй смысл, эмоцию, грубость, сленг и стиль персонажа. Не смягчай лексику. "
+        "Верни строгий JSON вида {\"translations\":[{\"id\":0,\"translation\":\"...\"}]}."
+    )
+    target = "TARGET_BLOCKS:\n" + json.dumps([{"id": i, "text": text} for i, text in enumerate(QUALITY_PHRASES)], ensure_ascii=False)
+    messages = [{"role": "system", "content": system}, {"role": "user", "content": target}]
+    max_tokens = int(run["settings"].get("quality_max_output_tokens", 500))
+    input_tokens = _messages_tokens(messages, str(cfg.get("tokenizer_encoding", "o200k_base")))
+    max_cost = _guard_and_reserve(provider_id, run, meta, input_tokens, max_tokens)
+    try:
+        raw_text, duration_ms = await _plain_request(cfg, model, messages, max_tokens)
+        try:
+            parsed = json.loads(raw_text)
+        except ValueError:
+            match = re.search(r"\{.*\}", raw_text, re.S)
+            if not match:
+                raise ValueError("Модель не вернула JSON mini-quality")
+            parsed = json.loads(match.group(0))
+        translations = {}
+        for item in parsed.get("translations") or []:
+            if isinstance(item, dict) and item.get("id") is not None:
+                translations[int(item["id"])] = str(item.get("translation") or "").strip()
+        ordered = [translations.get(i, "") for i in range(len(QUALITY_PHRASES))]
+        if any(not item for item in ordered):
+            raise ValueError("Модель вернула не все 5 переводов")
+        output_tokens = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).count("\n".join(ordered))
+        actual = _actual_cost(input_tokens, output_tokens, meta)
+        result = {"status": "OK", "translations": ordered, "duration_ms": duration_ms, "input_tokens": input_tokens, "output_tokens": output_tokens, "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": actual}
+    except Exception as exc:
+        logger.exception("Quality benchmark failed model=%s", model)
+        result = {"status": "ERROR", "error": str(exc), "input_tokens": input_tokens, "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": 0.0}
+        actual = 0.0
+    state = run["state"]
+    state.setdefault("quality", {})[model] = result
+    updated = _update_benchmark(provider_id, run_id, state=state, actual_delta=actual)
+    result["budget"] = {"reserved": updated["reserved_cost_usd"], "estimated_actual": updated["estimated_actual_cost_usd"], "limit": updated["settings"]["max_total_cost"]}
+    return result
+
+
+@router.post("/llm-test/funnel/{run_id}/finalists")
+async def funnel_finalists(run_id: str, request: Request):
+    payload = await request.json()
+    models = [str(item).strip() for item in payload.get("models", []) if str(item).strip()]
+    provider_id = _provider_id(load_config())
+    run = _benchmark_row(provider_id, run_id)
+    if run is None:
+        raise HTTPException(404, "Benchmark run not found")
+    allowed = set(_quality_survivors(run))
+    max_count = int(run["settings"].get("finalists_max", DEFAULTS["finalists_max"]))
+    if not models or len(models) > max_count or any(model not in allowed for model in models):
+        raise HTTPException(400, f"Выберите от 1 до {max_count} моделей, успешно прошедших mini-quality")
+    phrase_ids: list[int] = []
+    for value in payload.get("phrase_ids") or []:
+        try:
+            phrase_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if phrase_id not in phrase_ids:
+            phrase_ids.append(phrase_id)
+    by_id = {int(row["id"]): row for row in list_test_history_messages()}
+    state = run["state"]
+    state["finalists"] = models
+    state["final_phrase_ids"] = phrase_ids
+    state["final_phrases"] = [by_id[item] for item in phrase_ids if item in by_id]
+    updated = _update_benchmark(provider_id, run_id, state=state)
+    return {"models": models, "run": updated}
+
+
+@router.post("/llm-test/funnel/{run_id}/full/{message_id}/run")
+async def funnel_full(run_id: str, message_id: int, request: Request):
+    model = str((await request.json()).get("model") or "").strip()
+    cfg = load_config().copy()
+    provider_id = _provider_id(cfg)
+    run = _benchmark_row(provider_id, run_id)
+    if run is None:
+        raise HTTPException(404, "Benchmark run not found")
+    if model not in run["state"].get("finalists", []):
+        raise HTTPException(409, "MODEL_NOT_FINALIST")
+    meta = _model_meta_from_run(run, model)
+    row, fitted, _target, messages = await _real_pipeline(cfg, model, message_id)
+    max_tokens = int(cfg.get("max_output_tokens", 1200))
+    input_tokens = int(fitted.get("prompt_tokens") or _messages_tokens(messages, str(cfg.get("tokenizer_encoding", "o200k_base"))))
+    try:
+        max_cost = _guard_and_reserve(provider_id, run, meta, input_tokens, max_tokens, attempt_multiplier=2)
+    except HTTPException as guard_error:
+        detail = str(guard_error.detail)
+        if detail.startswith("TOO_EXPENSIVE") or detail.startswith("PRICE_UNKNOWN"):
+            result = {
+                "status": "SKIPPED_TOO_EXPENSIVE" if detail.startswith("TOO_EXPENSIVE") else "SKIPPED_PRICE_UNKNOWN",
+                "error": detail, "duration_ms": None,
+                "history_items": len(fitted.get("history") or []), "history_tokens": fitted.get("history_tokens"),
+                "prompt_tokens": fitted.get("prompt_tokens"), "reserved_cost_usd": 0.0,
+                "estimated_actual_cost_usd": 0.0,
+            }
+            state = run["state"]
+            state.setdefault("full", {}).setdefault(model, {})[str(message_id)] = result
+            updated = _update_benchmark(provider_id, run_id, state=state)
+            result["budget"] = {"reserved": updated["reserved_cost_usd"], "estimated_actual": updated["estimated_actual_cost_usd"], "limit": updated["settings"]["max_total_cost"]}
+            return result
+        raise
+    started = time.perf_counter()
+    try:
+        test_cfg = cfg.copy(); test_cfg["llm_model"] = model
+        translations = await translate_openai_compatible(cfg=test_cfg, messages=messages)
+        duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
+        translation = str(translations.get(0) or "").strip()
+        if not translation:
+            raise ValueError("Модель не вернула перевод")
+        output_tokens = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).count(translation)
+        actual = _actual_cost(input_tokens, output_tokens, meta)
+        result = {
+            "status": "OK", "translation": translation, "duration_ms": duration_ms,
+            "history_items": len(fitted.get("history") or []), "history_tokens": fitted.get("history_tokens"),
+            "prompt_tokens": fitted.get("prompt_tokens"), "reserved_cost_usd": max_cost,
+            "estimated_actual_cost_usd": actual,
+        }
+        _insert_test_result(provider_id, model, f"funnel:{run_id}", message_id, row["source_text"], translation, duration_ms, None, row["source_id"], row["session_id"], result["history_items"], result["history_tokens"], result["prompt_tokens"])
+    except Exception as exc:
+        logger.exception("Full benchmark failed model=%s message_id=%s", model, message_id)
+        duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
+        result = {"status": "ERROR", "error": str(exc), "duration_ms": duration_ms, "history_items": len(fitted.get("history") or []), "history_tokens": fitted.get("history_tokens"), "prompt_tokens": fitted.get("prompt_tokens"), "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": 0.0}
+        actual = 0.0
+        _insert_test_result(provider_id, model, f"funnel:{run_id}", message_id, row["source_text"], None, duration_ms, str(exc), row["source_id"], row["session_id"], result["history_items"], result["history_tokens"], result["prompt_tokens"])
+    state = run["state"]
+    state.setdefault("full", {}).setdefault(model, {})[str(message_id)] = result
+    updated = _update_benchmark(provider_id, run_id, state=state, actual_delta=actual)
+    result["budget"] = {"reserved": updated["reserved_cost_usd"], "estimated_actual": updated["estimated_actual_cost_usd"], "limit": updated["settings"]["max_total_cost"]}
+    return result
+
+
+@router.post("/llm-test/run/start")
+async def llm_test_start_run(request: Request):
+    payload = await request.json()
+    test_run_id = str(payload.get("test_run_id") or uuid.uuid4()).strip()
+    mode = str(payload.get("mode") or "all").strip().lower()
+    models = [str(item).strip() for item in (payload.get("models") or []) if str(item).strip()]
+    phrase_ids: list[int] = []
+    for value in payload.get("phrase_ids") or []:
+        try:
+            phrase_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if phrase_id not in phrase_ids:
+            phrase_ids.append(phrase_id)
+    if mode not in {"all", "model"} or not models or not phrase_ids:
+        raise HTTPException(400, "Нужны режим, модели и выбранные фразы")
+    by_id = {int(row["id"]): row for row in list_test_history_messages()}
+    missing = [item for item in phrase_ids if item not in by_id]
+    if missing:
+        raise HTTPException(404, f"Фразы истории больше не найдены: {missing}")
+    phrases = [by_id[item] for item in phrase_ids]
+    cfg = load_config()
+    provider_id = _provider_id(cfg)
+    _save_test_run(provider_id, test_run_id, mode, models, phrases)
+
+    settings = _normalize_settings(payload.get("settings") or {})
+    raw, _ = await _fetch_models_raw(cfg)
+    merged = {item["id"]: item for item in _merge_model_metadata(provider_id, raw)}
+    state = {"model_meta": {model: {key: value for key, value in merged.get(model, {"id": model}).items() if key != "raw"} for model in models}, "manual_models": models, "manual_phrase_ids": phrase_ids}
+    _create_benchmark_run(provider_id, test_run_id, "manual", settings, state)
+    return {"ok": True, "test_run_id": test_run_id, "mode": mode, "models": models, "phrases": phrases}
+
+
+@router.get("/llm-test/last-run")
+def llm_test_last_run():
+    run = _latest_full_test_run(_provider_id(load_config()))
+    if run is None:
+        raise HTTPException(404, "Сохранённых полных опросов пока нет")
+    return run
+
+
+@router.get("/llm-test/model-history")
+def llm_test_model_history(model: str):
+    return _model_history(_provider_id(load_config()), model)
+
+
+@router.post("/llm-test/{message_id}/run")
+async def llm_test_model(message_id: int, request: Request):
+    payload = await request.json()
+    model = str(payload.get("model") or "").strip()
+    test_run_id = str(payload.get("test_run_id") or "").strip()
+    if not model or not test_run_id:
+        raise HTTPException(400, "Модель или test_run_id не указаны")
+    cfg = load_config().copy()
+    provider_id = _provider_id(cfg)
+    run = _benchmark_row(provider_id, test_run_id)
+    if run is None:
+        raise HTTPException(409, "Сначала зарегистрируйте тестовый прогон")
+    meta = _model_meta_from_run(run, model)
+    row, fitted, _target, messages = await _real_pipeline(cfg, model, message_id)
+    max_tokens = int(cfg.get("max_output_tokens", 1200))
+    input_tokens = int(fitted.get("prompt_tokens") or _messages_tokens(messages, str(cfg.get("tokenizer_encoding", "o200k_base"))))
+    max_cost = _guard_and_reserve(provider_id, run, meta, input_tokens, max_tokens, attempt_multiplier=2)
+    started = time.perf_counter()
+    try:
+        test_cfg = cfg.copy(); test_cfg["llm_model"] = model
+        translations = await translate_openai_compatible(cfg=test_cfg, messages=messages)
+        duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
+        translation = str(translations.get(0) or "").strip()
+        if not translation:
+            raise ValueError("Модель не вернула перевод")
+        output_tokens = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).count(translation)
+        actual = _actual_cost(input_tokens, output_tokens, meta)
+        _insert_test_result(provider_id, model, test_run_id, message_id, row["source_text"], translation, duration_ms, None, row["source_id"], row["session_id"], len(fitted.get("history") or []), fitted.get("history_tokens"), fitted.get("prompt_tokens"))
+        updated = _update_benchmark(provider_id, test_run_id, actual_delta=actual)
+        return {
+            "translation": translation, "duration_ms": duration_ms,
+            "context": {"history_items": len(fitted.get("history") or []), "history_tokens": fitted.get("history_tokens"), "prompt_tokens": fitted.get("prompt_tokens")},
+            "cost": {"reserved_request": max_cost, "reserved_run": updated["reserved_cost_usd"], "estimated_actual_run": updated["estimated_actual_cost_usd"], "limit": updated["settings"]["max_total_cost"]},
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        duration_ms = round((time.perf_counter() - started) * 1000.0, 2)
+        _insert_test_result(provider_id, model, test_run_id, message_id, row["source_text"], None, duration_ms, str(exc), row["source_id"], row["session_id"], len(fitted.get("history") or []), fitted.get("history_tokens"), fitted.get("prompt_tokens"))
+        logger.exception("LLM comparison failed message_id=%s model=%s", message_id, model)
+        raise HTTPException(502, f"LLM request failed: {exc}") from exc

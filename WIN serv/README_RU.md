@@ -16,7 +16,7 @@
 4. При желании запустите `VERIFY_INSTALL.bat`.
 5. После успешной установки запустите `START_SERVER.bat`.
 6. Откроется панель `http://127.0.0.1:8765/admin`.
-7. Укажите LLM Base URL, API key, модель и общий лимит токенов.
+7. Укажите LLM Base URL, API key, модель и ограничение токенов истории.
 8. На телефоне в PC server URL укажите `http://IP_ПК:8765`, например `http://192.168.1.50:8765`.
 9. Если `server_api_key` задан, API key телефона должен с ним совпадать. Пустой ключ отключает серверную авторизацию.
 
@@ -24,9 +24,9 @@ Windows Firewall может запросить разрешение Python пр�
 
 ## Важно про токены
 
-`max_request_tokens` — жёсткий бюджет **prompt + зарезервированный output**. Сначала резервируются system prompt, glossary, текущие OCR-блоки и `max_output_tokens`. Затем история берётся с конца назад, пока следующая пара `source + translation` не перестанет помещаться.
+`history_token_limit` ограничивает **только HISTORY**. По умолчанию это 3000 токенов. Сервер берёт самые свежие пары `source + translation` текущего приложения/сессии и добавляет их целиком, пока следующая более старая пара уже не помещается. System prompt, glossary и текущие TARGET_BLOCKS этот бюджет не уменьшают.
 
-Например при 12000 и reserve output 1200 сервер гарантирует, что его собственная оценка `prompt + reserve <= 12000`.
+Общего лимита токенов входного prompt на сервере нет. `max_output_tokens` задаёт только максимальный размер ответа модели.
 
 Tokenizer задаётся `tokenizer_encoding`, по умолчанию `o200k_base`. Для OpenAI это хороший вариант. Для LM Studio/Ollama с другой моделью реальное количество токенов её tokenizer может отличаться; если нужна строгая граница именно конкретной локальной модели, следует добавить её нативный tokenizer.
 
@@ -90,9 +90,10 @@ Swagger UI доступен на `/docs`: кнопка **Authorize** отпра�
   ],
   "meta": {
     "history_items_used": 24,
-    "estimated_prompt_tokens": 9432,
-    "reserved_total_tokens": 10632,
-    "max_request_tokens": 12000
+    "history_tokens_used": 2874,
+    "history_token_limit": 3000,
+    "estimated_prompt_tokens": 5432,
+    "response_token_limit": 1200
   }
 }
 ```
