@@ -127,3 +127,66 @@ async def extract_glossary_openai_compatible(*, cfg: dict, messages: list[dict])
     parsed = _extract_json(content)
     entries = parsed.get("entries") or []
     return [entry for entry in entries if isinstance(entry, dict)]
+
+# === SEMANTIC_SCREEN_LLM_V1 ===
+async def translate_screen_openai_compatible(*, cfg: dict, messages: list[dict]) -> dict:
+    """Return the structured Semantic Destination Blocks payload for one whole screen."""
+    base = str(cfg["llm_base_url"]).rstrip("/")
+    url = f"{base}/chat/completions"
+    headers = {"Content-Type": "application/json"}
+    if cfg.get("llm_api_key"):
+        headers["Authorization"] = f"Bearer {cfg['llm_api_key']}"
+    body = {
+        "model": cfg["llm_model"],
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": int(cfg["max_output_tokens"]),
+        "response_format": {"type": "json_object"},
+    }
+    timeout = float(cfg.get("llm_timeout_seconds", 90))
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        async def post(attempt: int) -> httpx.Response:
+            started = time.perf_counter()
+            response = None
+            try:
+                response = await client.post(url, headers=headers, json=body)
+                return response
+            finally:
+                duration_ms = (time.perf_counter() - started) * 1000
+                logger.info("SEMANTIC LLM HTTP attempt=%s duration=%.2fms", attempt, duration_ms)
+                if response is not None:
+                    logger.info("SEMANTIC LLM HTTP attempt=%s status=%s", attempt, response.status_code)
+
+        payload = None
+        content = None
+        for attempt in (1, 2):
+            response = await post(attempt)
+            if response.status_code >= 400 and response.status_code in (400, 422) and "response_format" in body:
+                logger.warning(
+                    "SEMANTIC LLM response_format rejected status=%s body=%s; retrying without response_format",
+                    response.status_code,
+                    response.text[:1000],
+                )
+                body.pop("response_format", None)
+                response = await post(attempt)
+            if response.status_code >= 400:
+                logger.error("SEMANTIC LLM HTTP ERROR status=%s body=%s", response.status_code, response.text)
+            response.raise_for_status()
+            payload = response.json()
+            choices = payload.get("choices") or []
+            choice = choices[0] if choices else {}
+            message = choice.get("message") or {}
+            content = message.get("content")
+            if isinstance(content, str) and content.strip():
+                break
+            logger.warning(
+                "SEMANTIC LLM EMPTY RESPONSE model=%r finish_reason=%r usage=%r",
+                payload.get("model"), choice.get("finish_reason"), payload.get("usage"),
+            )
+            if attempt == 1:
+                await asyncio.sleep(0.15)
+
+    parsed = _extract_json(content)
+    if not isinstance(parsed, dict):
+        raise ValueError("Semantic screen response is not a JSON object")
+    return parsed

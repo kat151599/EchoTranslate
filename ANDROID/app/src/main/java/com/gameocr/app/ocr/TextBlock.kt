@@ -15,6 +15,10 @@ data class TextBlock(
     val sourceBoxes: List<Rect> = emptyList(),
     val bubbleGroupId: Int? = null,
     val historyId: Long? = null,
+    // SEMANTIC_DESTINATION_BLOCKS_ANDROID_V1
+    val destinationId: String? = null,
+    val semanticRole: String? = null,
+    val sourceFragmentIds: List<String> = emptyList(),
 )
 
 internal fun TextBlock.sourceBoxesOrBoundingBox(): List<Rect> =

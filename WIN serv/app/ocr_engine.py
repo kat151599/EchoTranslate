@@ -25,13 +25,19 @@ class OcrBlock:
     raw_ids: list[int] = field(default_factory=list)
 
 
-def merge_ocr_blocks(blocks: list[OcrBlock]) -> list[OcrBlock]:
-    """Build reading order from immutable OCR detections, then wrap rows."""
+# === SEMANTIC_VISUAL_FRAGMENTS_V1 ===
+def build_visual_fragments(
+    blocks: list[OcrBlock],
+    *,
+    screen_width: int | None = None,
+    join_contiguous: bool = True,
+) -> list[OcrBlock]:
+    """Build only physically contiguous visual fragments; never join wrapped lines."""
     if not blocks:
-        return blocks
+        return []
 
     @dataclass(frozen=True)
-    class RawBlock:
+    class RawFragment:
         raw_id: int
         text: str
         confidence: float
@@ -39,164 +45,129 @@ def merge_ocr_blocks(blocks: list[OcrBlock]) -> list[OcrBlock]:
         language: str
         multiline: bool
 
-    @dataclass(frozen=True)
-    class VisualRow:
-        raw_ids: tuple[int, ...]
-        text: str
-        confidence: float
-        box: tuple[int, int, int, int]
-        language: str
-        is_speaker: bool = False
-
-    # This is the merge boundary: do not mutate or reuse incoming OCR objects.
-    # All row membership below refers exclusively to these original geometries.
     raw_input = tuple(
-        (index, block.source, float(block.confidence), tuple(int(v) for v in block.box), block.language)
-        for index, block in enumerate(blocks)
-    )
-    initial_heights = sorted(max(1, box[3] - box[1]) for _, _, _, box, _ in raw_input)
-    # Lower median keeps one tall multiline detection from becoming the
-    # baseline when the screenshot has only a few OCR fragments.
-    initial_median = initial_heights[(len(initial_heights) - 1) // 2]
-    ordinary_heights = sorted(
-        max(1, box[3] - box[1])
-        for _, _, _, box, _ in raw_input
-        if box[3] - box[1] <= 1.6 * initial_median
-    )
-    typical_line_height = ordinary_heights[(len(ordinary_heights) - 1) // 2] if ordinary_heights else initial_median
-    raw_blocks = tuple(
-        RawBlock(raw_id, text, confidence, box, language, box[3] - box[1] > 1.6 * typical_line_height)
-        for raw_id, text, confidence, box, language in raw_input
-    )
-    raw_by_id = {block.raw_id: block for block in raw_blocks}
-    capture_left = min(block.box[0] for block in raw_blocks)
-    capture_right = max(block.box[2] for block in raw_blocks)
-    capture_width = max(1, capture_right - capture_left)
-
-    for block in raw_blocks:
-        logger.info(
-            "OCR RAW id=%s text=%r box=%s height=%s",
-            block.raw_id, block.text, list(block.box), block.box[3] - block.box[1],
+        RawFragment(
+            raw_id=index,
+            text=str(block.source or "").strip(),
+            confidence=float(block.confidence),
+            box=tuple(int(v) for v in block.box[:4]),
+            language=block.language,
+            multiline=False,
         )
-        if block.multiline:
-            logger.info("OCR RAW MULTILINE id=%s text=%r box=%s", block.raw_id, block.text, list(block.box))
+        for index, block in enumerate(blocks)
+        if str(block.source or "").strip() and len(block.box) >= 4
+    )
+    if not raw_input:
+        return []
+
+    heights = sorted(max(1, raw.box[3] - raw.box[1]) for raw in raw_input)
+    typical_height = heights[(len(heights) - 1) // 2]
+    raw_fragments = tuple(
+        RawFragment(
+            raw.raw_id,
+            raw.text,
+            raw.confidence,
+            raw.box,
+            raw.language,
+            (raw.box[3] - raw.box[1]) > 1.7 * typical_height,
+        )
+        for raw in raw_input
+    )
+    width = max(1, int(screen_width or (max(raw.box[2] for raw in raw_fragments) - min(raw.box[0] for raw in raw_fragments))))
 
     def contains_cjk(text: str) -> bool:
-        return any("\u4e00" <= char <= "\u9fff" or "\u3040" <= char <= "\u30ff" for char in text)
+        return any("\u3040" <= char <= "\u30ff" or "\u3400" <= char <= "\u9fff" for char in text)
 
-    def is_speaker_name(upper: VisualRow, lower: VisualRow) -> bool:
-        ux1, uy1, ux2, uy2 = upper.box
-        lx1, ly1, lx2, ly2 = lower.box
-        upper_width = max(1, ux2 - ux1)
-        lower_width = max(1, lx2 - lx1)
-        gap = ly1 - uy2
-        return (
-            len(upper.text.strip()) <= 20
-            and upper_width / lower_width < 0.45
-            and -0.20 * typical_line_height <= gap <= 0.80 * typical_line_height
-        )
+    def join_text(left: str, right: str) -> str:
+        return left + right if contains_cjk(left) or contains_cjk(right) else left + " " + right
 
-    def is_wrapped_continuation(left: VisualRow, right: VisualRow) -> bool:
-        lx1, ly1, lx2, ly2 = left.box
-        rx1, ry1, rx2, ry2 = right.box
-        lh, rh = max(1, ly2 - ly1), max(1, ry2 - ry1)
-        line_height = min(lh, rh)
-        vertical_gap = ry1 - ly2
-        left_delta = abs(rx1 - lx1)
-        overlap_x = max(0, min(lx2, rx2) - max(lx1, rx1))
-        containment = overlap_x / min(max(1, lx2 - lx1), max(1, rx2 - rx1))
-        return (
-            left_delta <= 0.03 * capture_width
-            and -0.25 * line_height <= vertical_gap <= 0.50 * line_height
-            and containment >= 0.80
-        )
-
-    def same_visual_row(left: RawBlock, right: RawBlock) -> bool:
-        # A tall original detection may already contain several visual lines.
-        # Its whole bbox is never evidence that another detection is same-row.
+    def vertical_match(left: RawFragment, right: RawFragment) -> bool:
         if left.multiline or right.multiline:
             return False
         lx1, ly1, lx2, ly2 = left.box
         rx1, ry1, rx2, ry2 = right.box
         lh, rh = max(1, ly2 - ly1), max(1, ry2 - ry1)
-        vertical_overlap = max(0, min(ly2, ry2) - max(ly1, ry1))
+        if max(lh, rh) / min(lh, rh) > 1.8:
+            return False
+        overlap = max(0, min(ly2, ry2) - max(ly1, ry1))
         center_distance = abs((ly1 + ly2) / 2 - (ry1 + ry2) / 2)
-        return (
-            max(lh, rh) / min(lh, rh) <= 2.0
-            and (
-                vertical_overlap >= 0.70 * min(lh, rh)
-                or center_distance <= 0.55 * ((lh + rh) / 2)
+        return overlap >= 0.68 * min(lh, rh) or center_distance <= 0.35 * ((lh + rh) / 2)
+
+    def horizontal_gap(left: RawFragment, right: RawFragment) -> int:
+        lx1, _, lx2, _ = left.box
+        rx1, _, rx2, _ = right.box
+        if lx2 < rx1:
+            return rx1 - lx2
+        if rx2 < lx1:
+            return lx1 - rx2
+        return 0
+
+    def gap_limit(left: RawFragment, right: RawFragment) -> int:
+        lh = max(1, left.box[3] - left.box[1])
+        rh = max(1, right.box[3] - right.box[1])
+        return max(8, int(min(2.0 * min(lh, rh), 0.04 * width)))
+
+    ordered = sorted(raw_fragments, key=lambda raw: (raw.box[1], raw.box[0], raw.raw_id))
+    if not join_contiguous:
+        return [
+            OcrBlock(raw.text, raw.confidence, list(raw.box), raw.language, [raw.raw_id])
+            for raw in ordered
+        ]
+
+    rows: list[list[RawFragment]] = []
+    for raw in ordered:
+        candidates: list[tuple[int, int, list[RawFragment]]] = []
+        for row in rows:
+            aligned = [member for member in row if vertical_match(member, raw)]
+            if not aligned:
+                continue
+            nearest_gap = min(horizontal_gap(member, raw) for member in aligned)
+            nearest_limit = max(gap_limit(member, raw) for member in aligned)
+            if nearest_gap <= nearest_limit:
+                y_distance = min(abs((member.box[1] + member.box[3]) - (raw.box[1] + raw.box[3])) for member in aligned)
+                candidates.append((nearest_gap, y_distance, row))
+        if candidates:
+            candidates.sort(key=lambda item: (item[0], item[1]))
+            candidates[0][2].append(raw)
+        else:
+            rows.append([raw])
+
+    visual: list[OcrBlock] = []
+    for row in rows:
+        parts = sorted(row, key=lambda raw: (raw.box[0], raw.raw_id))
+        text = parts[0].text
+        for part in parts[1:]:
+            text = join_text(text, part.text)
+        box = [
+            min(part.box[0] for part in parts),
+            min(part.box[1] for part in parts),
+            max(part.box[2] for part in parts),
+            max(part.box[3] for part in parts),
+        ]
+        visual.append(
+            OcrBlock(
+                source=text,
+                confidence=min(part.confidence for part in parts),
+                box=box,
+                language=parts[0].language,
+                raw_ids=[part.raw_id for part in parts],
             )
         )
 
-    def join_text(left: str, right: str) -> str:
-        return left + right if contains_cjk(left) or contains_cjk(right) else left + " " + right
-
-    # Phase 1: visual rows are classified entirely from original raw boxes.
-    raw_rows: list[list[int]] = []
-    for block in sorted(raw_blocks, key=lambda b: (b.box[1], b.box[0], b.raw_id)):
-        row = next(
-            (candidate for candidate in raw_rows if any(same_visual_row(raw_by_id[raw_id], block) for raw_id in candidate)),
-            None,
+    visual.sort(key=lambda block: (block.box[1], block.box[0], block.raw_ids))
+    for block in visual:
+        logger.info(
+            "OCR VISUAL raw_ids=%s text=%r box=%s",
+            block.raw_ids,
+            block.source,
+            block.box,
         )
-        if row is None:
-            raw_rows.append([block.raw_id])
-        else:
-            row.append(block.raw_id)
+    return visual
 
-    visual_rows: list[VisualRow] = []
-    for row_ids in raw_rows:
-        parts = sorted((raw_by_id[raw_id] for raw_id in row_ids), key=lambda b: (b.box[0], b.raw_id))
-        text = ""
-        for part in parts:
-            text = part.text if not text else join_text(text, part.text)
-        box = (
-            min(part.box[0] for part in parts), min(part.box[1] for part in parts),
-            max(part.box[2] for part in parts), max(part.box[3] for part in parts),
-        )
-        row = VisualRow(tuple(part.raw_id for part in parts), text, min(part.confidence for part in parts), box, parts[0].language)
-        visual_rows.append(row)
 
-    visual_rows.sort(key=lambda row: (row.box[1], row.box[0], row.raw_ids))
-    for row_id, row in enumerate(visual_rows):
-        logger.info("OCR ROW row=%s raw_ids=%s text=%r", row_id, list(row.raw_ids), row.text)
-
-    # Speaker classification is complete before wrap assembly and is immutable.
-    speaker_rows = {
-        index for index in range(len(visual_rows) - 1)
-        if is_speaker_name(visual_rows[index], visual_rows[index + 1])
-    }
-    visual_rows = [
-        VisualRow(row.raw_ids, row.text, row.confidence, row.box, row.language, index in speaker_rows)
-        for index, row in enumerate(visual_rows)
-    ]
-    for row in visual_rows:
-        if row.is_speaker:
-            logger.info("OCR SPEAKER raw_ids=%s text=%r", list(row.raw_ids), row.text)
-
-    # Phase 2 only follows finalized rows. The wrap check always receives the
-    # previous original row, never a bbox expanded by an earlier wrap.
-    final_rows: list[VisualRow] = []
-    wrap_tail: VisualRow | None = None
-    for row in visual_rows:
-        if wrap_tail and not wrap_tail.is_speaker and not row.is_speaker and is_wrapped_continuation(wrap_tail, row):
-            upper = final_rows[-1]
-            logger.info("OCR WRAP upper_row=%s lower_row=%s", list(wrap_tail.raw_ids), list(row.raw_ids))
-            final_rows[-1] = VisualRow(
-                upper.raw_ids + row.raw_ids,
-                join_text(upper.text, row.text),
-                min(upper.confidence, row.confidence),
-                (min(upper.box[0], row.box[0]), min(upper.box[1], row.box[1]), max(upper.box[2], row.box[2]), max(upper.box[3], row.box[3])),
-                upper.language,
-            )
-        else:
-            final_rows.append(row)
-        wrap_tail = row
-
-    final = [OcrBlock(row.text, row.confidence, list(row.box), row.language, list(row.raw_ids)) for row in final_rows]
-    for block in final:
-        logger.info("OCR FINAL raw_ids=%s text=%r box=%s", list(block.raw_ids), block.source, block.box)
-    return final
+def merge_ocr_blocks(blocks: list[OcrBlock]) -> list[OcrBlock]:
+    """Compatibility alias: semantic wrapping is deliberately no longer performed."""
+    return build_visual_fragments(blocks, join_contiguous=True)
 
 
 class PaddleOcrEngine:

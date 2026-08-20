@@ -184,6 +184,15 @@ def init_db() -> None:
             ON pending_history_corrections(status, id DESC);
         """)
         columns = {row[1] for row in con.execute("PRAGMA table_info(messages)")}
+        # === SEMANTIC_DESTINATION_DB_COLUMNS_V1 ===
+        for column_name, column_type in (
+            ("destination_id", "TEXT"),
+            ("role", "TEXT"),
+            ("source_fragment_ids_json", "TEXT"),
+            ("source_boxes_json", "TEXT"),
+        ):
+            if column_name not in columns:
+                con.execute(f"ALTER TABLE messages ADD COLUMN {column_name} {column_type}")
         source_columns = {row[1] for row in con.execute("PRAGMA table_info(history_sources)")}
         test_result_columns = {row[1] for row in con.execute("PRAGMA table_info(llm_test_results)")}
         if "history_items" not in test_result_columns:
@@ -729,11 +738,6 @@ def _propagate_glossary_translation(
             "UPDATE messages SET translation=?, token_count=NULL WHERE id=? AND source_id=?",
             (changed_translation, row["id"], source_id),
         )
-        if row["screen_hash"]:
-            con.execute(
-                "DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?",
-                (source_id, row["session_id"], row["screen_hash"]),
-            )
         updated_rows += 1
         replaced_occurrences += int(replacements)
     return updated_rows, replaced_occurrences
@@ -866,11 +870,6 @@ def update_history_translation(source_id: str, message_id: int, translation: str
             "UPDATE messages SET translation=? WHERE source_id=? AND id=?",
             (translation, source_id, message_id),
         )
-        if row["screen_hash"]:
-            con.execute(
-                "DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?",
-                (source_id, row["session_id"], row["screen_hash"]),
-            )
         return True
 
 
@@ -891,11 +890,6 @@ def update_history_message(source_id: str, message_id: int, source_text: str, tr
             con.execute(
                 "UPDATE messages SET source_text=?, translation=?, token_count=NULL WHERE source_id=? AND id=?",
                 (source_text, translation, source_id, message_id),
-            )
-        if row["screen_hash"]:
-            con.execute(
-                "DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?",
-                (source_id, row["session_id"], row["screen_hash"]),
             )
     return True
 
@@ -945,8 +939,6 @@ def resolve_pending_history_correction(correction_id: int, accept: bool) -> bool
             source_text = str(correction["proposed_source_text"] or row["source_text"]).strip() or row["source_text"]
             translation = str(correction["proposed_translation"] or row["translation"]).strip() or row["translation"]
             con.execute("UPDATE messages SET source_text=?, translation=? WHERE id=? AND source_id=?", (source_text, translation, correction["history_id"], correction["source_id"]))
-            if row["screen_hash"]:
-                con.execute("DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?", (correction["source_id"], row["session_id"], row["screen_hash"]))
         con.execute("UPDATE pending_history_corrections SET status=? WHERE id=?", ("accepted" if accept else "rejected", correction_id))
     return True
 
@@ -969,3 +961,78 @@ def put_cached(source_id: str, session_id: str, screen_hash: str, response_json:
             "INSERT OR REPLACE INTO screen_cache(source_id, session_id, screen_hash, response_json) VALUES(?,?,?,?)",
             (source_id, session_id, screen_hash, response_json),
         )
+
+# === SEMANTIC_DESTINATION_DB_WRITE_V1 ===
+def add_destination_messages(
+    source_id: str,
+    source_name: str,
+    session_id: str,
+    rows: Iterable[dict],
+) -> list[int | None]:
+    """Persist logical DestinationBlocks while preserving existing history/CJK rules."""
+    with _lock, connect() as con:
+        ids: list[int | None] = []
+        for row in rows:
+            translation = str(row.get("translation") or "")
+            target_language = str(row.get("target_language") or "")
+            if translation_has_disallowed_east_asian_script(translation, target_language):
+                ids.append(None)
+                continue
+            cursor = con.execute(
+                "INSERT INTO messages("
+                "source_id, source_name, session_id, source_text, translation, confidence, box_json, "
+                "language, target_language, screen_hash, token_count, destination_id, role, "
+                "source_fragment_ids_json, source_boxes_json"
+                ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    source_id,
+                    source_name,
+                    session_id,
+                    str(row.get("source_text") or ""),
+                    translation,
+                    float(row.get("confidence") or 0.0),
+                    str(row.get("box_json") or "[]"),
+                    str(row.get("language") or ""),
+                    target_language,
+                    str(row.get("screen_hash") or ""),
+                    row.get("token_count"),
+                    str(row.get("destination_id") or ""),
+                    str(row.get("role") or "unknown"),
+                    str(row.get("source_fragment_ids_json") or "[]"),
+                    str(row.get("source_boxes_json") or "[]"),
+                ),
+            )
+            ids.append(int(cursor.lastrowid))
+        return ids
+
+# === SCREEN_CACHE_HISTORY_REF_V1 ===
+def history_translations_by_ids(
+    source_id: str,
+    session_id: str,
+    target_language: str,
+    history_ids: Iterable[int],
+) -> dict[int, str]:
+    """Read current translations for reference-cache rows in one SQLite query."""
+    ids = [int(value) for value in history_ids]
+    if not ids:
+        return {}
+    unique_ids = list(dict.fromkeys(ids))
+    placeholders = ",".join("?" for _ in unique_ids)
+    query = (
+        "SELECT id, translation, target_language FROM messages "
+        f"WHERE source_id=? AND session_id=? AND target_language=? AND id IN ({placeholders})"
+    )
+    with connect() as con:
+        rows = con.execute(
+            query,
+            (source_id, session_id, target_language, *unique_ids),
+        ).fetchall()
+    result: dict[int, str] = {}
+    for row in rows:
+        translation = str(row["translation"] or "").strip()
+        if not translation:
+            continue
+        if translation_has_disallowed_east_asian_script(translation, row["target_language"]):
+            continue
+        result[int(row["id"])] = translation
+    return result

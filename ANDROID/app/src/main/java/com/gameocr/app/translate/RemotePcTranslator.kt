@@ -48,6 +48,7 @@ import timber.log.Timber
  * screen coordinates using the same end-to-end path used by Youdao image translation.
  */
 @Singleton
+// SEMANTIC_REMOTE_BLOCKS_V1: server returns logical DestinationBlocks.
 class RemotePcTranslator @Inject constructor(
     private val client: OkHttpClient,
     private val json: Json,
@@ -131,16 +132,28 @@ class RemotePcTranslator @Inject constructor(
                     val box = block.box
                     if (box.size < 4 || block.translation.isBlank()) return@mapNotNull null
                     val left = box[0].coerceIn(0, bitmap.width)
-                    val top = box[1].coerceIn(0, bitmap.height)
-                    val right = box[2].coerceIn(left, bitmap.width)
-                    val bottom = box[3].coerceIn(top, bitmap.height)
-                    TextBlock(
-                        text = block.source,
-                        boundingBox = Rect(left, top, right, bottom),
-                        confidence = block.confidence.coerceIn(0f, 1f),
-                        recognizedLanguage = block.language ?: settings.sourceLang,
-                        historyId = block.historyId,
-                    ) to block.translation
+                val top = box[1].coerceIn(0, bitmap.height)
+                val right = box[2].coerceIn(left, bitmap.width)
+                val bottom = box[3].coerceIn(top, bitmap.height)
+                val sourceRects = block.sourceBoxes.mapNotNull sourceRect@{ sourceBox ->
+                    if (sourceBox.size < 4) return@sourceRect null
+                    val sourceLeft = sourceBox[0].coerceIn(0, bitmap.width)
+                    val sourceTop = sourceBox[1].coerceIn(0, bitmap.height)
+                    val sourceRight = sourceBox[2].coerceIn(sourceLeft, bitmap.width)
+                    val sourceBottom = sourceBox[3].coerceIn(sourceTop, bitmap.height)
+                    Rect(sourceLeft, sourceTop, sourceRight, sourceBottom)
+                }
+                TextBlock(
+                    text = block.source,
+                    boundingBox = Rect(left, top, right, bottom),
+                    confidence = block.confidence.coerceIn(0f, 1f),
+                    recognizedLanguage = block.language ?: settings.sourceLang,
+                    sourceBoxes = sourceRects,
+                    destinationId = block.id,
+                    semanticRole = block.role,
+                    sourceFragmentIds = block.sourceIds,
+                    historyId = block.historyId,
+                ) to block.translation
                 }
             }
         }
@@ -241,10 +254,14 @@ class RemotePcTranslator @Inject constructor(
 
     @Serializable
     private data class RemoteTranslatedBlock(
+        val id: String? = null,
+        @SerialName("source_ids") val sourceIds: List<String> = emptyList(),
         val source: String = "",
         val translation: String = "",
+        val role: String? = null,
         val confidence: Float = 1f,
         val box: List<Int> = emptyList(),
+        @SerialName("source_boxes") val sourceBoxes: List<List<Int>> = emptyList(),
         val language: String? = null,
         @SerialName("history_id") val historyId: Long? = null,
     )

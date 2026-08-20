@@ -24,11 +24,12 @@ from pydantic import BaseModel
 
 from .bootstrap import configure_paddlex_cache
 from .config import ROOT, load_config, save_config
-from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, history_translation_hits, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message, create_pending_history_correction, pending_history_corrections, resolve_pending_history_correction, save_llm_test_run, latest_llm_test_run, llm_model_notes, save_llm_model_note
-from .ocr_engine import ocr_engine, merge_ocr_blocks
+from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message, create_pending_history_correction, pending_history_corrections, resolve_pending_history_correction, save_llm_test_run, latest_llm_test_run, llm_model_notes, save_llm_model_note, add_destination_messages, get_cached, put_cached, translation_has_disallowed_east_asian_script, history_translations_by_ids
+from .ocr_engine import ocr_engine, merge_ocr_blocks, build_visual_fragments
 from .token_budget import TokenBudget
-from .prompting import glossary_text, game_glossary_text, target_text, build_messages
-from .llm import translate_openai_compatible, extract_glossary_openai_compatible
+from .prompting import glossary_text, game_glossary_text, target_text, build_messages, screen_document_text, build_screen_messages
+from .llm import translate_openai_compatible, extract_glossary_openai_compatible, translate_screen_openai_compatible
+from .screen_document import PIPELINE_VERSION, ScreenDocument, ScreenDocumentError, validate_destination_payload, destination_blocks_from_cache, destination_blocks_to_cache, destination_cache_history_ids
 from .model_testing import router as model_testing_router
 
 logger = logging.getLogger(__name__)
@@ -74,8 +75,6 @@ def startup():
     # Re-test after the server logger is active and before accepting requests.
     configure_paddlex_cache()
     init_db()
-
-
 def check_auth(credentials: HTTPAuthorizationCredentials | None = Security(bearer_scheme)):
     key = str(load_config().get("server_api_key") or "").strip()
     if not key:
@@ -166,6 +165,7 @@ def submit_history_correction(payload: HistoryCorrectionRequest, _: None = Secur
         raise HTTPException(404, "History entry not found")
     return {"id": correction["id"], "status": correction["status"]}
 
+# === SEMANTIC_DESTINATION_BLOCKS_V1 ===
 @app.post("/v1/screen/translate")
 async def translate_screen(
     background_tasks: BackgroundTasks,
@@ -196,21 +196,21 @@ async def translate_screen(
         register_source(source_id, "")
     source_name = history_source_name(source_id) or source_name
     logger.info("HISTORY SOURCE id=%s name=%s", source_id, source_name)
+
     decode_start = time.perf_counter()
     raw = await image.read()
     if not raw:
         raise HTTPException(400, "Empty image")
     if len(raw) > 20 * 1024 * 1024:
         raise HTTPException(413, "Image is too large")
-    arr = np.frombuffer(raw, np.uint8)
-    frame = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    frame = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     decode_ms = (time.perf_counter() - decode_start) * 1000
     if frame is None:
         raise HTTPException(400, "Unsupported/corrupted image")
 
     try:
         ocr_start = time.perf_counter()
-        blocks = await asyncio.to_thread(
+        raw_blocks = await asyncio.to_thread(
             ocr_engine.recognize,
             frame, source_lang, float(cfg.get("ocr_min_confidence", 0.45)),
             backend=cfg.get("ocr_backend", "paddle_cpu"),
@@ -219,34 +219,98 @@ async def translate_screen(
         ocr_ms = (time.perf_counter() - ocr_start) * 1000
     except Exception as e:
         raise HTTPException(503, f"OCR unavailable: {e}") from e
-    raw_blocks_count = len(blocks)
-    logger.info("OCR RAW BLOCKS: %s", raw_blocks_count)
-    merge_start = time.perf_counter()
-    if cfg.get("ocr_merge_horizontal_blocks", True):
-        blocks = merge_ocr_blocks(blocks)
-    merge_ms = (time.perf_counter() - merge_start) * 1000
-    logger.info("OCR MERGED BLOCKS: %s", len(blocks))
-    if not blocks:
-        logger.info("PHONE RESPONSE RETURNED id=%s at=%s", request_id, time.strftime("%Y-%m-%d %H:%M:%S"))
-        return {"blocks": [], "meta": {"session_id": session_id, "ocr_blocks": 0}}
 
-    normalized = "\n".join(b.source.strip() for b in blocks)
-    screen_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-    history_cache_enabled = bool(cfg.get("cache_identical_screen", True))
-    logger.info("HISTORY CACHE enabled=%s", str(history_cache_enabled).lower())
-    logger.info("HISTORY CACHE SOURCE id=%s", source_id)
-    history_hits = history_translation_hits(source_id, session_id, source_lang, target_lang, blocks) if history_cache_enabled else {}
-    hit_ids = sorted(history_hits)
-    miss_ids = [index for index in range(len(blocks)) if index not in history_hits]
-    logger.info("HISTORY CACHE HIT ids=%s", hit_ids)
-    logger.info("HISTORY CACHE MISS ids=%s", miss_ids)
-    miss_blocks = [blocks[index] for index in miss_ids]
+    logger.info("OCR RAW FRAGMENTS: %s", len(raw_blocks))
+    merge_start = time.perf_counter()
+    blocks = build_visual_fragments(
+        raw_blocks,
+        screen_width=int(frame.shape[1]),
+        join_contiguous=bool(cfg.get("ocr_merge_horizontal_blocks", True)),
+    )
+    merge_ms = (time.perf_counter() - merge_start) * 1000
+    logger.info("OCR VISUAL FRAGMENTS: %s", len(blocks))
+    if not blocks:
+        total_ms = (time.perf_counter() - total_start) * 1000
+        return {
+            "blocks": [],
+            "meta": {
+                "session_id": session_id,
+                "pipeline": PIPELINE_VERSION,
+                "raw_ocr_fragments": len(raw_blocks),
+                "visual_fragments": 0,
+                "destination_blocks": 0,
+                "ocr_blocks": 0,
+                "screen_cache_hit": False,
+                "timings": {"decode_ms": decode_ms, "ocr_ms": ocr_ms, "merge_ms": merge_ms, "total_ms": total_ms},
+            },
+        }
+
+    document = ScreenDocument.from_ocr_blocks(
+        blocks,
+        width=int(frame.shape[1]),
+        height=int(frame.shape[0]),
+        source_language=source_lang,
+        target_language=target_lang,
+    )
+    screen_hash = document.semantic_hash()
+    screen_cache_enabled = bool(cfg.get("cache_identical_screen", True))
+    logger.info(
+        "SCREEN CACHE enabled=%s source=%s session=%s hash=%s fragments=%s",
+        str(screen_cache_enabled).lower(), source_id, session_id, screen_hash[:12], len(document.fragments),
+    )
+
+    if screen_cache_enabled:
+        cached = get_cached(source_id, session_id, screen_hash)
+        if cached:
+            try:
+                cache_history_ids = destination_cache_history_ids(cached)
+                live_cache_translations = history_translations_by_ids(
+                    source_id, session_id, target_lang, cache_history_ids
+                )
+                cached_destinations = destination_blocks_from_cache(
+                    cached, document, live_cache_translations
+                )
+                response_blocks = [block.response_dict() for block in cached_destinations]
+                total_ms = (time.perf_counter() - total_start) * 1000
+                logger.info("SCREEN CACHE HIT hash=%s destination_blocks=%s", screen_hash[:12], len(response_blocks))
+                logger.info("PHONE RESPONSE RETURNED id=%s at=%s", request_id, time.strftime("%Y-%m-%d %H:%M:%S"))
+                return {
+                    "blocks": response_blocks,
+                    "meta": {
+                        "session_id": session_id,
+                        "pipeline": PIPELINE_VERSION,
+                        "raw_ocr_fragments": len(raw_blocks),
+                        "visual_fragments": len(document.fragments),
+                        "destination_blocks": len(response_blocks),
+                        "ocr_blocks": len(document.fragments),
+                        "screen_cache_hit": True,
+                        "history_items_used": 0,
+                        "history_tokens_used": 0,
+                        "history_token_limit": int(cfg.get("history_token_limit", 3000)),
+                        "estimated_prompt_tokens": 0,
+                        "response_token_limit": int(cfg["max_output_tokens"]),
+                        "ocr": ocr_engine.diagnostics(),
+                        "timings": {
+                            "decode_ms": decode_ms,
+                            "ocr_ms": ocr_ms,
+                            "merge_ms": merge_ms,
+                            "context_ms": 0.0,
+                            "llm_ms": 0.0,
+                            "save_ms": 0.0,
+                            "total_ms": total_ms,
+                        },
+                    },
+                }
+            except Exception as e:
+                logger.warning("SCREEN CACHE INVALID hash=%s reason=%s; falling back to LLM", screen_hash[:12], e)
+        logger.info("SCREEN CACHE MISS hash=%s", screen_hash[:12])
 
     context_start = time.perf_counter()
-    glossary = "\n\n".join(part for part in (glossary_text(cfg), game_glossary_text(game_glossary(source_id))) if part)
+    glossary = "\n\n".join(
+        part for part in (glossary_text(cfg), game_glossary_text(game_glossary(source_id))) if part
+    )
     logger.info("GLOSSARY source=%s entries=%s", source_id, len(game_glossary(source_id)))
-    target = target_text(miss_blocks, source_lang, target_lang)
-    logger.info("CONTEXT SOURCE id=%s", source_id)
+    target = screen_document_text(document)
     history_rows = recent_messages(source_id, session_id, 1000) if cfg.get("history_enabled", True) else []
     budget = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base")))
     try:
@@ -259,72 +323,99 @@ async def translate_screen(
         )
     except ValueError as e:
         raise HTTPException(422, str(e))
-
-    messages = build_messages(cfg, fitted.history, glossary, target)
+    messages = build_screen_messages(cfg, fitted.history, glossary, target)
     context_ms = (time.perf_counter() - context_start) * 1000
-    translations = {index: hit[1] for index, hit in history_hits.items()}
-    history_ids = {index: hit[0] for index, hit in history_hits.items()}
-    if miss_blocks and not str(cfg.get("llm_api_key") or "").strip() and "localhost" not in str(cfg.get("llm_base_url", "")) and "127.0.0.1" not in str(cfg.get("llm_base_url", "")):
-        raise HTTPException(503, "LLM API key is not configured")
-    if miss_blocks:
-        try:
-            logger.info(
-                "CALLING LLM:\neffective_source_lang=%s\neffective_target_lang=%s\nblocks=%s\nhistory_items=%s\nhistory_tokens=%s\nhistory_token_limit=%s\nprompt_tokens=%s",
-                source_lang, target_lang, len(miss_blocks), len(fitted.history),
-                fitted.history_tokens, int(cfg.get("history_token_limit", 3000)), fitted.prompt_tokens,
-            )
-            logger.info("LLM BATCH BLOCKS: %s", len(miss_blocks))
-            llm_start = time.perf_counter()
-            try:
-                miss_translations = await translate_openai_compatible(cfg=cfg, messages=messages)
-            finally:
-                llm_ms = (time.perf_counter() - llm_start) * 1000
-            translations.update({miss_ids[index]: value for index, value in miss_translations.items() if index < len(miss_ids)})
-            logger.info("LLM RESULT:\n%r", miss_translations)
-        except Exception as e:
-            logger.exception("LLM request failed in /v1/screen/translate")
-            total_ms = (time.perf_counter() - total_start) * 1000
-            logger.info(
-                "TIMING id=%s status=502 decode=%.2fms ocr=%.2fms merge=%.2fms context=%.2fms llm=%.2fms save=%.2fms total=%.2fms",
-                request_id, decode_ms, ocr_ms, merge_ms, context_ms, llm_ms, save_ms, total_ms,
-            )
-            raise HTTPException(502, f"LLM request failed: {e}") from e
-    else:
-        logger.info("LLM BATCH BLOCKS: 0")
 
-    response_blocks = []
+    if not str(cfg.get("llm_api_key") or "").strip() and "localhost" not in str(cfg.get("llm_base_url", "")) and "127.0.0.1" not in str(cfg.get("llm_base_url", "")):
+        raise HTTPException(503, "LLM API key is not configured")
+
+    try:
+        logger.info(
+            "CALLING SEMANTIC LLM:\neffective_source_lang=%s\neffective_target_lang=%s\nfragments=%s\nhistory_items=%s\nhistory_tokens=%s\nhistory_token_limit=%s\nprompt_tokens=%s",
+            source_lang, target_lang, len(document.fragments), len(fitted.history),
+            fitted.history_tokens, int(cfg.get("history_token_limit", 3000)), fitted.prompt_tokens,
+        )
+        llm_start = time.perf_counter()
+        try:
+            semantic_payload = await translate_screen_openai_compatible(cfg=cfg, messages=messages)
+            try:
+                destinations = validate_destination_payload(semantic_payload, document)
+            except ScreenDocumentError as validation_error:
+                logger.warning(
+                    "SEMANTIC VALIDATOR rejected first response: %s; requesting one full-screen repair",
+                    validation_error,
+                )
+                repair_messages = build_screen_messages(
+                    cfg,
+                    fitted.history,
+                    glossary,
+                    target,
+                    repair_error=str(validation_error),
+                    previous_response=semantic_payload,
+                )
+                semantic_payload = await translate_screen_openai_compatible(cfg=cfg, messages=repair_messages)
+                destinations = validate_destination_payload(semantic_payload, document)
+        finally:
+            llm_ms = (time.perf_counter() - llm_start) * 1000
+        logger.info(
+            "SEMANTIC LLM RESULT fragments=%s destination_blocks=%s grouping=%s",
+            len(document.fragments), len(destinations), [block.source_ids for block in destinations],
+        )
+    except Exception as e:
+        logger.exception("Semantic LLM request failed in /v1/screen/translate")
+        total_ms = (time.perf_counter() - total_start) * 1000
+        logger.info(
+            "TIMING id=%s status=502 decode=%.2fms ocr=%.2fms merge=%.2fms context=%.2fms llm=%.2fms save=%.2fms total=%.2fms",
+            request_id, decode_ms, ocr_ms, merge_ms, context_ms, llm_ms, save_ms, total_ms,
+        )
+        raise HTTPException(502, f"Semantic screen translation failed: {e}") from e
+
     db_rows = []
-    for i, b in enumerate(blocks):
-        translated = translations.get(i)
-        if not translated:
-            logger.warning(
-                "SOURCE COPIED TO TRANSLATION: source=%r (LLM was called but returned no translation for block=%s)",
-                b.source, i,
-            )
-            translated = b.source  # fail-soft for one omitted block
-        response_blocks.append({
-            "source": b.source,
-            "translation": translated,
-            "confidence": round(float(b.confidence), 5),
-            "box": b.box,
+    for destination in destinations:
+        logger.info(
+            "SAVE DESTINATION role=%s source_ids=%s source=%r translation=%r",
+            destination.role, destination.source_ids, destination.source, destination.translation,
+        )
+        db_rows.append({
+            "source_text": destination.source,
+            "translation": destination.translation,
+            "confidence": float(destination.confidence),
+            "box_json": json.dumps(list(destination.box), ensure_ascii=False),
             "language": source_lang,
-            "history_id": history_ids.get(i),
+            "target_language": target_lang,
+            "screen_hash": screen_hash,
+            "token_count": budget.count(f"SOURCE: {destination.source}\nTRANSLATION: {destination.translation}"),
+            "destination_id": destination.id,
+            "role": destination.role,
+            "source_fragment_ids_json": json.dumps(destination.source_ids, ensure_ascii=False),
+            "source_boxes_json": json.dumps([list(box) for box in destination.source_boxes], ensure_ascii=False),
         })
-        logger.info("SAVE TRANSLATION:\nsource=%r\ntranslation=%r", b.source, translated)
-        if i in miss_ids:
-            db_rows.append((b.source, translated, float(b.confidence), json.dumps(b.box), source_lang, target_lang, screen_hash, budget.count(f"SOURCE: {b.source}\nTRANSLATION: {translated}")))
 
     save_start = time.perf_counter()
-    inserted_ids = add_messages(source_id, source_name, session_id, db_rows)
-    for block_index, history_id in zip(miss_ids, inserted_ids):
-        response_blocks[block_index]["history_id"] = history_id
+    inserted_ids = add_destination_messages(source_id, source_name, session_id, db_rows)
+    for destination, history_id in zip(destinations, inserted_ids):
+        destination.history_id = history_id
+    if screen_cache_enabled and destinations and all(history_id is not None for history_id in inserted_ids):
+        if all(
+            not translation_has_disallowed_east_asian_script(destination.translation, target_lang)
+            for destination in destinations
+        ):
+            put_cached(source_id, session_id, screen_hash, destination_blocks_to_cache(destinations))
+            logger.info("SCREEN CACHE STORED hash=%s destination_blocks=%s", screen_hash[:12], len(destinations))
     save_ms = (time.perf_counter() - save_start) * 1000
+
+    response_blocks = [destination.response_dict() for destination in destinations]
     total_ms = (time.perf_counter() - total_start) * 1000
     response = {
         "blocks": response_blocks,
         "meta": {
             "session_id": session_id,
-            "ocr_blocks": len(blocks),
+            "pipeline": PIPELINE_VERSION,
+            "raw_ocr_fragments": len(raw_blocks),
+            "visual_fragments": len(document.fragments),
+            "destination_blocks": len(destinations),
+            "ocr_blocks": len(document.fragments),
+            "screen_cache_hit": False,
             "history_items_used": len(fitted.history),
             "history_tokens_used": fitted.history_tokens,
             "history_token_limit": int(cfg.get("history_token_limit", 3000)),
@@ -358,7 +449,7 @@ async def admin_ocr_test(
     target_lang: str = Form("ru"),
     translate: bool = Form(False),
 ):
-    """Run OCR independently of the Android endpoint, history, and screen cache."""
+    """Run the same visual-fragment/semantic-block pipeline without history or screen cache."""
     cfg = load_config()
     raw = await image.read()
     if not raw:
@@ -369,44 +460,80 @@ async def admin_ocr_test(
     if frame is None:
         raise HTTPException(400, "Unsupported/corrupted image")
     try:
-        blocks = await asyncio.to_thread(
+        raw_blocks = await asyncio.to_thread(
             ocr_engine.recognize,
             frame, source_lang, float(cfg.get("ocr_min_confidence", 0.45)),
             backend=cfg.get("ocr_backend", "paddle_cpu"),
             fallback_to_paddle=bool(cfg.get("ocr_fallback_to_paddle", True)),
         )
-        if cfg.get("ocr_merge_horizontal_blocks", True):
-            blocks = merge_ocr_blocks(blocks)
+        blocks = build_visual_fragments(
+            raw_blocks,
+            screen_width=int(frame.shape[1]),
+            join_contiguous=bool(cfg.get("ocr_merge_horizontal_blocks", True)),
+        )
     except Exception as e:
         raise HTTPException(503, f"OCR unavailable: {e}") from e
 
-    translations: dict[int, str] = {}
-    if translate and blocks:
+    document = ScreenDocument.from_ocr_blocks(
+        blocks,
+        width=int(frame.shape[1]),
+        height=int(frame.shape[0]),
+        source_language=source_lang,
+        target_language=target_lang,
+    )
+    if translate and document.fragments:
         if not str(cfg.get("llm_api_key") or "").strip() and "localhost" not in str(cfg.get("llm_base_url", "")) and "127.0.0.1" not in str(cfg.get("llm_base_url", "")):
             raise HTTPException(503, "LLM API key is not configured")
-        messages = build_messages(
-            cfg,
-            [],
-            glossary_text(cfg),
-            target_text(blocks, source_lang, target_lang),
-        )
+        target = screen_document_text(document)
+        messages = build_screen_messages(cfg, [], glossary_text(cfg), target)
         try:
-            translations = await translate_openai_compatible(cfg=cfg, messages=messages)
+            payload = await translate_screen_openai_compatible(cfg=cfg, messages=messages)
+            try:
+                destinations = validate_destination_payload(payload, document)
+            except ScreenDocumentError as validation_error:
+                repair_messages = build_screen_messages(
+                    cfg,
+                    [],
+                    glossary_text(cfg),
+                    target,
+                    repair_error=str(validation_error),
+                    previous_response=payload,
+                )
+                payload = await translate_screen_openai_compatible(cfg=cfg, messages=repair_messages)
+                destinations = validate_destination_payload(payload, document)
         except Exception as e:
-            raise HTTPException(502, f"LLM request failed: {e}") from e
+            raise HTTPException(502, f"Semantic LLM request failed: {e}") from e
+        response_blocks = [destination.response_dict() for destination in destinations]
+    else:
+        response_blocks = [
+            {
+                "id": fragment.id,
+                "source_ids": [fragment.id],
+                "source": fragment.text,
+                "translation": None,
+                "role": "unknown",
+                "confidence": round(float(fragment.confidence), 5),
+                "box": list(fragment.box),
+                "source_boxes": [list(fragment.box)],
+                "language": fragment.language,
+                "history_id": None,
+            }
+            for fragment in document.fragments
+        ]
 
     return {
-        "blocks": [
-            {
-                "source": block.source,
-                "translation": translations.get(index) if translate else None,
-                "confidence": round(float(block.confidence), 5),
-                "box": block.box,
-                "language": block.language,
-            }
-            for index, block in enumerate(blocks)
-        ],
-        "meta": {"ocr_blocks": len(blocks), "width": int(frame.shape[1]), "height": int(frame.shape[0]), "translated": translate, "ocr": ocr_engine.diagnostics()},
+        "blocks": response_blocks,
+        "meta": {
+            "pipeline": PIPELINE_VERSION,
+            "raw_ocr_fragments": len(raw_blocks),
+            "visual_fragments": len(document.fragments),
+            "destination_blocks": len(response_blocks) if translate else None,
+            "ocr_blocks": len(document.fragments),
+            "width": int(frame.shape[1]),
+            "height": int(frame.shape[0]),
+            "translated": translate,
+            "ocr": ocr_engine.diagnostics(),
+        },
     }
 
 class SettingsUpdate(BaseModel):
