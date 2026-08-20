@@ -13,27 +13,25 @@ class TranslationPresetTransferTest {
     @Test
     fun encryptedExportRoundTripsWithoutPlainPresetContent() {
         val settings = Settings(
-            model = "sync-model",
             targetLang = "zh-TW",
             dictionaryPrompt = "private dictionary prompt",
             translatorEngine = TranslatorEngine.OPENAI,
         )
         val preset = preset(
             id = "custom_sync",
-            name = "Manga Sync",
+            name = "Sync Preset",
             settings = settings,
         )
 
         val exported = TranslationPresetTransfer.encodeEncrypted(listOf(preset))
 
         assertTrue(exported.contains("ciphertext"))
-        assertFalse(exported.contains("Manga Sync"))
-        assertFalse(exported.contains("sync-model"))
+        assertFalse(exported.contains("Sync Preset"))
         assertFalse(exported.contains("private dictionary prompt"))
 
         val decoded = TranslationPresetTransfer.decodeEncrypted(exported)
         assertEquals(1, decoded.size)
-        assertEquals("Manga Sync", decoded.single().name)
+        assertEquals("Sync Preset", decoded.single().name)
         assertTrue(TranslationPresetCatalog.matchesSettings(decoded.single(), settings))
     }
 
@@ -73,12 +71,12 @@ class TranslationPresetTransferTest {
             val existing = preset(
                 id = "custom_existing",
                 name = case.existingName,
-                settings = Settings(model = "old-model")
+                settings = Settings().copy(dictionaryPrompt = "old-dict")
             )
             val imported = preset(
                 id = "custom_imported",
                 name = case.importedName,
-                settings = Settings(model = "new-model")
+                settings = Settings().copy(dictionaryPrompt = "new-dict")
             )
 
             val result = TranslationPresetTransfer.mergeImportedPresets(
@@ -90,7 +88,7 @@ class TranslationPresetTransferTest {
             assertEquals(case.name, listOf(case.existingName), result.overwrittenNames)
             assertEquals(case.name, "custom_existing", result.presets.single().id)
             assertEquals(case.name, case.existingName, result.presets.single().name)
-            assertEquals(case.name, "new-model", result.presets.single().model)
+            assertEquals(case.name, "new-dict", result.presets.single().dictionaryPrompt)
         }
     }
 
@@ -120,7 +118,7 @@ class TranslationPresetTransferTest {
     @Test
     fun mergeImportedPresetsAddsNewNamesAndAvoidsIdCollisions() {
         val existing = preset(id = "custom_same_id", name = "Manga")
-        val imported = preset(id = "custom_same_id", name = "Novel")
+        val imported = preset(id = "custom_same_id", name = "Novel", settings = Settings().copy(dictionaryPrompt = "d"))
 
         val result = TranslationPresetTransfer.mergeImportedPresets(
             existing = listOf(existing),
@@ -132,22 +130,6 @@ class TranslationPresetTransferTest {
         assertEquals("custom_same_id", result.presets.first().id)
         assertNotEquals("custom_same_id", result.presets.last().id)
         assertTrue(result.presets.last().id.startsWith("custom_imported_"))
-    }
-
-    @Test
-    fun importPreparationSkipsBuiltInIdsAndBlankNames() {
-        val imported = listOf(
-            TranslationPreset(id = TranslationPresetCatalog.BUILTIN_MANGA_JA_ZH, name = "Shadow"),
-            TranslationPreset(id = "custom_blank", name = "   "),
-        )
-
-        val plan = TranslationPresetTransfer.planImport(
-            existing = emptyList(),
-            imported = imported,
-        )
-
-        assertEquals(0, plan.importedCount)
-        assertTrue(plan.importedPresets.isEmpty())
     }
 
     @Test

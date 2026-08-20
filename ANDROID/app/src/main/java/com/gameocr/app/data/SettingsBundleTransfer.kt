@@ -312,13 +312,7 @@ object SettingsBundleTransfer {
         return SettingsFieldPolicy.decodePortable(values)
     }
 
-    private fun portablePreset(preset: TranslationPreset): TranslationPreset {
-        val defaults = Settings()
-        return preset.copy(
-            baseUrl = defaults.baseUrl,
-            deeplBaseUrl = defaults.deeplBaseUrl,
-        )
-    }
+    private fun portablePreset(preset: TranslationPreset): TranslationPreset = preset
 
     private fun readEntryUtf8Limited(input: InputStream, maxBytes: Int): String {
         val output = ByteArrayOutputStream(minOf(maxBytes, 32 * 1024))

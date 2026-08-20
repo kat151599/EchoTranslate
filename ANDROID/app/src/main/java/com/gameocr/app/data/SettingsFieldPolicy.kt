@@ -1,4 +1,4 @@
-﻿package com.gameocr.app.data
+package com.gameocr.app.data
 
 import androidx.annotation.StringRes
 import com.gameocr.app.R
@@ -131,14 +131,6 @@ object SettingsFieldPolicy {
         portable("translationGlossaryEnabled", R.string.settings_glossary_enabled),
         portable("foregroundAppDetectionMode", R.string.settings_foreground_app_detection),
         portable("sendAppNameToTranslator", R.string.settings_send_app_name),
-        credential("deeplApiKey", R.string.settings_search_item_deepl_api_key),
-        portable("deeplPro", R.string.settings_search_item_deepl_pro),
-        portable("deeplProtocol", R.string.settings_search_item_deepl_advanced),
-        privateConnection("deeplBaseUrl", R.string.settings_search_item_deepl_advanced),
-        portable("deeplBearerAuth", R.string.settings_search_item_deepl_advanced),
-        credential("deeplCustomToken", R.string.settings_search_item_deepl_advanced),
-        credential("youdaoAppKey", R.string.settings_search_item_youdao_pictrans),
-        credential("youdaoAppSecret", R.string.settings_search_item_youdao_pictrans),
         credential("volcAccessKeyId", R.string.settings_search_item_volc),
         credential("volcSecretAccessKey", R.string.settings_search_item_volc),
         portable("volcRegion", R.string.settings_search_item_volc),

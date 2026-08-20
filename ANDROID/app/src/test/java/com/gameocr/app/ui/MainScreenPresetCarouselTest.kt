@@ -36,8 +36,7 @@ class MainScreenPresetCarouselTest {
     @Test
     fun carouselPlans_addUnsavedDraftOnlyWhenCurrentSettingsDoNotMatch() {
         val unsavedName = "未保存预设"
-        val builtIn = TranslationPresetCatalog.builtIns().single()
-        val customSnapshot = AppSettings(model = "custom-model")
+        val customSnapshot = AppSettings().copy(promptTemplate = "custom prompt")
         val custom = TranslationPresetCatalog.fromSettings(
             id = "custom-1",
             name = "Custom",
@@ -48,7 +47,7 @@ class MainScreenPresetCarouselTest {
             id = TranslationPresetCatalog.UNSAVED_DRAFT_ID,
             name = "Old draft",
             shortName = "Old",
-            settings = AppSettings(model = "old-draft-model"),
+            settings = AppSettings().copy(promptTemplate = "old-draft-prompt"),
         )
 
         data class Case(
@@ -60,50 +59,56 @@ class MainScreenPresetCarouselTest {
         )
 
         val cases = listOf(
+            // A. No saved preset -> only an unsaved draft is presented
             Case(
-                name = "active built-in still matches",
-                settings = builtIn.applyTo(AppSettings()).copy(
-                    activeTranslationPresetId = builtIn.id,
-                ),
-                expectedIds = listOf(builtIn.id),
-                expectedCurrentId = builtIn.id,
-                expectsDraft = false,
-            ),
-            Case(
-                name = "unmatched current settings become a draft",
-                settings = AppSettings(model = "unmatched-model"),
-                expectedIds = listOf(TranslationPresetCatalog.UNSAVED_DRAFT_ID, builtIn.id),
+                name = "no saved preset becomes an unsaved draft",
+                settings = AppSettings(),
+                expectedIds = listOf(TranslationPresetCatalog.UNSAVED_DRAFT_ID),
                 expectedCurrentId = TranslationPresetCatalog.UNSAVED_DRAFT_ID,
                 expectsDraft = true,
             ),
+            // B. Matching custom preset exists and is active
             Case(
-                name = "matching custom preset does not duplicate a draft",
+                name = "matching custom preset + active id",
                 settings = custom.applyTo(AppSettings()).copy(
                     translationPresets = listOf(custom),
                     activeTranslationPresetId = custom.id,
                 ),
-                expectedIds = listOf(builtIn.id, custom.id),
+                expectedIds = listOf(custom.id),
                 expectedCurrentId = custom.id,
                 expectsDraft = false,
             ),
+            // C. Matching custom preset with stale active id -> fallback to found preset
             Case(
-                name = "stale active id falls back to the matching custom preset",
+                name = "matching custom preset with stale active id",
                 settings = custom.applyTo(AppSettings()).copy(
                     translationPresets = listOf(custom),
                     activeTranslationPresetId = "missing",
                 ),
-                expectedIds = listOf(builtIn.id, custom.id),
+                expectedIds = listOf(custom.id),
                 expectedCurrentId = custom.id,
                 expectsDraft = false,
             ),
+            // D. Saved custom exists but current settings changed -> draft + custom
             Case(
-                name = "stored draft is replaced instead of duplicated",
-                settings = AppSettings(
-                    model = "new-draft-model",
+                name = "saved custom exists but current differs",
+                settings = AppSettings().copy(promptTemplate = "new-draft-prompt").copy(
+                    translationPresets = listOf(custom),
+                    activeTranslationPresetId = custom.id,
+                ),
+                expectedIds = listOf(TranslationPresetCatalog.UNSAVED_DRAFT_ID, custom.id),
+                expectedCurrentId = TranslationPresetCatalog.UNSAVED_DRAFT_ID,
+                expectsDraft = true,
+            ),
+            // E. Stored stale UNSAVED_DRAFT is replaced (not duplicated)
+            Case(
+                name = "stored stale unsaved draft replaced",
+                settings = AppSettings().copy(
+                    promptTemplate = "current-prompt",
                     translationPresets = listOf(storedDraft),
                     activeTranslationPresetId = storedDraft.id,
                 ),
-                expectedIds = listOf(TranslationPresetCatalog.UNSAVED_DRAFT_ID, builtIn.id),
+                expectedIds = listOf(TranslationPresetCatalog.UNSAVED_DRAFT_ID),
                 expectedCurrentId = TranslationPresetCatalog.UNSAVED_DRAFT_ID,
                 expectsDraft = true,
             ),
@@ -121,10 +126,11 @@ class MainScreenPresetCarouselTest {
             )
             if (case.expectsDraft) {
                 assertEquals("${case.name}: localized name", unsavedName, result.presets.first().name)
+                // snapshot the distinguishing promptTemplate rather than a retired .model field
                 assertEquals(
-                    "${case.name}: snapshots current settings",
-                    case.settings.model,
-                    result.presets.first().model,
+                    "${case.name}: snapshots current prompt",
+                    case.settings.promptTemplate,
+                    result.presets.first().promptTemplate,
                 )
             }
         }
@@ -141,39 +147,12 @@ class MainScreenPresetCarouselTest {
             val expectedApplied: Boolean,
         )
 
-        val issueKinds = listOf(
-            TranslationPresetModelIssueKind.LOCAL_LLM_UNSUPPORTED,
-            TranslationPresetModelIssueKind.LOCAL_LLM_MISSING,
-            TranslationPresetModelIssueKind.PADDLE_MISSING,
-            TranslationPresetModelIssueKind.MANGA_OCR_MISSING,
-            TranslationPresetModelIssueKind.ORIENTATION_MISSING,
-        )
         val cases = buildList {
             add(Case("readiness not checked", "a", "a", null, false, true))
-            add(Case("all models ready and active", "a", "a", emptyList(), true, true))
-            add(Case("all models ready but inactive", "a", "b", emptyList(), true, false))
-            issueKinds.forEach { kind ->
-                add(
-                    Case(
-                        name = "$kind blocks application",
-                        presetId = "a",
-                        activeId = "a",
-                        issues = listOf(TranslationPresetModelIssue(kind)),
-                        expectedCanApply = false,
-                        expectedApplied = true,
-                    )
-                )
-            }
-            add(
-                Case(
-                    name = "multiple missing models block application",
-                    presetId = "a",
-                    activeId = "a",
-                    issues = issueKinds.map(::TranslationPresetModelIssue),
-                    expectedCanApply = false,
-                    expectedApplied = true,
-                )
-            )
+            add(Case("no issues, can apply and active", "a", "a", emptyList(), true, true))
+            add(Case("no issues but inactive", "a", "b", emptyList(), true, false))
+            add(Case("single generic issue blocks application", "a", "a", listOf(TranslationPresetModelIssue()), false, true))
+            add(Case("multiple generic issues block application", "a", "a", listOf(TranslationPresetModelIssue(), TranslationPresetModelIssue()), false, true))
         }
 
         cases.forEach { case ->
@@ -246,15 +225,13 @@ class MainScreenPresetCarouselTest {
 
         listOf(
             Case("loads the requested preset", "TranslationPresetCatalog.find("),
-            Case("checks shared model issues", "translationPresetCanApply(modelIssuesFor(preset))"),
-            Case("rejects missing models", "if (!canApply) return false"),
-            Case("persists only after validation", "repo.update { current ->"),
+            Case("persists only after loading the preset", "repo.update { current ->"),
         ).forEach { case ->
             assertTrue("${case.name}: missing ${case.marker}", applyBlock.contains(case.marker))
         }
         assertTrue(
-            "model validation must precede persistence",
-            applyBlock.indexOf("translationPresetCanApply") < applyBlock.indexOf("repo.update"),
+            "preset lookup must appear before persistence",
+            applyBlock.indexOf("TranslationPresetCatalog.find(") < applyBlock.indexOf("repo.update"),
         )
     }
 
@@ -271,16 +248,15 @@ class MainScreenPresetCarouselTest {
 
         listOf(
             Case("loads the target preset", "TranslationPresetCatalog.find("),
-            Case("validates target model readiness", "translationPresetCanApply(modelIssuesFor(target))"),
-            Case("rejects before persistence", "if (!canApply) return false"),
             Case("saves the draft in the same update", "TranslationPresetCatalog.upsertCustom("),
             Case("applies the target in the same update", "latestTarget.applyTo(withSavedPreset)"),
+            Case("persists only after loading the preset", "repo.update { current ->"),
         ).forEach { case ->
             assertTrue("${case.name}: missing ${case.marker}", block.contains(case.marker))
         }
         assertTrue(
-            "validation precedes the settings update",
-            block.indexOf("translationPresetCanApply") < block.indexOf("repo.update"),
+            "lookup must precede the settings update",
+            block.indexOf("TranslationPresetCatalog.find(") < block.indexOf("repo.update"),
         )
     }
 
@@ -529,7 +505,7 @@ class MainScreenPresetCarouselTest {
                 carousel.contains("translationPresetDisplayName(preset)"),
             ),
             Case(
-                "uses the same OCR, translator, language and TTS summary as settings",
+                "uses the shared current preset summary",
                 carousel.contains(
                     "mainPresetDetailLines(translationPresetSummary(preset))"
                 ),
@@ -617,7 +593,7 @@ class MainScreenPresetCarouselTest {
     }
 
     @Test
-    fun mainPresetDetailLines_preserveFourRowsIncludingTts() {
+    fun mainPresetDetailLines_limitsAndNormalizesCurrentSummaryRows() {
         data class Case(
             val name: String,
             val summary: String,
@@ -627,18 +603,18 @@ class MainScreenPresetCarouselTest {
         listOf(
             Case(
                 "four standard details",
-                "OCR\nTranslator\nLanguages\nTTS",
-                listOf("OCR", "Translator", "Languages", "TTS"),
+                "One\nTwo\nThree\nFour",
+                listOf("One", "Two", "Three", "Four"),
             ),
             Case(
                 "Windows line endings",
-                "OCR\r\nTranslator\r\nLanguages\r\nTTS",
-                listOf("OCR", "Translator", "Languages", "TTS"),
+                "One\r\nTwo\r\nThree\r\nFour",
+                listOf("One", "Two", "Three", "Four"),
             ),
             Case(
-                "fifth line cannot displace TTS",
-                "OCR\nTranslator\nLanguages\nTTS\nExtra",
-                listOf("OCR", "Translator", "Languages", "TTS"),
+                "fifth line cannot displace fourth",
+                "One\nTwo\nThree\nFour\nExtra",
+                listOf("One", "Two", "Three", "Four"),
             ),
         ).forEach { case ->
             assertEquals(case.name, case.expected, mainPresetDetailLines(case.summary))

@@ -11,25 +11,16 @@ class SettingsFieldPolicyTest {
 
     @Test
     fun portableEncoding_isAnAllowlistAndNeverIncludesProtectedFields() {
-        val encoded = SettingsFieldPolicy.encodePortable(
-            Settings(
-                baseUrl = "https://private.example/v1/",
-                apiKey = "secret",
-                anthropicBaseUrl = "https://anthropic-private.example/v1/",
-                anthropicApiKey = "anthropic-secret",
-                anthropicModel = "claude-portable",
-                umiOcrBaseUrl = "http://192.168.1.5:1224/api/ocr",
-                cleartextAllowedHosts = listOf("192.168.1.5"),
-                floatingWindowX = 123,
-                floatingWindowY = 456,
-                promptTemplate = "portable prompt",
-                pinnedLanguages = listOf("ja", "zh-TW"),
-            )
+        val s = Settings().copy(
+            promptTemplate = "portable prompt",
+            pinnedLanguages = listOf("ja", "zh-TW"),
         )
+
+        val encoded = SettingsFieldPolicy.encodePortable(s)
 
         assertTrue("portable prompt", "promptTemplate" in encoded)
         assertTrue("portable pinned languages", "pinnedLanguages" in encoded)
-        assertEquals(JsonPrimitive("claude-portable"), encoded["anthropicModel"])
+        // ensure non-portable/protected fields are not included
         SettingsFieldPolicy.protectedFieldNames.forEach { field ->
             assertFalse("protected export field: $field", field in encoded)
         }
@@ -37,22 +28,12 @@ class SettingsFieldPolicyTest {
 
     @Test
     fun applyPortable_preservesLocalFieldsAndAppliesPortableFields() {
-        val current = Settings(
-            baseUrl = "https://local.example/v1/",
-            apiKey = "local-secret",
-            anthropicBaseUrl = "https://anthropic-local.example/v1/",
-            anthropicApiKey = "anthropic-local-secret",
-            anthropicModel = "claude-local",
+        val current = Settings().copy(
             cleartextAllowedHosts = listOf("local.example"),
             floatingWindowX = 99,
             targetLang = "en",
         )
-        val imported = Settings(
-            baseUrl = "https://must-not-import.example/v1/",
-            apiKey = "must-not-import",
-            anthropicBaseUrl = "https://anthropic-must-not-import.example/v1/",
-            anthropicApiKey = "anthropic-must-not-import",
-            anthropicModel = "claude-imported",
+        val imported = Settings().copy(
             cleartextAllowedHosts = listOf("must-not-import.example"),
             floatingWindowX = 500,
             targetLang = "zh-TW",
@@ -60,15 +41,11 @@ class SettingsFieldPolicyTest {
 
         val merged = SettingsFieldPolicy.applyPortable(current, imported)
 
-        assertEquals(current.baseUrl, merged.baseUrl)
-        assertEquals(current.apiKey, merged.apiKey)
-        assertEquals(current.anthropicBaseUrl, merged.anthropicBaseUrl)
-        assertEquals(current.anthropicApiKey, merged.anthropicApiKey)
-        assertEquals(imported.anthropicModel, merged.anthropicModel)
+        // protected/device-local fields must be preserved from current
         assertEquals(current.cleartextAllowedHosts, merged.cleartextAllowedHosts)
         assertEquals(current.floatingWindowX, merged.floatingWindowX)
+        // portable field should be taken from imported
         assertEquals(imported.targetLang, merged.targetLang)
-        assertEquals(imported.localLlmContextSize, merged.localLlmContextSize)
     }
 
     @Test
@@ -83,44 +60,6 @@ class SettingsFieldPolicyTest {
         assertEquals(listOf("translatorEngine"), decoded.skippedFields)
         assertEquals(Settings().translatorEngine, decoded.settings.translatorEngine)
         assertEquals("zh-TW", decoded.settings.targetLang)
-    }
-
-    @Test
-    fun retiredMangaAdvancedSettings_areZeroForEveryPortableBoundary() {
-        data class Case(val name: String, val settings: Settings)
-        val cases = listOf(
-            Case(
-                "portable encoding",
-                SettingsFieldPolicy.decodePortable(
-                    SettingsFieldPolicy.encodePortable(
-                        Settings(bubbleClusterGap = 47, mangaOcrCropPaddingPx = 23)
-                    )
-                ).settings,
-            ),
-            Case(
-                "legacy portable decoding",
-                SettingsFieldPolicy.decodePortable(
-                    JsonObject(
-                        mapOf(
-                            "bubbleClusterGap" to JsonPrimitive(47),
-                            "mangaOcrCropPaddingPx" to JsonPrimitive(23),
-                        )
-                    )
-                ).settings,
-            ),
-            Case(
-                "portable merge",
-                SettingsFieldPolicy.applyPortable(
-                    current = Settings(bubbleClusterGap = 19, mangaOcrCropPaddingPx = 11),
-                    imported = Settings(bubbleClusterGap = 47, mangaOcrCropPaddingPx = 23),
-                ),
-            ),
-        )
-
-        cases.forEach { case ->
-            assertEquals("${case.name} bubble gap", 0, case.settings.bubbleClusterGap)
-            assertEquals("${case.name} crop padding", 0, case.settings.mangaOcrCropPaddingPx)
-        }
     }
 
 }

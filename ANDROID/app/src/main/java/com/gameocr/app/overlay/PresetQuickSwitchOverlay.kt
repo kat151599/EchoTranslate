@@ -258,10 +258,6 @@ class PresetQuickSwitchOverlay(private val context: Context) {
     }
 
     private fun presetLlmName(preset: TranslationPreset): String = when (preset.translatorEngine) {
-        TranslatorEngine.OPENAI -> preset.model.ifBlank { translatorName(TranslatorEngine.OPENAI) }
-        TranslatorEngine.ANTHROPIC -> preset.anthropicModel.ifBlank {
-            translatorName(TranslatorEngine.ANTHROPIC)
-        }
         TranslatorEngine.LOCAL_SAKURA -> translatorName(TranslatorEngine.LOCAL_SAKURA)
         TranslatorEngine.LOCAL_HY_MT2 -> translatorName(TranslatorEngine.LOCAL_HY_MT2)
         TranslatorEngine.GOOGLE_ML_KIT -> onDeviceSourceName(preset.sourceLang)

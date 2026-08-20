@@ -104,12 +104,11 @@ class FloatingMenuOrderTest {
             onPresetSwitch = {},
             onRestartCapture = {},
             onSwitchToFullScreen = {},
-            onSwitchToWordSelect = {},
         )
         listOf(
             Case(
                 FloatingSkill.FULL_SCREEN,
-                listOf(R.string.menu_loop_translate, R.string.menu_word_select),
+                listOf(R.string.menu_loop_translate, R.string.menu_full_screen_skill),
             ),
             Case(
                 FloatingSkill.WORD_SELECT,
@@ -117,7 +116,7 @@ class FloatingMenuOrderTest {
             ),
             Case(
                 FloatingSkill.LOOP,
-                listOf(R.string.menu_full_screen_skill, R.string.menu_word_select),
+                listOf(R.string.menu_full_screen_skill, R.string.menu_loop_translate),
             ),
         ).forEach { case ->
             val items = MenuItemRegistry.build(
@@ -171,12 +170,11 @@ class FloatingMenuOrderTest {
             onSwitchToLoop = {}, onRegion = {}, onLanguagePair = {}, onOpenMain = {},
             onOpenSettings = {}, onPresetSwitch = {}, onSwitchToFullScreen = {},
             onRestartCapture = {},
-            onSwitchToWordSelect = {},
         )
         data class Case(val id: MenuItemId, val expectedLabel: Int)
         listOf(
             Case(MenuItemId.LOOP, R.string.menu_full_screen_skill),
-            Case(MenuItemId.FULL_SCREEN_SKILL, R.string.menu_word_select),
+            Case(MenuItemId.FULL_SCREEN_SKILL, R.string.menu_full_screen_skill),
         ).forEach { case ->
             val items = MenuItemRegistry.build(
                 ids = listOf(case.id),

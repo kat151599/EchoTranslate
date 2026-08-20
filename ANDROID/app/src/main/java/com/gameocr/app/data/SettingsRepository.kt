@@ -1,4 +1,4 @@
-﻿package com.gameocr.app.data
+package com.gameocr.app.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.MutablePreferences
@@ -34,12 +34,6 @@ class SettingsRepository @Inject constructor(
     secretCipher: SettingsSecretCipher
 ) {
     private object Keys {
-        val BaseUrl = stringPreferencesKey("base_url")
-        val ApiKey = stringPreferencesKey("api_key")
-        val Model = stringPreferencesKey("model")
-        val AnthropicBaseUrl = stringPreferencesKey("anthropic_base_url")
-        val AnthropicApiKey = stringPreferencesKey("anthropic_api_key")
-        val AnthropicModel = stringPreferencesKey("anthropic_model")
         val SourceLang = stringPreferencesKey("source_lang")
         val TargetLang = stringPreferencesKey("target_lang")
         val Prompt = stringPreferencesKey("prompt")
@@ -80,12 +74,6 @@ class SettingsRepository @Inject constructor(
         val RemotePcApiKey = stringPreferencesKey("remote_pc_api_key")
         val RemotePcSessionId = stringPreferencesKey("remote_pc_session_id")
         val RemotePcImageQuality = intPreferencesKey("remote_pc_image_quality")
-        val DeeplKey = stringPreferencesKey("deepl_key")
-        val DeeplPro = booleanPreferencesKey("deepl_pro")
-        val DeeplProtocol = stringPreferencesKey("deepl_protocol")
-        val DeeplBaseUrl = stringPreferencesKey("deepl_base_url")
-        val DeeplBearerAuth = booleanPreferencesKey("deepl_bearer_auth")
-        val DeeplCustomToken = stringPreferencesKey("deepl_custom_token")
         val FloatingSize = intPreferencesKey("floating_button_size_dp")
         val FloatingX = intPreferencesKey("floating_button_x")
         val FloatingY = intPreferencesKey("floating_button_y")
@@ -140,14 +128,9 @@ class SettingsRepository @Inject constructor(
         context.getString(R.string.default_dictionary_prompt)
     }
     private val secureStringKeys = listOf(
-        Keys.BaseUrl,
-        Keys.ApiKey,
         Keys.Prompt,
         Keys.RemotePcBaseUrl,
         Keys.RemotePcApiKey,
-        Keys.DeeplKey,
-        Keys.DeeplBaseUrl,
-        Keys.DeeplCustomToken,
         Keys.VolcAccessKeyId,
         Keys.VolcSecretAccessKey,
         Keys.BaiduFanyiAppId,
@@ -276,12 +259,6 @@ class SettingsRepository @Inject constructor(
                 requested
             }
             val next = languageSafe
-            prefs.putSecure(Keys.BaseUrl, next.baseUrl)
-            prefs.putSecure(Keys.ApiKey, next.apiKey)
-            prefs[Keys.Model] = next.model
-            prefs.putSecure(Keys.AnthropicBaseUrl, next.anthropicBaseUrl)
-            prefs.putSecure(Keys.AnthropicApiKey, next.anthropicApiKey)
-            prefs[Keys.AnthropicModel] = next.anthropicModel
             prefs[Keys.SourceLang] = next.sourceLang
             prefs[Keys.TargetLang] = next.targetLang
             prefs.putSecure(Keys.Prompt, next.promptTemplate)
@@ -326,12 +303,6 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.TranslationGlossaryEnabled] = next.translationGlossaryEnabled
             prefs[Keys.ForegroundAppDetectionMode] = next.foregroundAppDetectionMode.name
             prefs[Keys.SendAppNameToTranslator] = next.sendAppNameToTranslator
-            prefs.putSecure(Keys.DeeplKey, next.deeplApiKey)
-            prefs[Keys.DeeplPro] = next.deeplPro
-            prefs[Keys.DeeplProtocol] = next.deeplProtocol.name
-            prefs.putSecure(Keys.DeeplBaseUrl, next.deeplBaseUrl)
-            prefs[Keys.DeeplBearerAuth] = next.deeplBearerAuth
-            prefs.putSecure(Keys.DeeplCustomToken, next.deeplCustomToken)
             prefs[Keys.FloatingSize] = next.floatingButtonSizeDp
             prefs[Keys.FloatingX] = next.floatingButtonX
             prefs[Keys.FloatingY] = next.floatingButtonY
@@ -391,12 +362,6 @@ class SettingsRepository @Inject constructor(
             direction = storedTranslationOutputDirection,
         )
         return Settings(
-            baseUrl = secureString(Keys.BaseUrl, default.baseUrl),
-            apiKey = secureString(Keys.ApiKey, default.apiKey),
-            model = this[Keys.Model] ?: default.model,
-            anthropicBaseUrl = secureString(Keys.AnthropicBaseUrl, default.anthropicBaseUrl),
-            anthropicApiKey = secureString(Keys.AnthropicApiKey, default.anthropicApiKey),
-            anthropicModel = this[Keys.AnthropicModel] ?: default.anthropicModel,
             // 兼容 0.1.x 旧用户：那时 sourceLang 用 enum.name（"AUTO"/"JA"/...）保存。
             // 新版改为 BCP-47 tag（"auto"/"ja"/...）。读出时若是旧大写值，按 mapping 转回。
             sourceLang = (this[Keys.SourceLang] ?: default.sourceLang).let { raw ->
@@ -487,13 +452,6 @@ class SettingsRepository @Inject constructor(
             }.getOrDefault(default.foregroundAppDetectionMode),
             sendAppNameToTranslator = this[Keys.SendAppNameToTranslator]
                 ?: default.sendAppNameToTranslator,
-            deeplApiKey = secureString(Keys.DeeplKey, default.deeplApiKey),
-            deeplPro = this[Keys.DeeplPro] ?: default.deeplPro,
-            deeplProtocol = runCatching { DeeplProtocol.valueOf(this[Keys.DeeplProtocol] ?: "") }
-                .getOrDefault(default.deeplProtocol),
-            deeplBaseUrl = secureString(Keys.DeeplBaseUrl, default.deeplBaseUrl),
-            deeplBearerAuth = this[Keys.DeeplBearerAuth] ?: default.deeplBearerAuth,
-            deeplCustomToken = secureString(Keys.DeeplCustomToken, default.deeplCustomToken),
             floatingButtonSizeDp = this[Keys.FloatingSize] ?: default.floatingButtonSizeDp,
             floatingButtonX = this[Keys.FloatingX] ?: default.floatingButtonX,
             floatingButtonY = this[Keys.FloatingY] ?: default.floatingButtonY,

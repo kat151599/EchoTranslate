@@ -1,4 +1,4 @@
-﻿package com.gameocr.app.data
+package com.gameocr.app.data
 
 import androidx.annotation.StringRes
 import com.gameocr.app.R
@@ -6,18 +6,9 @@ import com.gameocr.app.capture.CaptureRegion
 import kotlinx.serialization.Serializable
 import java.security.MessageDigest
 
-const val DEFAULT_ANTHROPIC_BASE_URL = "https://api.deepseek.com/anthropic"
-const val DEFAULT_ANTHROPIC_MODEL = "deepseek-v4-flash"
-
 /** 用户配置：capture、render 与 Remote PC 翻译相关。 */
 @Serializable
 data class Settings(
-    val baseUrl: String = "https://api.deepseek.com/v1/",
-    val apiKey: String = "",
-    val model: String = "deepseek-v4-flash",
-    val anthropicBaseUrl: String = DEFAULT_ANTHROPIC_BASE_URL,
-    val anthropicApiKey: String = "",
-    val anthropicModel: String = DEFAULT_ANTHROPIC_MODEL,
     /** BCP-47 源语言代码（如 "auto"/"ja"/"zh-CN"）。从全部 [Languages.ALL] 中选取。 */
     val sourceLang: String = Languages.AUTO.code,
     val targetLang: String = "zh-CN",
@@ -113,32 +104,6 @@ data class Settings(
     val translationGlossaryEnabled: Boolean = true,
     val foregroundAppDetectionMode: ForegroundAppDetectionMode = ForegroundAppDetectionMode.AUTO,
     val sendAppNameToTranslator: Boolean = false,
-    val deeplApiKey: String = "",
-    val deeplPro: Boolean = false,
-    /**
-     * DeepL 请求 / 响应协议。**与 [deeplBaseUrl] 解耦**，因为有的自架是 deeplx 协议、有的是
-     * DeepL 官方兼容代理；URL 不应该决定协议。默认走 OFFICIAL 不破坏老配置。
-     */
-    val deeplProtocol: DeeplProtocol = DeeplProtocol.OFFICIAL,
-    /**
-     * DeepL 自定义 base URL（含末尾 `/`，例如 `http://localhost:1188/`）。
-     * 空 = 按 [deeplPro] 选官方端点（free / pro）。自架 deeplx / Cloudflare worker 的用户填这里。
-     * 非空时 [deeplPro] 失效（自定义后端不区分 free/pro），test connection 也改用 `translate` 探活。
-     */
-    val deeplBaseUrl: String = "",
-    /**
-     * 自定义 base URL 时的鉴权方式：false = `DeepL-Auth-Key <token>`（官方格式），true = `Bearer <token>`（部分 deeplx 部署）。
-     * 仅在 [deeplBaseUrl] 非空时生效。鉴权用的 token 是 [deeplCustomToken]（**不是** [deeplApiKey]），避免把官方 key 误发给自架/第三方端点。
-     */
-    val deeplBearerAuth: Boolean = false,
-    /**
-     * 自定义 base URL 模式下专用的访问 token。与 [deeplApiKey]（官方 free/pro key）**完全隔离**，
-     * 防止用户切换 URL 时把官方 key 泄漏给第三方。留空 = 不发 Authorization（裸 deeplx 无鉴权场景）。
-     */
-    val deeplCustomToken: String = "",
-    /** 有道智云一套 AppKey/Secret，OCR (ocrapi) 与图片翻译 (ocrtransapi) 共用。 */
-    val youdaoAppKey: String = "",
-    val youdaoAppSecret: String = "",
     /** 火山引擎机器翻译 AccessKey ID（SignV4 鉴权用）。 */
     val volcAccessKeyId: String = "",
     val volcSecretAccessKey: String = "",
@@ -322,10 +287,6 @@ data class TranslationPreset(
     val id: String,
     val name: String,
     val shortName: String = name.take(8),
-    val baseUrl: String = "https://api.deepseek.com/v1/",
-    val model: String = "deepseek-v4-flash",
-    val anthropicBaseUrl: String = DEFAULT_ANTHROPIC_BASE_URL,
-    val anthropicModel: String = DEFAULT_ANTHROPIC_MODEL,
     val sourceLang: String = Languages.AUTO.code,
     val targetLang: String = "zh-CN",
     val promptTemplate: String = Settings.DEFAULT_PROMPT,
@@ -353,10 +314,6 @@ data class TranslationPreset(
     val streamingTranslate: Boolean = true,
     val retryEmptyTranslation: Boolean = false,
     val translatorEngine: TranslatorEngine = TranslatorEngine.REMOTE_PC,
-    val deeplPro: Boolean = false,
-    val deeplProtocol: DeeplProtocol = DeeplProtocol.OFFICIAL,
-    val deeplBaseUrl: String = "",
-    val deeplBearerAuth: Boolean = false,
     val apiTimeoutSeconds: Int = 30,
     val mergeAdjacentBlocks: Boolean = false,
     val mergeStrength: MergeStrength = MergeStrength.STANDARD,
@@ -374,10 +331,6 @@ data class TranslationPreset(
             translationOutputDirection,
         )
         return settings.copy(
-        baseUrl = baseUrl,
-        model = model,
-        anthropicBaseUrl = anthropicBaseUrl,
-        anthropicModel = anthropicModel,
         sourceLang = sourceLang,
         targetLang = targetLang,
         promptTemplate = promptTemplate,
@@ -405,10 +358,6 @@ data class TranslationPreset(
         retryEmptyTranslation = retryEmptyTranslation,
         // LEGACY_COMPAT: presets may contain a retired engine, but always apply Remote PC.
         translatorEngine = TranslatorEngine.REMOTE_PC,
-        deeplPro = deeplPro,
-        deeplProtocol = deeplProtocol,
-        deeplBaseUrl = deeplBaseUrl,
-        deeplBearerAuth = deeplBearerAuth,
         apiTimeoutSeconds = apiTimeoutSeconds,
         mergeAdjacentBlocks = mergeAdjacentBlocks,
         mergeStrength = mergeStrength,
@@ -447,10 +396,6 @@ object TranslationPresetCatalog {
             id = id,
             name = name,
             shortName = shortName,
-            baseUrl = settings.baseUrl,
-            model = settings.model,
-            anthropicBaseUrl = settings.anthropicBaseUrl,
-            anthropicModel = settings.anthropicModel,
             sourceLang = settings.sourceLang,
             targetLang = settings.targetLang,
             promptTemplate = settings.promptTemplate,
@@ -477,10 +422,6 @@ object TranslationPresetCatalog {
             streamingTranslate = settings.streamingTranslate,
             retryEmptyTranslation = settings.retryEmptyTranslation,
             translatorEngine = TranslatorEngine.REMOTE_PC,
-            deeplPro = settings.deeplPro,
-            deeplProtocol = settings.deeplProtocol,
-            deeplBaseUrl = settings.deeplBaseUrl,
-            deeplBearerAuth = settings.deeplBearerAuth,
             apiTimeoutSeconds = settings.apiTimeoutSeconds,
             mergeAdjacentBlocks = settings.mergeAdjacentBlocks,
             mergeStrength = settings.mergeStrength,
@@ -515,10 +456,6 @@ object TranslationPresetCatalog {
             preset.translationOutputDirection,
         )
         return sha256(
-            preset.baseUrl,
-            preset.model,
-            preset.anthropicBaseUrl,
-            preset.anthropicModel,
             preset.sourceLang,
             preset.targetLang,
             preset.promptTemplate,
@@ -558,10 +495,6 @@ object TranslationPresetCatalog {
             preset.streamingTranslate,
             preset.retryEmptyTranslation,
             preset.translatorEngine.name,
-            preset.deeplPro,
-            preset.deeplProtocol.name,
-            preset.deeplBaseUrl,
-            preset.deeplBearerAuth,
             preset.apiTimeoutSeconds,
             preset.mergeAdjacentBlocks,
             preset.mergeStrength.name,

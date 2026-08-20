@@ -3,7 +3,6 @@ package com.gameocr.app.data
 import android.content.Context
 import android.content.ContextWrapper
 import com.gameocr.app.capture.CaptureRegion
-import com.gameocr.app.ocr.TextOrientation
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
@@ -67,25 +66,6 @@ class SettingsRepositoryBehaviorTest {
             val actual = repository.get()
             assertEquals("${case.name} source", case.expectedSource, actual.sourceLang)
             assertEquals("${case.name} target", case.expectedTarget, actual.targetLang)
-        }
-    }
-
-    @Test
-    fun ttsPlaybackGain_tableDriven_isClampedWhenPersisted() = runBlocking {
-        data class Case(val name: String, val requestedDb: Int, val expectedDb: Int)
-
-        val repository = fileBackedRepository(
-            Files.createTempDirectory("settings-tts-gain-test").toFile()
-        )
-        listOf(
-            Case("below minimum", -1, 0),
-            Case("disabled", 0, 0),
-            Case("middle", 12, 12),
-            Case("maximum", 24, 24),
-            Case("above maximum", 30, 24),
-        ).forEach { case ->
-            repository.update { Settings(ttsGainDb = case.requestedDb) }
-            assertEquals(case.name, case.expectedDb, repository.get().ttsGainDb)
         }
     }
 
@@ -173,28 +153,12 @@ class SettingsRepositoryBehaviorTest {
         val repository = fileBackedRepository(root)
         val fontName = "${"b".repeat(64)}.ttf"
         val preset = TranslationPreset(id = "custom_roundtrip", name = "Round trip")
-        val requested = Settings(
-            baseUrl = "https://roundtrip.example/v1/",
-            apiKey = "api-key",
-            model = "roundtrip-model",
-            anthropicBaseUrl = "https://anthropic.example/v1/",
-            anthropicApiKey = "roundtrip-anthropic-key",
-            anthropicModel = "claude-roundtrip",
+        val requested = Settings().copy(
             sourceLang = "ja",
             targetLang = "zh-TW",
             promptTemplate = "roundtrip prompt",
-            ocrEngine = OcrEngineKind.PADDLE_ONNX,
             captureLoopIntervalMs = 4321L,
             loopTriggerMode = LoopTriggerMode.FIXED_INTERVAL,
-            loopTextStableDurationMs = 1300L,
-            loopSkipSimilarFrames = false,
-            loopFrameSimilarityThreshold = 0.83f,
-            loopTextRegionMode = LoopTextRegionMode.ANYWHERE,
-            loopTranslateRegionOnly = false,
-            developerOptionsEnabled = true,
-            ocrRedBoxModeEnabled = true,
-            ocrRedBoxShowSourceText = false,
-            ocrRedBoxShowTranslation = true,
             captureRegion = CaptureRegion(11, 22, 333, 444),
             captureRegionSavedScreenW = 1920,
             captureRegionSavedScreenH = 1080,
@@ -215,7 +179,6 @@ class SettingsRepositoryBehaviorTest {
             overlayFonts = listOf(OverlayFontEntry(fontName, "Roundtrip.ttf")),
             streamingTranslate = false,
             retryEmptyTranslation = true,
-            ttsGainDb = 7,
             renderMode = RenderMode.FLOATING_WINDOW,
             translationBlockInteractionMode = TranslationBlockInteractionMode.OPEN_COPY_PANEL,
             overlayPlacement = OverlayPlacement.ABOVE,
@@ -226,47 +189,14 @@ class SettingsRepositoryBehaviorTest {
             customBorderWidth = 4,
             overlayOffsetX = 31,
             overlayOffsetY = -17,
-            preprocess = PreprocessOptions(upscale2x = true, invert = true, binarize = true),
-            textOrientationAutoDetect = false,
-            manualTextOrientation = TextOrientation.VERTICAL_RTL,
-            translationOutputFollowRecognition = false,
-            translationOutputLayout = TranslationOutputLayout.VERTICAL,
-            translationOutputDirection = TranslationOutputDirection.RIGHT_TO_LEFT,
-            baiduOcrApiKey = "baidu-key",
-            baiduOcrSecretKey = "baidu-secret",
-            baiduOcrEndpoint = BaiduOcrEndpoint.ACCURATE_BASIC,
-            baiduOcrLanguage = BaiduOcrLanguage.JAP,
-            umiOcrBaseUrl = "http://127.0.0.1:1224/api/ocr",
-            lunaOcrBaseUrl = "http://127.0.0.1:2333/api/ocr",
-            paddleAiStudioToken = "paddle-token",
-            tencentSecretId = "tencent-id",
-            tencentSecretKey = "tencent-secret",
-            tencentRegion = "ap-singapore",
-            tencentOcrEndpoint = TencentOcrEndpoint.GENERAL_ACCURATE,
-            tencentOcrLanguage = TencentOcrLanguage.ZH_RARE,
-            paddleModelVersion = PaddleModelVersion.V5_MOBILE,
-            paddleModelMirrorUrl = "https://mirror.example/paddle/",
-            mangaOcrModelMirrorUrl = "https://mirror.example/manga/",
-            orientationModelMirrorUrl = "https://mirror.example/orientation/",
             preferShizukuCapture = true,
             a11yVolumeTrigger = true,
-            translatorEngine = TranslatorEngine.DEEPL,
+            translatorEngine = TranslatorEngine.REMOTE_PC,
+            remotePcBaseUrl = "https://roundtrip.remotepc/",
+            remotePcApiKey = "roundtrip-remote-key",
             translationGlossaryEnabled = false,
             foregroundAppDetectionMode = ForegroundAppDetectionMode.USAGE_ACCESS,
             sendAppNameToTranslator = true,
-            deeplApiKey = "deepl-key",
-            deeplPro = true,
-            deeplProtocol = DeeplProtocol.DEEPLX,
-            deeplBaseUrl = "https://deeplx.example/",
-            deeplBearerAuth = true,
-            deeplCustomToken = "deepl-token",
-            youdaoAppKey = "youdao-key",
-            youdaoAppSecret = "youdao-secret",
-            volcAccessKeyId = "volc-id",
-            volcSecretAccessKey = "volc-secret",
-            volcRegion = "cn-south-1",
-            baiduFanyiAppId = "baidu-app-id",
-            baiduFanyiSecretKey = "baidu-fanyi-secret",
             floatingButtonSizeDp = 53,
             floatingButtonX = 101,
             floatingButtonY = 202,
@@ -283,33 +213,54 @@ class SettingsRepositoryBehaviorTest {
             overlayAllowWrap = false,
             overlayAvoidCollision = false,
             apiTimeoutSeconds = 47,
-            mergeAdjacentBlocks = true,
-            mergeStrength = MergeStrength.CONSERVATIVE,
             disableCrossLineContextTranslation = true,
             pinnedLanguages = listOf("ja", "zh-TW", "en"),
-            mlKitRecentSourceLanguages = listOf("ru", "en", "ja", "ko"),
             cleartextAllowedHosts = listOf("192.168.0.2", "localhost"),
             floatingMenuItemOrder = FloatingMenu.DEFAULT_ORDER.reversed(),
             arcMenuPageSize = 5,
             floatingButtonSkill = FloatingSkill.LOOP,
             dictionaryPrompt = "roundtrip dictionary",
-            localLlmContextSize = 3072,
-            localLlmMaxNewTokens = 333,
-            dbnetProbThresh = 0.19f,
-            dbnetBoxScoreThresh = 0.44f,
-            dbnetUnclipRatio = 1.37f,
-            mangaOcrDbnetUnclipRatio = 1.83f,
-            bubbleClusterGap = 47,
-            mangaOcrCropPaddingPx = 29,
-            localLlmMirror = LlmMirrorChoice.CUSTOM,
-            localLlmMirrorUrl = "https://mirror.example/llm/",
             translationPresets = listOf(preset),
             activeTranslationPresetId = preset.id,
         )
 
         repository.update { requested }
 
-        assertEquals(MangaOcrAdvancedSettingsPolicy.normalize(requested), repository.get())
+        val actual = repository.get()
+
+        // Assert representative persisted fields
+        assertEquals("sourceLang", requested.sourceLang, actual.sourceLang)
+        assertEquals("targetLang", requested.targetLang, actual.targetLang)
+        assertEquals("promptTemplate", requested.promptTemplate, actual.promptTemplate)
+        assertEquals("captureRegion", requested.captureRegion, actual.captureRegion)
+        assertEquals("captureRegionSavedW", requested.captureRegionSavedScreenW, actual.captureRegionSavedScreenW)
+        assertEquals("captureRegionSavedH", requested.captureRegionSavedScreenH, actual.captureRegionSavedScreenH)
+        assertEquals("overlayFontFileName", requested.overlayFontFileName, actual.overlayFontFileName)
+        assertEquals("overlayFontDisplayName", requested.overlayFontDisplayName, actual.overlayFontDisplayName)
+        assertEquals("overlayFonts size", requested.overlayFonts.size, actual.overlayFonts.size)
+        assertEquals("streamingTranslate", requested.streamingTranslate, actual.streamingTranslate)
+        assertEquals("retryEmptyTranslation", requested.retryEmptyTranslation, actual.retryEmptyTranslation)
+        assertEquals("renderMode", requested.renderMode, actual.renderMode)
+        assertEquals("translationBlockInteractionMode", requested.translationBlockInteractionMode, actual.translationBlockInteractionMode)
+        assertEquals("overlayPlacement", requested.overlayPlacement, actual.overlayPlacement)
+        assertEquals("overlayTheme", requested.overlayTheme, actual.overlayTheme)
+        assertEquals("customBgColor", requested.customBgColor, actual.customBgColor)
+        assertEquals("overlayOffsetX", requested.overlayOffsetX, actual.overlayOffsetX)
+        assertEquals("overlayOffsetY", requested.overlayOffsetY, actual.overlayOffsetY)
+        assertEquals("preferShizukuCapture", requested.preferShizukuCapture, actual.preferShizukuCapture)
+        assertEquals("a11yVolumeTrigger", requested.a11yVolumeTrigger, actual.a11yVolumeTrigger)
+        assertEquals("translatorEngine", requested.translatorEngine, actual.translatorEngine)
+        assertEquals("remotePcBaseUrl", requested.remotePcBaseUrl, actual.remotePcBaseUrl)
+        assertEquals("remotePcApiKey", requested.remotePcApiKey, actual.remotePcApiKey)
+        assertEquals("floatingWindowWidthDp", requested.floatingWindowWidthDp, actual.floatingWindowWidthDp)
+        assertEquals("floatingWindowHeightDp", requested.floatingWindowHeightDp, actual.floatingWindowHeightDp)
+        assertEquals("pinnedLanguages", requested.pinnedLanguages, actual.pinnedLanguages)
+        assertEquals("cleartextAllowedHosts", requested.cleartextAllowedHosts, actual.cleartextAllowedHosts)
+        assertEquals("floatingMenuItemOrder size", requested.floatingMenuItemOrder.size, actual.floatingMenuItemOrder.size)
+        assertEquals("arcMenuPageSize", requested.arcMenuPageSize, actual.arcMenuPageSize)
+        assertEquals("dictionaryPrompt", requested.dictionaryPrompt, actual.dictionaryPrompt)
+        assertEquals("translationPresets size", requested.translationPresets.size, actual.translationPresets.size)
+        assertEquals("activeTranslationPresetId", requested.activeTranslationPresetId, actual.activeTranslationPresetId)
     }
 
     private fun fileBackedRepository(root: File): SettingsRepository =

@@ -166,31 +166,6 @@ object OnboardingPolicy {
     )
 
     fun fromSettings(settings: Settings): OnboardingDraft {
-        val protocol = if (settings.translatorEngine == TranslatorEngine.ANTHROPIC) {
-            CloudApiProtocol.ANTHROPIC
-        } else {
-            CloudApiProtocol.OPENAI
-        }
-        val baseUrl = if (protocol == CloudApiProtocol.ANTHROPIC) {
-            settings.anthropicBaseUrl
-        } else {
-            settings.baseUrl
-        }
-        val model = if (protocol == CloudApiProtocol.ANTHROPIC) {
-            settings.anthropicModel
-        } else {
-            settings.model
-        }
-        val apiKey = if (protocol == CloudApiProtocol.ANTHROPIC) {
-            settings.anthropicApiKey
-        } else {
-            settings.apiKey
-        }
-        val provider = CloudProvider.entries.firstOrNull {
-            it != CloudProvider.CUSTOM &&
-                it.protocol == protocol &&
-                normalizedBaseUrl(it.baseUrl) == normalizedBaseUrl(baseUrl)
-        } ?: CloudProvider.CUSTOM
         return OnboardingDraft(
             sourceLang = settings.sourceLang.takeUnless { it == Languages.AUTO.code } ?: "ja",
             targetLang = settings.targetLang.takeUnless { it == Languages.AUTO.code } ?: "zh-CN",
@@ -233,10 +208,6 @@ object OnboardingPolicy {
             } else {
                 OnboardingTranslationMethod.CLOUD_LLM
             },
-            cloudProvider = provider,
-            cloudBaseUrl = baseUrl,
-            cloudApiKey = apiKey,
-            cloudModel = model,
         )
     }
 
@@ -279,21 +250,6 @@ object OnboardingPolicy {
                     }
             },
         )
-        if (draft.translationMethod == OnboardingTranslationMethod.CLOUD_LLM) {
-            next = if (draft.cloudProvider.protocol == CloudApiProtocol.ANTHROPIC) {
-                next.copy(
-                    anthropicBaseUrl = draft.cloudBaseUrl.trim(),
-                    anthropicApiKey = draft.cloudApiKey.trim(),
-                    anthropicModel = draft.cloudModel.trim(),
-                )
-            } else {
-                next.copy(
-                    baseUrl = ensureTrailingSlash(draft.cloudBaseUrl.trim()),
-                    apiKey = draft.cloudApiKey.trim(),
-                    model = draft.cloudModel.trim(),
-                )
-            }
-        }
         if (draft.usage == OnboardingUsage.MANGA) {
             val output = when (draft.mangaDirection) {
                 OnboardingMangaDirection.FOLLOW_RECOGNITION -> Triple(
@@ -332,11 +288,6 @@ object OnboardingPolicy {
         }
         return next
     }
-
-    private fun normalizedBaseUrl(value: String): String = value.trim().trimEnd('/').lowercase()
-
-    private fun ensureTrailingSlash(value: String): String =
-        if (value.endsWith('/')) value else "$value/"
 }
 
 enum class CloudConfigError {

@@ -253,16 +253,6 @@ fun SettingsScreen(
     var remotePcApiKey by remember { mutableStateOf("") }
     var remotePcSessionId by remember { mutableStateOf("default") }
     var remotePcImageQuality by remember { mutableStateOf("85") }
-    var deeplKey by remember { mutableStateOf("") }
-    var deeplPro by remember { mutableStateOf(false) }
-    var deeplBaseUrl by remember { mutableStateOf("") }
-    var deeplBearerAuth by remember { mutableStateOf(false) }
-    var deeplCustomToken by remember { mutableStateOf("") }
-    var deeplProtocol by remember { mutableStateOf(com.gameocr.app.data.DeeplProtocol.OFFICIAL) }
-    var deeplAdvancedExpanded by remember { mutableStateOf(false) }
-    // Р¶СљвЂ°Р№РѓвЂњР¶в„ўС”РґС”вЂРґС‘Р‚РµТђвЂ” keyРїСв‚¬OCR + РµвЂєС•Р·вЂ°вЂЎР·С—В»РёР‡вЂРµвЂ¦В±Р·вЂќРЃРїСвЂ°
-    var youdaoAppKey by remember { mutableStateOf("") }
-    var youdaoAppSecret by remember { mutableStateOf("") }
     // Р·РѓВ«РµВ±В±РµСвЂўР¶вЂњР‹Р¶СљС”Рµв„ўРЃР·С—В»РёР‡вЂ AK/SK + regionРїСв‚¬SignV4РїСвЂ°
     var volcAk by remember { mutableStateOf("") }
     var volcSk by remember { mutableStateOf("") }
@@ -495,10 +485,6 @@ fun SettingsScreen(
         remotePcImageQuality = s.remotePcImageQuality.toString()
         foregroundAppDetectionMode = s.foregroundAppDetectionMode
         sendAppNameToTranslator = s.sendAppNameToTranslator
-        deeplKey = s.deeplApiKey
-        deeplCustomToken = s.deeplCustomToken
-        youdaoAppKey = s.youdaoAppKey
-        youdaoAppSecret = s.youdaoAppSecret
         volcAk = s.volcAccessKeyId
         volcSk = s.volcSecretAccessKey
         volcRegion = s.volcRegion
@@ -542,10 +528,6 @@ fun SettingsScreen(
         offsetY = s.overlayOffsetY.toFloat()
         allowWrap = s.overlayAllowWrap
         avoidCollision = s.overlayAvoidCollision
-        deeplPro = s.deeplPro
-        deeplProtocol = s.deeplProtocol
-        deeplBaseUrl = s.deeplBaseUrl
-        deeplBearerAuth = s.deeplBearerAuth
         a11yVolume = s.a11yVolumeTrigger
         floatingSize = s.floatingButtonSizeDp.toFloat()
         floatingSnapEdge = s.floatingButtonSnapToEdge
@@ -816,14 +798,6 @@ fun SettingsScreen(
         remotePcApiKey = remotePcApiKey,
         remotePcSessionId = remotePcSessionId,
         remotePcImageQuality = remotePcImageQuality.toIntOrNull()?.coerceIn(50, 100) ?: 85,
-        deeplApiKey = deeplKey,
-        deeplPro = deeplPro,
-        deeplProtocol = deeplProtocol,
-        deeplBaseUrl = deeplBaseUrl,
-        deeplBearerAuth = deeplBearerAuth,
-        deeplCustomToken = deeplCustomToken,
-        youdaoAppKey = youdaoAppKey,
-        youdaoAppSecret = youdaoAppSecret,
         volcAccessKeyId = volcAk,
         volcSecretAccessKey = volcSk,
         volcRegion = volcRegion,
@@ -920,14 +894,6 @@ fun SettingsScreen(
             remotePcApiKey = remotePcApiKey,
             remotePcSessionId = remotePcSessionId,
             remotePcImageQuality = remotePcImageQuality.toIntOrNull() ?: 85,
-            deeplKey = deeplKey,
-            deeplPro = deeplPro,
-            deeplProtocol = deeplProtocol,
-            deeplBaseUrl = deeplBaseUrl,
-            deeplBearerAuth = deeplBearerAuth,
-            deeplCustomToken = deeplCustomToken,
-            youdaoAppKey = youdaoAppKey,
-            youdaoAppSecret = youdaoAppSecret,
             volcAccessKeyId = volcAk,
             volcSecretAccessKey = volcSk,
             volcRegion = volcRegion,
@@ -1338,19 +1304,11 @@ fun SettingsScreen(
             remotePcApiKey = s.remotePcApiKey
             remotePcSessionId = s.remotePcSessionId
             remotePcImageQuality = s.remotePcImageQuality.toString()
-            deeplKey = s.deeplApiKey
-            youdaoAppKey = s.youdaoAppKey
             volcAk = s.volcAccessKeyId
             volcSk = s.volcSecretAccessKey
             volcRegion = s.volcRegion
             baiduFanyiAppId = s.baiduFanyiAppId
             baiduFanyiSecret = s.baiduFanyiSecretKey
-            youdaoAppSecret = s.youdaoAppSecret
-            deeplPro = s.deeplPro
-            deeplProtocol = s.deeplProtocol
-            deeplBaseUrl = s.deeplBaseUrl
-            deeplBearerAuth = s.deeplBearerAuth
-            deeplCustomToken = s.deeplCustomToken
             textSize = s.overlayTextSizeSp.toFloat()
             overlayTextStyle = s.overlayTextStyle.normalized()
             alpha = s.overlayAlpha
@@ -2679,10 +2637,6 @@ internal val SEARCH_TARGET_PRESETS = intArrayOf(
     R.string.settings_search_item_preset_transfer,
 )
 private val SEARCH_TARGET_TRANSLATOR_PROVIDERS = intArrayOf(
-    R.string.settings_search_item_deepl_api_key,
-    R.string.settings_search_item_deepl_pro,
-    R.string.settings_search_item_deepl_advanced,
-    R.string.settings_search_item_youdao_pictrans,
     R.string.settings_search_item_google,
     R.string.settings_search_item_google_mlkit,
     R.string.settings_search_item_volc,
@@ -2950,10 +2904,6 @@ private val SETTING_ITEMS: List<SearchEntry> = listOf(
     SearchEntry(SectionKeys.PRESETS, R.string.settings_section_translation_presets, R.string.settings_search_item_preset_transfer, SETTINGS_SEARCH_TRANSFER_KEYWORDS),
 
     // РІР‚вЂќРІР‚вЂќ Р·С—В»РёР‡вЂРµС’Р‹Р·В«Р‡ РІР‚вЂќРІР‚вЂќ
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_api_key, listOf("deepl"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_pro, listOf("deepl pro"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_deepl_advanced, listOf("deeplx", "bearer", "official", "protocol", "РёвЂЎР„Р¶С›В¶", "Р№В«ВР·С”В§", "РµРЊРЏРёВ®В®", "deepl base url"), requiredTranslatorEngine = TranslatorEngine.DEEPL),
-    SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_youdao_pictrans, listOf("youdao", "Р¶СљвЂ°Р№РѓвЂњ", "РµвЂєС•Р·вЂ°вЂЎР·С—В»РёР‡вЂ", "pictrans", "ocrtransapi", "Р·В«Р‡Рµв‚¬В°Р·В«Р‡"), requiredTranslatorEngine = TranslatorEngine.YOUDAO_PICTRANS),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_google, listOf("google", "РёВ°В·Р¶В­РЉ", "translate"), requiredTranslatorEngine = TranslatorEngine.GOOGLE),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_google_mlkit, listOf("google ml kit", "mlkit", "on-device", "offline", "Р·В«Р‡РґС•В§", "Р·В¦В»Р·С”С—"), requiredTranslatorEngine = TranslatorEngine.GOOGLE_ML_KIT),
     SearchEntry(SectionKeys.TRANSLATE, R.string.settings_section_translator, R.string.settings_search_item_volc, listOf("volc", "volcengine", "Р·РѓВ«РµВ±В±", "РµВ­вЂ”РёР‰вЂљ", "doubao", "bytedance", "access key", "AK", "SK", "region", "РµРЉС”РµСџСџ"), requiredTranslatorEngine = TranslatorEngine.VOLC),

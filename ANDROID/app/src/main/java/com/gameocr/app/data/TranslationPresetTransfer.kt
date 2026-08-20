@@ -226,7 +226,7 @@ object TranslationPresetTransfer {
         ) {
             return importedId
         }
-        val hash = sha256(preset.name, preset.settingsHash, preset.model).take(12)
+        val hash = sha256(preset.name, preset.settingsHash).take(12)
         var candidate = "custom_imported_$hash"
         var suffix = 2
         while (candidate in usedIds || TranslationPresetCatalog.isBuiltIn(candidate)) {
