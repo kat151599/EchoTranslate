@@ -59,6 +59,12 @@ async def translate_openai_compatible(*, cfg: dict, messages: list[dict]) -> dic
                 if r.status_code in (400, 422):
                     body.pop("response_format", None)
                     r = await post(attempt)
+            if r.status_code >= 400:
+                logger.error(
+                    "LLM HTTP ERROR status=%s body=%s",
+                    r.status_code,
+                    r.text,
+                )
             r.raise_for_status()
             payload = r.json()
             choices = payload.get("choices") or []
