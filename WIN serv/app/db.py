@@ -9,6 +9,42 @@ from .config import ROOT, load_config
 
 _lock = threading.RLock()
 
+# CJK_HISTORY_FILTER_V2
+# A Russian/European target translation that still contains East-Asian script
+# is treated as incomplete and must never become future context.
+def contains_east_asian_script(text: str | None) -> bool:
+    for ch in str(text or ""):
+        code = ord(ch)
+        if (
+            0x3400 <= code <= 0x4DBF      # CJK Extension A
+            or 0x4E00 <= code <= 0x9FFF   # CJK Unified Ideographs
+            or 0xF900 <= code <= 0xFAFF   # CJK Compatibility Ideographs
+            or 0x20000 <= code <= 0x2EBEF # CJK Extensions B-F/I
+            or 0x30000 <= code <= 0x323AF # CJK Extensions G-H
+            or 0x3040 <= code <= 0x309F   # Hiragana
+            or 0x30A0 <= code <= 0x30FF   # Katakana
+            or 0x31F0 <= code <= 0x31FF   # Katakana extensions
+            or 0xAC00 <= code <= 0xD7AF   # Hangul syllables
+        ):
+            return True
+    return False
+
+
+def target_allows_east_asian_script(target_language: str | None) -> bool:
+    language = str(target_language or "").strip().lower().replace("_", "-")
+    return language.startswith(("zh", "ja", "ko"))
+
+
+def translation_has_disallowed_east_asian_script(
+    translation: str | None,
+    target_language: str | None,
+) -> bool:
+    return (
+        not target_allows_east_asian_script(target_language)
+        and contains_east_asian_script(translation)
+    )
+
+
 
 def _db_path() -> Path:
     p = Path(load_config().get("database_path", "data/server.db"))
@@ -197,6 +233,26 @@ def init_db() -> None:
         con.execute("CREATE INDEX IF NOT EXISTS idx_messages_glossary_scan ON messages(source_id, id, token_count)")
 
 
+    # CJK_HISTORY_PURGE_V2: remove contaminated rows accumulated before this filter existed.
+    with _lock, connect() as con:
+        dirty_rows = con.execute(
+            "SELECT id, source_id, session_id, screen_hash, translation, target_language FROM messages ORDER BY id"
+        ).fetchall()
+        dirty_rows = [
+            row for row in dirty_rows
+            if translation_has_disallowed_east_asian_script(row["translation"], row["target_language"])
+        ]
+        for row in dirty_rows:
+            con.execute("DELETE FROM pending_history_corrections WHERE history_id=?", (int(row["id"]),))
+            con.execute("DELETE FROM messages WHERE id=?", (int(row["id"]),))
+            if row["screen_hash"]:
+                con.execute(
+                    "DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?",
+                    (row["source_id"], row["session_id"], row["screen_hash"]),
+                )
+
+
+
 def register_source(source_id: str, source_name: str) -> None:
     with _lock, connect() as con:
         con.execute(
@@ -208,16 +264,24 @@ def register_source(source_id: str, source_name: str) -> None:
             con.execute("UPDATE messages SET source_name=? WHERE source_id=?", (source_name, source_id))
 
 
-def add_messages(source_id: str, source_name: str, session_id: str, rows: Iterable[tuple[str, str, float, str, str, str, str, int]]) -> list[int]:
+def add_messages(source_id: str, source_name: str, session_id: str, rows: Iterable[tuple[str, str, float, str, str, str, str, int]]) -> list[int | None]:
+    """Insert clean history rows; keep positional None for rejected CJK-residue rows."""
     with _lock, connect() as con:
-        ids: list[int] = []
+        ids: list[int | None] = []
         for row in rows:
+            translation = str(row[1] or "") if len(row) > 1 else ""
+            target_language = str(row[5] or "") if len(row) > 5 else ""
+            if translation_has_disallowed_east_asian_script(translation, target_language):
+                # Keep output visible to the client, but never persist it as context.
+                ids.append(None)
+                continue
             cursor = con.execute(
                 "INSERT INTO messages(source_id, source_name, session_id, source_text, translation, confidence, box_json, language, target_language, screen_hash, token_count) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                 (source_id, source_name, session_id, *row),
             )
             ids.append(int(cursor.lastrowid))
         return ids
+
 
 
 def recent_messages(source_id: str, session_id: str, limit: int = 500, exclude_id: int | None = None) -> list[dict]:
@@ -783,22 +847,58 @@ def delete_history_message(source_id: str, message_id: int) -> bool:
 
 def update_history_translation(source_id: str, message_id: int, translation: str) -> bool:
     with _lock, connect() as con:
-        return con.execute(
+        row = con.execute(
+            "SELECT session_id, screen_hash, target_language FROM messages WHERE source_id=? AND id=?",
+            (source_id, message_id),
+        ).fetchone()
+        if row is None:
+            return False
+        if translation_has_disallowed_east_asian_script(translation, row["target_language"]):
+            con.execute("DELETE FROM pending_history_corrections WHERE history_id=?", (message_id,))
+            con.execute("DELETE FROM messages WHERE source_id=? AND id=?", (source_id, message_id))
+            if row["screen_hash"]:
+                con.execute(
+                    "DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?",
+                    (source_id, row["session_id"], row["screen_hash"]),
+                )
+            return True
+        con.execute(
             "UPDATE messages SET translation=? WHERE source_id=? AND id=?",
             (translation, source_id, message_id),
-        ).rowcount > 0
+        )
+        if row["screen_hash"]:
+            con.execute(
+                "DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?",
+                (source_id, row["session_id"], row["screen_hash"]),
+            )
+        return True
+
 
 
 def update_history_message(source_id: str, message_id: int, source_text: str, translation: str) -> bool:
-    """Edit one history row and invalidate only its matching screen response cache."""
+    """Edit one history row; delete it instead if the corrected translation still contains forbidden CJK residue."""
     with _lock, connect() as con:
-        row = con.execute("SELECT session_id, screen_hash FROM messages WHERE source_id=? AND id=?", (source_id, message_id)).fetchone()
+        row = con.execute(
+            "SELECT session_id, screen_hash, target_language FROM messages WHERE source_id=? AND id=?",
+            (source_id, message_id),
+        ).fetchone()
         if row is None:
             return False
-        con.execute("UPDATE messages SET source_text=?, translation=? WHERE source_id=? AND id=?", (source_text, translation, source_id, message_id))
+        if translation_has_disallowed_east_asian_script(translation, row["target_language"]):
+            con.execute("DELETE FROM pending_history_corrections WHERE history_id=?", (message_id,))
+            con.execute("DELETE FROM messages WHERE source_id=? AND id=?", (source_id, message_id))
+        else:
+            con.execute(
+                "UPDATE messages SET source_text=?, translation=?, token_count=NULL WHERE source_id=? AND id=?",
+                (source_text, translation, source_id, message_id),
+            )
         if row["screen_hash"]:
-            con.execute("DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?", (source_id, row["session_id"], row["screen_hash"]))
+            con.execute(
+                "DELETE FROM screen_cache WHERE source_id=? AND session_id=? AND screen_hash=?",
+                (source_id, row["session_id"], row["screen_hash"]),
+            )
     return True
+
 
 
 def create_pending_history_correction(history_id: int, proposed_source_text: str | None, proposed_translation: str | None, client_request_id: str | None) -> dict | None:
