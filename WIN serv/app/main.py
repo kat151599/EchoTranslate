@@ -6,6 +6,7 @@ import hmac
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import threading
 import time
@@ -970,7 +971,27 @@ def admin_server_action(action: str):
     def finish_action():
         time.sleep(0.5)
         if action == "restart":
-            os.execv(sys.executable, [sys.executable, str(ROOT / "run_server.py")])
+            cfg = load_config()
+            payload = {
+                "command": [
+                    sys.executable,
+                    "-m",
+                    "uvicorn",
+                    "app.main:app",
+                    "--host",
+                    str(cfg.get("host", "0.0.0.0")),
+                    "--port",
+                    str(int(cfg.get("port", 8765))),
+                ],
+                "cwd": str(ROOT),
+            }
+            helper = (
+                "import json, subprocess, sys, time; "
+                "payload=json.loads(sys.argv[1]); time.sleep(0.75); "
+                "subprocess.Popen(payload['command'], cwd=payload['cwd'])"
+            )
+            flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+            subprocess.Popen([sys.executable, "-c", helper, json.dumps(payload)], creationflags=flags)
         os._exit(0)
 
     threading.Thread(target=finish_action, daemon=True).start()
