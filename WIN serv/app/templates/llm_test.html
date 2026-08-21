@@ -37,7 +37,11 @@
   <div class="card" id="pricing-agent-card">
     <div class="title-row">
       <div><h2>Цены через ChatGPT Pricing Agent</h2><div class="muted">Внешний поиск цен запускается только этой кнопкой. Обычное открытие, переключение и тесты читают последний SQLite snapshot.</div></div>
-      <button class="btn good" id="pricing-refresh">↻ Обновить цены</button>
+      <div class="toolbar">
+        <button class="btn secondary" id="pricing-check" disabled>↻ Проверить сейчас</button>
+        <button class="btn danger" id="pricing-stop" disabled>■ Стоп</button>
+        <button class="btn good" id="pricing-refresh">↻ Обновить цены</button>
+      </div>
     </div>
     <div class="grid" style="margin-top:14px">
       <div class="field"><label>Официальный сайт провайдера</label><input id="pricing-official-site" type="url" placeholder="https://provider.example.com/"></div>
@@ -154,17 +158,20 @@ window.addEventListener('pagehide',()=>{if(catalogAbort)catalogAbort.abort()});
 
 // CHATGPT_PRICING_AGENT_UI_JS_V1
 let pricingAgentJob=null,pricingAgentTimer=null,pricingAgentManualStart=false;
-// ECHOTRANSLATE_CURRENT_HEAD_LLM_UI_V1
-function pricingAgentBusy(busy){$('pricing-refresh').disabled=busy;$('pricing-save-settings').disabled=busy;$('pricing-dot').classList.toggle('busy',busy)}
+const PRICING_AGENT_POLL_MS=30000;
+// ECHOTRANSLATE_PRICING_POLL_30S_STOP_V1
+function clearPricingAgentTimer(){if(pricingAgentTimer){clearTimeout(pricingAgentTimer);pricingAgentTimer=null}}
+function pricingAgentBusy(busy){$('pricing-refresh').disabled=busy;$('pricing-save-settings').disabled=busy;$('pricing-dot').classList.toggle('busy',busy);$('pricing-check').disabled=!pricingAgentJob;$('pricing-stop').disabled=!pricingAgentJob}
 function pricingAgentStatus(text,error=''){$('pricing-status').textContent=text;$('pricing-error').textContent=error||''}
+function schedulePricingAgentPoll(){clearPricingAgentTimer();if(pricingAgentJob&&document.visibilityState==='visible')pricingAgentTimer=setTimeout(()=>pollPricingAgentJob(false),PRICING_AGENT_POLL_MS)}
 async function loadPricingAgentConfig(){
   try{
     const c=await api('/llm-test/pricing-agent/config');
     $('pricing-official-site').value=c.official_site_url||'';$('pricing-bridge-url').value=c.chatgpt_bridge_url||'http://127.0.0.1:8639';$('pricing-chat-url').value=c.pricing_chat_url||'';
     $('pricing-bridge-token').value='';$('pricing-bridge-token').placeholder=c.chatgpt_bridge_token_configured?'сохранён — оставь пустым, чтобы не менять':'вставь EXTERNAL_API_TOKEN из Family Bridge';
-    const j=c.latest_job;if(j&&['queued','processing'].includes(j.status)){pricingAgentJob=j.request_id;pricingAgentBusy(true);pricingAgentStatus(j.status==='queued'?'Продолжаю ранее запущенное обновление — новый запрос не создаётся':'Допроверяю ранее запущенное обновление — новый запрос не создаётся');pollPricingAgentJob();}
+    const j=c.latest_job;if(j&&['queued','processing'].includes(j.status)){pricingAgentJob=j.request_id;pricingAgentBusy(true);pricingAgentStatus(j.status==='queued'?'Продолжаю ранее запущенное обновление — новый запрос не создаётся':'Допроверяю ранее запущенное обновление — новый запрос не создаётся');pollPricingAgentJob(false);}
     else if(j&&j.status==='applied'){pricingAgentStatus('Последнее обновление применено');$('pricing-summary').textContent=`request ${j.request_id} · ${j.applied_at||j.updated_at||''}`}
-    else if(j&&j.status==='error'){pricingAgentStatus('Последнее обновление завершилось ошибкой',j.error_text||'')}
+    else if(j&&j.status==='cancelled'){pricingAgentStatus('Последнее обновление было остановлено')}else if(j&&j.status==='error'){pricingAgentStatus('Последнее обновление завершилось ошибкой',j.error_text||'')}
     else pricingAgentStatus('Готово');
   }catch(e){pricingAgentStatus('Pricing Agent не настроен',e.message)}
 }
@@ -177,17 +184,22 @@ async function startPricingAgentRefresh(){
   if(!pricingAgentManualStart){pricingAgentStatus('Новый поиск цен запускается только кнопкой «↻ Обновить цены»');return;}
   pricingAgentManualStart=false;
   if(pricingAgentJob)return;pricingAgentBusy(true);pricingAgentStatus('Сохраняю настройки…');$('pricing-summary').textContent='';
-  try{await savePricingAgentConfig();pricingAgentStatus('Обновляю список моделей и ставлю Pricing Agent в очередь…');const j=await api('/llm-test/pricing-agent/refresh',{method:'POST'});pricingAgentJob=j.request_id;pricingAgentStatus(j.status==='processing'?'ChatGPT исследует цены…':'Задание создано, ожидает очереди…');$('pricing-summary').textContent=`Передано моделей: ${j.models}${j.models_discovered!=null?' из '+j.models_discovered:''}${j.models_skipped!=null?' · локально исключено '+j.models_skipped:''}${j.parts!=null?' · частей: '+j.parts:''}${j.models_warning?' · '+j.models_warning:''}`;pollPricingAgentJob();}
+  try{await savePricingAgentConfig();pricingAgentStatus('Обновляю список моделей и ставлю Pricing Agent в очередь…');const j=await api('/llm-test/pricing-agent/refresh',{method:'POST'});pricingAgentJob=j.request_id;pricingAgentBusy(true);pricingAgentStatus(j.status==='processing'?'ChatGPT исследует цены…':'Задание создано, ожидает очереди…');$('pricing-summary').textContent=`Передано моделей: ${j.models}${j.models_discovered!=null?' из '+j.models_discovered:''}${j.models_skipped!=null?' · локально исключено '+j.models_skipped:''}${j.parts!=null?' · частей: '+j.parts:''}${j.models_warning?' · '+j.models_warning:''}`;pollPricingAgentJob(false);}
   catch(e){pricingAgentJob=null;pricingAgentBusy(false);pricingAgentStatus('Не удалось запустить обновление',e.message)}
 }
-async function pollPricingAgentJob(){
-  if(!pricingAgentJob)return;const id=pricingAgentJob;
+async function pollPricingAgentJob(manual=false){
+  if(!pricingAgentJob)return;if(!manual&&document.visibilityState!=='visible'){clearPricingAgentTimer();return}clearPricingAgentTimer();const id=pricingAgentJob;
   try{const j=await api('/llm-test/pricing-agent/jobs/'+encodeURIComponent(id));if(id!==pricingAgentJob)return;
-    /* CHATGPT_PRICING_AGENT_PROGRESS_UI_V1 */if(j.status==='queued'||j.status==='processing'){const done=Number(j.parts_done||0),total=Number(j.parts_total||0);const progress=total?` · готово ${done}/${total}`:'';const text=j.status==='queued'?((done>0?'Следующая часть ждёт общей очереди ChatGPT…':'Задание ждёт общей очереди ChatGPT…')+progress):('ChatGPT исследует официальный сайт…'+progress);const pollError=j.poll_error?('Ошибка опроса Bridge: '+j.poll_error):'';pricingAgentStatus(text,pollError);$('pricing-summary').dataset.progress=total?`${done}/${total}`:'';clearTimeout(pricingAgentTimer);pricingAgentTimer=setTimeout(pollPricingAgentJob,1500);return;}
+    if(j.status==='queued'||j.status==='processing'){const done=Number(j.parts_done||0),total=Number(j.parts_total||0),progress=total?` · готово ${done}/${total}`:'';const text=j.status==='queued'?((done>0?'Следующая часть ждёт общей очереди ChatGPT…':'Задание ждёт общей очереди ChatGPT…')+progress):('ChatGPT исследует официальный сайт…'+progress);pricingAgentStatus(text,j.poll_error?('Ошибка опроса Bridge: '+j.poll_error):'');pricingAgentBusy(true);schedulePricingAgentPoll();return;}
     if(j.status==='applied'){pricingAgentStatus('Цены получены и сохранены');const s=j.summary||{};$('pricing-summary').textContent=`Сохранено: ${s.saved??s.total??'—'} · известна цена: ${s.known_saved??s.known??'—'} · partial: ${s.partial_saved??s.partial??'—'} · PRICE UNKNOWN: ${s.unknown_saved??s.unknown??'—'}`;pricingAgentJob=null;pricingAgentBusy(false);await refreshCatalog();return;}
+    if(j.status==='cancelled'){pricingAgentStatus('Pricing Agent остановлен');pricingAgentJob=null;pricingAgentBusy(false);return;}
     const message=j.error||j.error_text||j.poll_error||('Неожиданный status: '+j.status);pricingAgentJob=null;pricingAgentBusy(false);pricingAgentStatus('Обновление цен не применено',message);
-  }catch(e){pricingAgentStatus('Связь с Bridge временно недоступна',e.message);clearTimeout(pricingAgentTimer);pricingAgentTimer=setTimeout(pollPricingAgentJob,2500)}
+  }catch(e){pricingAgentStatus('Связь с Bridge временно недоступна',e.message);schedulePricingAgentPoll()}
 }
+$('pricing-check').onclick=()=>pollPricingAgentJob(true);
+$('pricing-stop').onclick=async()=>{if(!pricingAgentJob)return;const id=pricingAgentJob;clearPricingAgentTimer();$('pricing-stop').disabled=true;pricingAgentStatus('Останавливаю Pricing Agent…');try{const j=await api('/llm-test/pricing-agent/jobs/'+encodeURIComponent(id)+'/stop',{method:'POST'});if(id===pricingAgentJob){pricingAgentJob=null;pricingAgentBusy(false);pricingAgentStatus(j.warning?'Остановлено с предупреждением':'Pricing Agent остановлен',j.warning||'')}}catch(e){pricingAgentStatus('Не удалось остановить Pricing Agent',e.message);pricingAgentBusy(true);schedulePricingAgentPoll()}};
+document.addEventListener('visibilitychange',()=>{clearPricingAgentTimer();if(document.visibilityState==='visible'&&pricingAgentJob)pollPricingAgentJob(false)});
+window.addEventListener('pagehide',clearPricingAgentTimer);
 $('pricing-save-settings').onclick=async()=>{try{pricingAgentBusy(true);await savePricingAgentConfig();pricingAgentStatus('Настройки сохранены')}catch(e){pricingAgentStatus('Ошибка настроек',e.message)}finally{pricingAgentBusy(false)}};
 $('pricing-refresh').onclick=()=>{pricingAgentManualStart=true;startPricingAgentRefresh();};
 $('max-request-cost').addEventListener('blur',()=>{$('catalog-summary').innerHTML='<span class="pill">Пересчитываю по новому лимиту…</span>';refreshCatalog(false);});
@@ -241,7 +253,7 @@ function setActiveStage(stage){
   $('stage-results').hidden=catalogMode;
   if(catalogMode){setStageHeading('Каталог','Дорогие, неподходящие и дубли отбрасываются до первого платного запроса.');return}
   if(stage==='speed')setStageHeading('Проверка скорости','Модель остаётся в тесте только при успешном ответе в пределах 5 секунд.');
-  if(stage==='uncensored')setStageHeading('Проверка Uncensored','OK идёт дальше. Failed, отказ, санитаризация, timeout или ошибка исключают модель.');
+  if(stage==='uncensored')setStageHeading('Проверка Uncensored','3 отдельные провокационные 18+ реплики. PASS идёт дальше; BLOCKED_BY_PROVIDER остаётся видимым результатом и не обрывает тест остальных моделей.');
   if(stage==='quality')setStageHeading('Mini quality','Выбери реплики из истории. Каждая модель получит их одним компактным запросом; проходной порог — не менее 80% заполненных переводов.');
 }
 function statusLabel(ok){return ok?'OK':'Failed'}
@@ -250,11 +262,24 @@ function renderSpeedStage(models){
   $('catalog-summary').innerHTML=`<span class="pill">Проверено <strong>${tested}/${models.length}</strong></span><span class="pill">OK <strong>${passed}</strong></span><span class="pill">Исключено <strong>${tested-passed}</strong></span>`;
   $('stage-results').innerHTML=models.map(model=>{const r=resultFor('speed',model);if(!r)return `<div class="stage-row pending"><div class="stage-head"><span class="stage-model">${esc(model)}</span><span class="stage-status pending">Ожидает</span></div></div>`;const ok=r.status==='OK';return `<div class="stage-row"><div class="stage-head"><span class="stage-model">${esc(model)}</span><span class="stage-status ${ok?'pass':'fail'}">${statusLabel(ok)}</span></div><div class="metrics"><span class="metric">TTFT <strong>${r.ttft_ms==null?'—':Number(r.ttft_ms).toFixed(0)+' ms'}</strong></span><span class="metric">TPS <strong>${r.tps??'—'}</strong></span><span class="metric">Total <strong>${r.total_ms==null?'—':Number(r.total_ms).toFixed(0)+' ms'}</strong></span></div>${!ok?`<div class="answer fail">${esc(r.error||r.status||'Ошибка')}</div>`:''}</div>`}).join('');
 }
+/* ECHOTRANSLATE_UNCENSORED_TRIPLE_UI_V1 */
 function renderUncensoredStage(models){
-  setActiveStage('uncensored');const tested=models.filter(m=>resultFor('uncensored',m)).length,passed=models.filter(m=>(resultFor('uncensored',m)||{}).status==='PASS').length;
-  $('catalog-summary').innerHTML=`<span class="pill">Проверено <strong>${tested}/${models.length}</strong></span><span class="pill">OK <strong>${passed}</strong></span><span class="pill">Failed <strong>${tested-passed}</strong></span>`;
-  $('stage-results').innerHTML=models.map(model=>{const r=resultFor('uncensored',model);if(!r)return `<div class="stage-row pending"><div class="stage-head"><span class="stage-model">${esc(model)}</span><span class="stage-status pending">Ожидает</span></div></div>`;const ok=r.status==='PASS';return `<div class="stage-row"><div class="stage-head"><span class="stage-model">${esc(model)}</span><span class="stage-status ${ok?'pass':'fail'}">${statusLabel(ok)}</span></div>${r.text?`<div class="answer">${esc(r.text)}</div>`:''}${!ok?`<div class="answer fail">${esc(r.error||r.status||'Failed')}</div>`:''}<div class="metrics"><span class="metric">${r.duration_ms==null?'—':(Number(r.duration_ms)/1000).toFixed(2)+' s'}</span></div></div>`}).join('');
+  setActiveStage('uncensored');
+  const tested=models.filter(m=>resultFor('uncensored',m)).length;
+  const passed=models.filter(m=>(resultFor('uncensored',m)||{}).status==='PASS').length;
+  const blocked=models.filter(m=>(resultFor('uncensored',m)||{}).status==='BLOCKED_BY_PROVIDER').length;
+  $('catalog-summary').innerHTML=`<span class="pill">Проверено <strong>${tested}/${models.length}</strong></span><span class="pill">OK <strong>${passed}</strong></span><span class="pill">BLOCKED <strong>${blocked}</strong></span><span class="pill">Failed <strong>${tested-passed}</strong></span>`;
+  $('stage-results').innerHTML=models.map(model=>{
+    const r=resultFor('uncensored',model);
+    if(!r)return `<div class="stage-row pending"><div class="stage-head"><span class="stage-model">${esc(model)}</span><span class="stage-status pending">Ожидает</span></div></div>`;
+    const ok=r.status==='PASS';
+    const badge=r.status==='BLOCKED_BY_PROVIDER'?'BLOCKED_BY_PROVIDER':statusLabel(ok);
+    const cases=Array.isArray(r.cases)?r.cases:[];
+    const caseHtml=cases.length?`<div class="quality-grid">${cases.map((item,i)=>`<div class="quality-line"><div class="src">18+ #${i+1}: ${esc(item.phrase||'')}</div><div class="${item.status==='PASS'?'':'fail'}">${esc(item.text||item.error||item.status||'Failed')}</div></div>`).join('')}</div>`:(r.text?`<div class="answer">${esc(r.text)}</div>`:'');
+    return `<div class="stage-row"><div class="stage-head"><span class="stage-model">${esc(model)}</span><span class="stage-status ${ok?'pass':'fail'}">${esc(badge)}</span></div>${caseHtml}${!ok?`<div class="answer fail">${esc(r.error||r.label||r.status||'Failed')}</div>`:''}<div class="metrics"><span class="metric">18+ <strong>${r.passed_cases??(ok?3:0)}/${r.case_count??3}</strong></span><span class="metric">blocked <strong>${r.blocked_cases??0}</strong></span><span class="metric">${r.duration_ms==null?'—':(Number(r.duration_ms)/1000).toFixed(2)+' s'}</span></div></div>`;
+  }).join('');
 }
+
 function qualityLines(result){
   const phrases=Array.isArray(result?.phrases)?result.phrases:[],translations=Array.isArray(result?.translations)?result.translations:[];
   return phrases.map((phrase,i)=>`<div class="quality-line"><div class="src">${esc(phrase.source_text||'')}</div><div class="${translations[i]?'':'fail'}">${esc(translations[i]||'Нет ответа')}</div></div>`).join('');

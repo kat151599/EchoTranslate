@@ -124,7 +124,7 @@ class RemotePcTranslator @Inject constructor(
             client.withApiTimeout(settings.apiTimeoutSeconds).newCall(request).execute().use { r ->
                 val raw = r.body?.string().orEmpty()
                 if (!r.isSuccessful) {
-                    throw TranslationException("PC server HTTP ${r.code}: ${raw.take(300)}")
+                    throw TranslationException(remoteErrorMessage(raw, r.code))
                 }
                 val response = runCatching { json.decodeFromString<RemoteScreenResponse>(raw) }
                     .getOrElse { throw TranslationException("PC server response parse failed: ${raw.take(300)}", it) }
@@ -225,11 +225,17 @@ class RemotePcTranslator @Inject constructor(
         }
     }
 
+    // ECHOTRANSLATE_REMOTE_ERROR_DETAIL_V1
+    private fun remoteErrorMessage(raw: String, status: Int): String {
+        val detail = runCatching { json.decodeFromString<RemoteApiError>(raw).detail?.trim() }.getOrNull()
+        return detail?.takeIf { it.isNotEmpty() } ?: "PC server HTTP $status: ${raw.take(300)}"
+    }
+
     private suspend fun executeHistoryRequest(request: Request, settings: Settings): RemoteHistoryTranslation =
         withContext(Dispatchers.IO) {
             client.withApiTimeout(settings.apiTimeoutSeconds).newCall(request).execute().use { response ->
                 val raw = response.body?.string().orEmpty()
-                if (!response.isSuccessful) throw TranslationException("PC server HTTP ${response.code}: ${raw.take(300)}")
+                if (!response.isSuccessful) throw TranslationException(remoteErrorMessage(raw, response.code))
                 runCatching { json.decodeFromString<RemoteHistoryTranslation>(raw) }
                     .getOrElse { throw TranslationException("PC server response parse failed: ${raw.take(300)}", it) }
             }
@@ -246,6 +252,11 @@ class RemotePcTranslator @Inject constructor(
         if (!(v.startsWith("http://") || v.startsWith("https://"))) return null
         return v
     }
+
+    @Serializable
+    private data class RemoteApiError(
+        val detail: String? = null,
+    )
 
     @Serializable
     private data class RemoteScreenResponse(

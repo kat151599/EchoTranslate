@@ -25,12 +25,12 @@ from pydantic import BaseModel
 
 from .bootstrap import configure_paddlex_cache
 from .config import ROOT, load_config, save_config
-from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message, create_pending_history_correction, pending_history_corrections, resolve_pending_history_correction, save_llm_test_run, latest_llm_test_run, llm_model_notes, save_llm_model_note, add_destination_messages, get_cached, put_cached, translation_has_disallowed_east_asian_script, history_translations_by_ids
+from .db import init_db, add_messages, recent_messages, list_sessions, clear_session, register_source, list_history_sources, source_history, history_source_name, history_source_info, set_history_source_image, clear_history_source, history_message, history_message_by_id, history_context_before, list_test_history_messages, add_llm_test_result, llm_test_model_history, game_glossary, glossary_state, glossary_scan_rows, update_glossary_state, merge_game_glossary, save_game_glossary, delete_game_glossary, delete_history_message, update_history_translation, update_history_message, create_pending_history_correction, pending_history_corrections, resolve_pending_history_correction, save_llm_test_run, latest_llm_test_run, llm_model_notes, save_llm_model_note, add_destination_messages, get_cached, put_cached, translation_has_disallowed_east_asian_script, history_translations_by_ids, backfill_destination_screen_snapshots
 from .ocr_engine import ocr_engine, merge_ocr_blocks, build_visual_fragments
 from .token_budget import TokenBudget
 from .prompting import glossary_text, game_glossary_text, target_text, build_messages, screen_document_text, build_screen_messages
-from .llm import translate_openai_compatible, extract_glossary_openai_compatible, translate_screen_openai_compatible
-from .screen_document import PIPELINE_VERSION, ScreenDocument, ScreenDocumentError, validate_destination_payload, destination_blocks_from_cache, destination_blocks_to_cache, destination_cache_history_ids
+from .llm import translate_openai_compatible, extract_glossary_openai_compatible, translate_screen_openai_compatible, LLMProviderContentBlockedError, PROVIDER_CONTENT_BLOCK_MESSAGE
+from .screen_document import PIPELINE_VERSION, ScreenDocument, ScreenFragment, ScreenDocumentError, validate_destination_payload, destination_blocks_from_cache, destination_blocks_to_cache, destination_cache_history_ids
 from .model_testing import router as model_testing_router
 
 logger = logging.getLogger(__name__)
@@ -271,6 +271,22 @@ async def translate_screen(
                 cached_destinations = destination_blocks_from_cache(
                     cached, document, live_cache_translations
                 )
+                # Backfill the exact semantic source snapshot for rows created before
+                # snapshot persistence existed. Seeing the same screen once is enough
+                # to make future retranslate requests use the original SCREEN_DOCUMENT.
+                backfill_destination_screen_snapshots(
+                    source_id,
+                    session_id,
+                    json.dumps(document.prompt_dict(), ensure_ascii=False, separators=(",", ":")),
+                    [
+                        {
+                            "history_id": block.history_id,
+                            "source_ids": list(block.source_ids),
+                            "source_boxes": [list(box) for box in block.source_boxes],
+                        }
+                        for block in cached_destinations
+                    ],
+                )
                 response_blocks = [block.response_dict() for block in cached_destinations]
                 total_ms = (time.perf_counter() - total_start) * 1000
                 logger.info("SCREEN CACHE HIT hash=%s destination_blocks=%s", screen_hash[:12], len(response_blocks))
@@ -362,6 +378,12 @@ async def translate_screen(
             "SEMANTIC LLM RESULT fragments=%s destination_blocks=%s grouping=%s",
             len(document.fragments), len(destinations), [block.source_ids for block in destinations],
         )
+    except LLMProviderContentBlockedError as e:
+        logger.warning(
+            "SEMANTIC LLM blocked by provider code=%s source=%s",
+            e.provider_code, source_id,
+        )
+        raise HTTPException(422, PROVIDER_CONTENT_BLOCK_MESSAGE) from e
     except Exception as e:
         logger.exception("Semantic LLM request failed in /v1/screen/translate")
         total_ms = (time.perf_counter() - total_start) * 1000
@@ -371,6 +393,9 @@ async def translate_screen(
         )
         raise HTTPException(502, f"Semantic screen translation failed: {e}") from e
 
+    screen_document_snapshot = json.dumps(
+        document.prompt_dict(), ensure_ascii=False, separators=(",", ":")
+    )
     db_rows = []
     for destination in destinations:
         logger.info(
@@ -390,6 +415,7 @@ async def translate_screen(
             "role": destination.role,
             "source_fragment_ids_json": json.dumps(destination.source_ids, ensure_ascii=False),
             "source_boxes_json": json.dumps([list(box) for box in destination.source_boxes], ensure_ascii=False),
+            "screen_document_json": screen_document_snapshot,
         })
 
     save_start = time.perf_counter()
@@ -666,6 +692,173 @@ def _llm_test_provider_id(cfg: dict) -> str:
     return f"profile:{profile}" if profile else f"base_url:{str(cfg.get('llm_base_url') or '').strip().rstrip('/')}"
 
 
+# ECHOTRANSLATE_SEMANTIC_RETRANSLATE_V1
+def _history_screen_document(row: dict, source_lang: str, target_lang: str) -> tuple[ScreenDocument, bool]:
+    snapshot_raw = str(row.get("screen_document_json") or "").strip()
+    if snapshot_raw:
+        try:
+            payload = json.loads(snapshot_raw)
+            size = payload.get("screen_size") or [1, 1]
+            width = max(1, int(size[0]))
+            height = max(1, int(size[1]))
+            fragments: list[ScreenFragment] = []
+            seen_ids: set[str] = set()
+            for index, item in enumerate(payload.get("screen_fragments") or []):
+                if not isinstance(item, dict):
+                    continue
+                source_text = str(item.get("text") or "").strip()
+                box_values = tuple(int(value) for value in list(item.get("box") or [])[:4])
+                fragment_id = str(item.get("id") or f"f{index}")
+                if not source_text or len(box_values) != 4 or fragment_id in seen_ids:
+                    continue
+                seen_ids.add(fragment_id)
+                fragments.append(
+                    ScreenFragment(
+                        id=fragment_id,
+                        order=int(item.get("order", len(fragments))),
+                        text=source_text,
+                        box=box_values,
+                        confidence=float(row.get("confidence") or 1.0),
+                        language=source_lang,
+                    )
+                )
+            fragments.sort(key=lambda fragment: fragment.order)
+            if fragments:
+                return ScreenDocument(
+                    width=width,
+                    height=height,
+                    source_language=source_lang,
+                    target_language=target_lang,
+                    fragments=tuple(fragments),
+                ), True
+        except Exception as exc:
+            logger.warning(
+                "HISTORY semantic snapshot invalid history_id=%s reason=%s; using legacy one-fragment fallback",
+                row.get("id"), exc,
+            )
+
+    # Rows created before this patch do not contain individual OCR fragment text.
+    # Do not invent/split text: use one semantic fragment until the same screen is
+    # seen again, at which point the cache-hit path backfills the exact snapshot.
+    source = str(row.get("source_text") or "").strip()
+    if not source:
+        raise ScreenDocumentError("History source text is empty")
+    box = (0, 0, 1, 1)
+    try:
+        values = tuple(int(value) for value in list(json.loads(str(row.get("box_json") or "[]")))[:4])
+        if len(values) == 4:
+            box = values
+    except Exception:
+        pass
+    width = max(1, int(box[2]))
+    height = max(1, int(box[3]))
+    fragment = ScreenFragment(
+        id="f0", order=0, text=source, box=box,
+        confidence=float(row.get("confidence") or 1.0), language=source_lang,
+    )
+    return ScreenDocument(
+        width=width, height=height, source_language=source_lang,
+        target_language=target_lang, fragments=(fragment,),
+    ), False
+
+
+def _history_retranslate_target_ids(row: dict, document: ScreenDocument, exact_snapshot: bool) -> list[str]:
+    if exact_snapshot:
+        try:
+            values = json.loads(str(row.get("source_fragment_ids_json") or "[]"))
+        except Exception as exc:
+            raise ScreenDocumentError(f"Invalid history source ids: {exc}") from exc
+        ids = [str(value) for value in values if str(value) in document.fragment_by_id]
+        if ids:
+            return ids
+        raise ScreenDocumentError("Semantic history snapshot has no target source ids")
+    return [document.fragments[0].id]
+
+
+def _retranslate_messages(
+    cfg: dict,
+    history: list[dict],
+    glossary: str,
+    target: str,
+    target_ids: list[str],
+    *,
+    repair_error: str | None = None,
+    previous_response: dict | None = None,
+) -> list[dict]:
+    messages = build_screen_messages(
+        cfg, history, glossary, target,
+        repair_error=repair_error, previous_response=previous_response,
+    )
+    rule = (
+        "RETRANSLATE_TARGET: This history item was originally one semantic destination block. "
+        f"Keep source_ids {json.dumps(target_ids, ensure_ascii=False)} together as exactly one destination block. "
+        "Use the normal semantic-screen rules for every other fragment. Return the normal DESTINATION BLOCK JSON only."
+    )
+    content = messages[-1].get("content")
+    if not isinstance(content, str):
+        raise ScreenDocumentError("History retranslate unexpectedly produced non-text user content")
+    messages[-1]["content"] = content + "\n\n" + rule
+    return messages
+
+
+async def _semantic_retranslate_history_row(
+    row: dict,
+    cfg: dict,
+    context_rows: list[dict],
+    glossary: str,
+) -> str:
+    source_lang = str(row.get("language") or "auto")
+    target_lang = str(row.get("target_language") or cfg.get("target_lang", "ru"))
+    document, exact_snapshot = _history_screen_document(row, source_lang, target_lang)
+    target_ids = _history_retranslate_target_ids(row, document, exact_snapshot)
+    target = screen_document_text(document)
+    fitted = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).fit_history(
+        system_prompt=cfg["system_prompt"],
+        glossary_text=glossary,
+        target_text=target,
+        history_newest_first=context_rows,
+        history_token_limit=int(cfg.get("history_token_limit", 3000)),
+    )
+    if (
+        not str(cfg.get("llm_api_key") or "").strip()
+        and "localhost" not in str(cfg.get("llm_base_url", ""))
+        and "127.0.0.1" not in str(cfg.get("llm_base_url", ""))
+    ):
+        raise HTTPException(503, "LLM API key is not configured")
+
+    messages = _retranslate_messages(cfg, fitted.history, glossary, target, target_ids)
+    payload = await translate_screen_openai_compatible(cfg=cfg, messages=messages)
+    try:
+        destinations = validate_destination_payload(payload, document)
+    except ScreenDocumentError as validation_error:
+        logger.warning(
+            "HISTORY SEMANTIC RETRANSLATE validator rejected first response history_id=%s: %s; repairing",
+            row.get("id"), validation_error,
+        )
+        repair_messages = _retranslate_messages(
+            cfg, fitted.history, glossary, target, target_ids,
+            repair_error=str(validation_error), previous_response=payload,
+        )
+        payload = await translate_screen_openai_compatible(cfg=cfg, messages=repair_messages)
+        destinations = validate_destination_payload(payload, document)
+
+    destination = next((item for item in destinations if item.source_ids == target_ids), None)
+    if destination is None:
+        raise ScreenDocumentError(
+            f"Retranslate target grouping {target_ids!r} was not preserved: "
+            f"{[item.source_ids for item in destinations]!r}"
+        )
+    translation = str(destination.translation or "").strip()
+    if not translation:
+        raise ValueError("LLM returned no translation")
+    logger.info(
+        "HISTORY SEMANTIC RETRANSLATE history_id=%s snapshot=%s fragments=%s target_ids=%s grouping=%s",
+        row.get("id"), str(exact_snapshot).lower(), len(document.fragments), target_ids,
+        [item.source_ids for item in destinations],
+    )
+    return translation
+
+
 @app.post("/history/{source_id}/clear")
 def history_clear_source(source_id: str):
     clear_history_source(source_id)
@@ -695,36 +888,27 @@ async def history_retranslate_message(source_id: str, message_id: int):
     row = history_message(source_id, message_id)
     if row is None:
         raise HTTPException(404, "History entry not found")
+    row["source_id"] = source_id
     cfg = load_config()
-    source_lang = str(row.get("language") or "auto")
-    target_lang = str(row.get("target_language") or cfg.get("target_lang", "ru"))
-    target = target_text([SimpleNamespace(source=row["source_text"])], source_lang, target_lang)
-    history_rows = recent_messages(source_id, row["session_id"], 1000, exclude_id=message_id) if cfg.get("history_enabled", True) else []
-    budget = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base")))
+    context_rows = history_context_before(source_id, row["session_id"], message_id, 1000) if cfg.get("history_enabled", True) else []
+    if row.get("screen_hash"):
+        context_rows = [item for item in context_rows if item.get("screen_hash") != row["screen_hash"]]
+    glossary = "\n\n".join(
+        part for part in (glossary_text(cfg), game_glossary_text(game_glossary(source_id))) if part
+    )
     try:
-        fitted = budget.fit_history(
-            system_prompt=cfg["system_prompt"],
-            glossary_text=glossary_text(cfg),
-            target_text=target,
-            history_newest_first=history_rows,
-            history_token_limit=int(cfg.get("history_token_limit", 3000)),
-        )
-        messages = build_messages(cfg, fitted.history, glossary_text(cfg), target)
-        if not str(cfg.get("llm_api_key") or "").strip() and "localhost" not in str(cfg.get("llm_base_url", "")) and "127.0.0.1" not in str(cfg.get("llm_base_url", "")):
-            raise HTTPException(503, "LLM API key is not configured")
-        translations = await translate_openai_compatible(cfg=cfg, messages=messages)
-        translation = str(translations.get(0) or "").strip()
-        if not translation:
-            raise ValueError("LLM returned no translation")
+        translation = await _semantic_retranslate_history_row(row, cfg, context_rows, glossary)
     except HTTPException:
         raise
+    except LLMProviderContentBlockedError as e:
+        logger.warning("LLM retranslate blocked source_id=%s message_id=%s code=%s", source_id, message_id, e.provider_code)
+        raise HTTPException(422, PROVIDER_CONTENT_BLOCK_MESSAGE) from e
     except Exception as e:
-        logger.exception("LLM retranslate failed source_id=%s message_id=%s", source_id, message_id)
-        raise HTTPException(502, f"LLM request failed: {e}") from e
+        logger.exception("LLM semantic retranslate failed source_id=%s message_id=%s", source_id, message_id)
+        raise HTTPException(502, f"Semantic LLM request failed: {e}") from e
     if not update_history_translation(source_id, message_id, translation):
         raise HTTPException(404, "History entry not found")
     return {"ok": True, "translation": translation}
-
 
 @app.post("/v1/history/{history_id}/retranslate")
 async def mobile_history_retranslate(history_id: int, _: None = Security(check_auth)):
@@ -735,34 +919,28 @@ async def mobile_history_retranslate(history_id: int, _: None = Security(check_a
     cfg = load_config()
     source_id = row["source_id"]
     session_id = row["session_id"]
-    source_lang = str(row.get("language") or "auto")
-    target_lang = str(row.get("target_language") or cfg.get("target_lang", "ru"))
-    target = target_text([SimpleNamespace(source=row["source_text"])], source_lang, target_lang)
     context_rows = history_context_before(source_id, session_id, history_id, 1000) if cfg.get("history_enabled", True) else []
-    glossary = "\n\n".join(part for part in (glossary_text(cfg), game_glossary_text(game_glossary(source_id))) if part)
+    # The first screen request did not have any destination from its own screen in HISTORY.
+    # Exclude sibling rows from the same screen so retranslate reproduces that context boundary.
+    if row.get("screen_hash"):
+        context_rows = [item for item in context_rows if item.get("screen_hash") != row["screen_hash"]]
+    glossary = "\n\n".join(
+        part for part in (glossary_text(cfg), game_glossary_text(game_glossary(source_id))) if part
+    )
     try:
-        fitted = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).fit_history(
-            system_prompt=cfg["system_prompt"], glossary_text=glossary, target_text=target,
-            history_newest_first=context_rows, history_token_limit=int(cfg.get("history_token_limit", 3000)),
-        )
-        if not str(cfg.get("llm_api_key") or "").strip() and "localhost" not in str(cfg.get("llm_base_url", "")) and "127.0.0.1" not in str(cfg.get("llm_base_url", "")):
-            raise HTTPException(503, "LLM API key is not configured")
-        translations = await translate_openai_compatible(
-            cfg=cfg, messages=build_messages(cfg, fitted.history, glossary, target),
-        )
-        translation = str(translations.get(0) or "").strip()
-        if not translation:
-            raise ValueError("LLM returned no translation")
+        translation = await _semantic_retranslate_history_row(row, cfg, context_rows, glossary)
     except HTTPException:
         raise
+    except LLMProviderContentBlockedError as e:
+        logger.warning("MOBILE RETRANSLATE blocked history_id=%s code=%s", history_id, e.provider_code)
+        raise HTTPException(422, PROVIDER_CONTENT_BLOCK_MESSAGE) from e
     except Exception as e:
-        logger.exception("MOBILE RETRANSLATE failed history_id=%s", history_id)
-        raise HTTPException(502, f"LLM request failed: {e}") from e
+        logger.exception("MOBILE RETRANSLATE semantic failed history_id=%s", history_id)
+        raise HTTPException(502, f"Semantic LLM request failed: {e}") from e
     if not update_history_translation(source_id, history_id, translation):
         raise HTTPException(404, "History entry not found")
     logger.info("MOBILE RETRANSLATE OK history_id=%s", history_id)
     return {"history_id": history_id, "source": row["source_text"], "translation": translation}
-
 
 @app.delete("/v1/history/{history_id}")
 def mobile_history_delete(history_id: int, _: None = Security(check_auth)):

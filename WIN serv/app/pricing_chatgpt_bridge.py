@@ -197,7 +197,7 @@ def _save_job(request_id: str, provider_id: str, provider_name: str, official_si
 def _save_part(part_request_id: str, parent_request_id: str, part_index: int, models: list[str]) -> None:
     with connect() as con:
         con.execute(
-            "INSERT INTO llm_pricing_agent_parts(part_request_id,parent_request_id,part_index,models_json,status) "
+            "INSERT OR IGNORE INTO llm_pricing_agent_parts(part_request_id,parent_request_id,part_index,models_json,status) "
             "VALUES(?,?,?,?, 'queued')",
             (part_request_id, parent_request_id, part_index, json.dumps(models, ensure_ascii=False)),
         )
@@ -542,10 +542,12 @@ async def pricing_agent_refresh():
     job = _job(parent_id); assert job is not None
     chunks = [models[i:i + MODELS_PER_AGENT_REQUEST] for i in range(0, len(models), MODELS_PER_AGENT_REQUEST)]
     try:
-        # Submit in order. Family Bridge owns the single Chromium queue, so all parts
-        # are processed sequentially together with family messages.
+        # ECHOTRANSLATE_PRICING_LAZY_PART_SUBMIT_V1
+        # Persist the whole plan, but submit only the first part.
         for index, part_models in enumerate(chunks):
-            await _submit_part(cfg, parent_id, index, part_models, job, chat_url)
+            _save_part(f"{parent_id}-p{index + 1:02d}", parent_id, index, part_models)
+        if chunks:
+            await _submit_part(cfg, parent_id, 0, chunks[0], job, chat_url)
     except Exception as exc:
         _update_job(parent_id, status="error", error_text=f"Bridge submit failed: {exc}")
         raise HTTPException(502, f"Не удалось передать Pricing Agent batch: {exc}") from exc
@@ -621,6 +623,7 @@ async def _poll_part(cfg: dict, part: dict) -> dict:
     return next(x for x in _parts(str(part["parent_request_id"])) if x["part_request_id"] == part_id)
 
 
+# ECHOTRANSLATE_PRICING_POLL_30S_STOP_V1
 @router.get("/llm-test/pricing-agent/jobs/{request_id}")
 async def pricing_agent_job(request_id: str):
     job = _job(request_id)
@@ -628,6 +631,8 @@ async def pricing_agent_job(request_id: str):
         raise HTTPException(404, "Pricing job не найден")
     if job["status"] == "applied":
         return {"request_id": request_id, "status": "applied", "applied_at": job.get("applied_at")}
+    if job["status"] == "cancelled":
+        return {"request_id": request_id, "status": "cancelled", "error": job.get("error_text") or "Остановлено пользователем"}
     if job["status"] == "error":
         if _is_rendered_pricing_parser_error(job.get("error_text")) and _recover_rendered_pricing_parser_error(request_id):
             job = _job(request_id)
@@ -635,31 +640,46 @@ async def pricing_agent_job(request_id: str):
         else:
             return {"request_id": request_id, "status": "error", "error": job.get("error_text")}
 
-    cfg = load_config(); current_parts = _parts(request_id)
-    # Poll each part. Temporary connection failures are reported but the parent stays resumable.
-    poll_errors: list[str] = []
-    for part in current_parts:
-        if part["status"] in {"done", "error"}:
-            continue
-        try:
-            await _poll_part(cfg, part)
-        except Exception as exc:
-            poll_errors.append(f"{part['part_request_id']}: {exc}")
+    cfg = load_config()
     current_parts = _parts(request_id)
+    poll_errors: list[str] = []
+
+    active = next((p for p in current_parts if p["status"] not in {"done", "error", "cancelled"}), None)
+    if active is not None:
+        try:
+            if active.get("bridge_job_id"):
+                await _poll_part(cfg, active)
+            else:
+                await _submit_part(cfg, request_id, int(active["part_index"]), list(active["models"]), job, _pricing_chat_url(cfg))
+        except Exception as exc:
+            poll_errors.append(f"{active['part_request_id']}: {exc}")
+
+    current_parts = _parts(request_id)
+    next_part = next((p for p in current_parts if p["status"] not in {"done", "error", "cancelled"}), None)
+    if next_part is not None and not next_part.get("bridge_job_id"):
+        try:
+            await _submit_part(cfg, request_id, int(next_part["part_index"]), list(next_part["models"]), job, _pricing_chat_url(cfg))
+        except Exception as exc:
+            poll_errors.append(f"{next_part['part_request_id']}: submit failed: {exc}")
+        current_parts = _parts(request_id)
+
+    cancelled = [p for p in current_parts if p["status"] == "cancelled"]
     errors = [p for p in current_parts if p["status"] == "error"]
     done = [p for p in current_parts if p["status"] == "done"]
+    if cancelled:
+        _update_job(request_id, status="cancelled", error_text="Остановлено пользователем")
+        return {"request_id": request_id, "status": "cancelled", "parts_done": len(done), "parts_total": len(current_parts)}
     if errors:
         message = "; ".join(str(p.get("error_text") or p["part_request_id"]) for p in errors[:5])
         _update_job(request_id, status="error", error_text=message)
         return {"request_id": request_id, "status": "error", "error": message, "parts_done": len(done), "parts_total": len(current_parts)}
     if len(done) != len(current_parts):
-        _update_job(request_id, status="processing" if any(p["status"] == "processing" for p in current_parts) else "queued")
-        return {"request_id": request_id, "status": "processing" if any(p["status"] == "processing" for p in current_parts) else "queued",
-                "parts_done": len(done), "parts_total": len(current_parts), "poll_error": "; ".join(poll_errors[:3]) if poll_errors else ""}
+        status_value = "processing" if any(p["status"] == "processing" for p in current_parts) else "queued"
+        _update_job(request_id, status=status_value)
+        return {"request_id": request_id, "status": status_value, "parts_done": len(done), "parts_total": len(current_parts), "poll_error": "; ".join(poll_errors[:3]) if poll_errors else ""}
 
-    # Validate every ChatGPT response first. Only after the whole batch is clean do
-    # we touch the active pricing snapshot.
-    all_infos: list[PricingInfo] = []; totals = {"known": 0, "partial": 0, "unknown": 0, "total": 0}
+    all_infos: list[PricingInfo] = []
+    totals = {"known": 0, "partial": 0, "unknown": 0, "total": 0}
     try:
         for part in current_parts:
             payload = _extract_payload(str(part.get("response_text") or ""))
@@ -677,5 +697,34 @@ async def pricing_agent_job(request_id: str):
         return {"request_id": request_id, "status": "error", "error": str(exc), "parts_done": len(done), "parts_total": len(current_parts)}
 
     _update_job(request_id, status="applied", error_text="", applied=True)
-    return {"request_id": request_id, "status": "applied", "summary": {**totals, **saved},
-            "parts_done": len(done), "parts_total": len(current_parts)}
+    return {"request_id": request_id, "status": "applied", "summary": {**totals, **saved}, "parts_done": len(done), "parts_total": len(current_parts)}
+
+
+@router.post("/llm-test/pricing-agent/jobs/{request_id}/stop")
+async def pricing_agent_stop(request_id: str):
+    job = _job(request_id)
+    if job is None:
+        raise HTTPException(404, "Pricing job не найден")
+    if job["status"] in {"applied", "error", "cancelled"}:
+        return {"request_id": request_id, "status": job["status"]}
+
+    cfg = load_config()
+    remote_errors: list[str] = []
+    for part in _parts(request_id):
+        if part["status"] in {"done", "error", "cancelled"}:
+            continue
+        if part.get("bridge_job_id"):
+            try:
+                timeout = httpx.Timeout(8.0, connect=3.0)
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.post(_bridge_url(cfg) + "/api/external/jobs/" + str(part["part_request_id"]) + "/cancel", headers=_bridge_headers(cfg))
+                response.raise_for_status()
+            except Exception as exc:
+                remote_errors.append(f"{part['part_request_id']}: {exc}")
+        _update_part(str(part["part_request_id"]), status="cancelled", error_text="Остановлено пользователем")
+
+    detail = "Остановлено пользователем"
+    if remote_errors:
+        detail += "; Bridge cancel warnings: " + "; ".join(remote_errors[:3])
+    _update_job(request_id, status="cancelled", error_text=detail)
+    return {"request_id": request_id, "status": "cancelled", "warning": "; ".join(remote_errors[:3])}

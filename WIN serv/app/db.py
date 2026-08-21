@@ -190,6 +190,8 @@ def init_db() -> None:
             ("role", "TEXT"),
             ("source_fragment_ids_json", "TEXT"),
             ("source_boxes_json", "TEXT"),
+            # ECHOTRANSLATE_SCREEN_DOCUMENT_SNAPSHOT_V1
+            ("screen_document_json", "TEXT"),
         ):
             if column_name not in columns:
                 con.execute(f"ALTER TABLE messages ADD COLUMN {column_name} {column_type}")
@@ -399,7 +401,9 @@ def clear_history_source(source_id: str) -> None:
 def history_message(source_id: str, message_id: int) -> dict | None:
     with connect() as con:
         row = con.execute(
-            "SELECT id, session_id, source_text, translation, confidence, box_json, language, target_language, screen_hash FROM messages WHERE source_id=? AND id=?",
+            "SELECT id, session_id, source_text, translation, confidence, box_json, language, target_language, screen_hash, "
+            "destination_id, role, source_fragment_ids_json, source_boxes_json, screen_document_json "
+            "FROM messages WHERE source_id=? AND id=?",
             (source_id, message_id),
         ).fetchone()
     return dict(row) if row else None
@@ -408,7 +412,9 @@ def history_message(source_id: str, message_id: int) -> dict | None:
 def history_message_by_id(message_id: int) -> dict | None:
     with connect() as con:
         row = con.execute(
-            "SELECT id, source_id, session_id, source_text, language, target_language FROM messages WHERE id=?",
+            "SELECT id, source_id, session_id, source_text, translation, confidence, box_json, language, target_language, "
+            "screen_hash, destination_id, role, source_fragment_ids_json, source_boxes_json, screen_document_json "
+            "FROM messages WHERE id=?",
             (message_id,),
         ).fetchone()
     return dict(row) if row else None
@@ -417,7 +423,7 @@ def history_message_by_id(message_id: int) -> dict | None:
 def history_context_before(source_id: str, session_id: str, message_id: int, limit: int = 1000) -> list[dict]:
     with connect() as con:
         rows = con.execute(
-            "SELECT id, created_at, source_text, translation, confidence, box_json, language "
+            "SELECT id, created_at, source_text, translation, confidence, box_json, language, screen_hash "
             "FROM messages WHERE source_id=? AND session_id=? AND id<? ORDER BY id DESC LIMIT ?",
             (source_id, session_id, message_id, limit),
         ).fetchall()
@@ -888,7 +894,8 @@ def update_history_message(source_id: str, message_id: int, source_text: str, tr
             con.execute("DELETE FROM messages WHERE source_id=? AND id=?", (source_id, message_id))
         else:
             con.execute(
-                "UPDATE messages SET source_text=?, translation=?, token_count=NULL WHERE source_id=? AND id=?",
+                "UPDATE messages SET source_text=?, translation=?, token_count=NULL, "
+                "screen_document_json=NULL, source_fragment_ids_json='[]' WHERE source_id=? AND id=?",
                 (source_text, translation, source_id, message_id),
             )
     return True
@@ -982,8 +989,8 @@ def add_destination_messages(
                 "INSERT INTO messages("
                 "source_id, source_name, session_id, source_text, translation, confidence, box_json, "
                 "language, target_language, screen_hash, token_count, destination_id, role, "
-                "source_fragment_ids_json, source_boxes_json"
-                ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "source_fragment_ids_json, source_boxes_json, screen_document_json"
+                ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (
                     source_id,
                     source_name,
@@ -1000,10 +1007,38 @@ def add_destination_messages(
                     str(row.get("role") or "unknown"),
                     str(row.get("source_fragment_ids_json") or "[]"),
                     str(row.get("source_boxes_json") or "[]"),
+                    str(row.get("screen_document_json") or ""),
                 ),
             )
             ids.append(int(cursor.lastrowid))
         return ids
+
+# ECHOTRANSLATE_SCREEN_DOCUMENT_SNAPSHOT_BACKFILL_V1
+def backfill_destination_screen_snapshots(
+    source_id: str,
+    session_id: str,
+    screen_document_json: str,
+    destinations: Iterable[dict],
+) -> None:
+    """Backfill semantic source data for history rows reused by an old screen-cache entry."""
+    if not screen_document_json:
+        return
+    with _lock, connect() as con:
+        for destination in destinations:
+            history_id = destination.get("history_id")
+            if history_id is None:
+                continue
+            source_ids_json = json.dumps(destination.get("source_ids") or [], ensure_ascii=False)
+            source_boxes_json = json.dumps(destination.get("source_boxes") or [], ensure_ascii=False)
+            con.execute(
+                "UPDATE messages SET "
+                "screen_document_json=CASE WHEN COALESCE(screen_document_json,'')='' THEN ? ELSE screen_document_json END, "
+                "source_fragment_ids_json=CASE WHEN COALESCE(source_fragment_ids_json,'') IN ('','[]') THEN ? ELSE source_fragment_ids_json END, "
+                "source_boxes_json=CASE WHEN COALESCE(source_boxes_json,'') IN ('','[]') THEN ? ELSE source_boxes_json END "
+                "WHERE source_id=? AND session_id=? AND id=?",
+                (screen_document_json, source_ids_json, source_boxes_json, source_id, session_id, int(history_id)),
+            )
+
 
 # === SCREEN_CACHE_HISTORY_REF_V1 ===
 def history_translations_by_ids(

@@ -10,6 +10,54 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+# ECHOTRANSLATE_PROVIDER_CONTENT_BLOCK_V1
+PROVIDER_CONTENT_BLOCK_MESSAGE = (
+    "Провайдер отклонил текст из-за ограничения контента. "
+    "Попробуйте другую модель или другого провайдера."
+)
+
+
+class LLMProviderContentBlockedError(RuntimeError):
+    def __init__(self, provider_code: str, provider_message: str = "") -> None:
+        self.provider_code = str(provider_code or "data_inspection_failed")
+        self.provider_message = str(provider_message or "")
+        super().__init__(PROVIDER_CONTENT_BLOCK_MESSAGE)
+
+
+def provider_error_code(response: httpx.Response) -> str:
+    if response.status_code < 400:
+        return ""
+    try:
+        payload = response.json()
+    except Exception:
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+    error = payload.get("error")
+    if isinstance(error, dict):
+        return str(error.get("code") or "").strip()
+    return str(payload.get("code") or "").strip()
+
+
+def raise_for_provider_content_block(response: httpx.Response) -> None:
+    code = provider_error_code(response)
+    if code != "data_inspection_failed":
+        return
+    provider_message = ""
+    try:
+        payload = response.json()
+        error = payload.get("error") if isinstance(payload, dict) else None
+        if isinstance(error, dict):
+            provider_message = str(error.get("message") or "")
+    except Exception:
+        pass
+    logger.warning(
+        "LLM PROVIDER CONTENT BLOCK status=%s code=%s message=%s",
+        response.status_code, code, provider_message,
+    )
+    raise LLMProviderContentBlockedError(code, provider_message)
+
+
 def _extract_json(text: str | None) -> dict:
     if text is None:
         text = ""
@@ -54,11 +102,15 @@ async def translate_openai_compatible(*, cfg: dict, messages: list[dict]) -> dic
         content = None
         for attempt in (1, 2):
             r = await post(attempt)
+            raise_for_provider_content_block(r)
             if r.status_code >= 400:
                 # Some OpenAI-compatible local servers do not accept response_format.
+                # Provider moderation errors are handled above and MUST NOT be retried
+                # as a response_format compatibility problem.
                 if r.status_code in (400, 422):
                     body.pop("response_format", None)
                     r = await post(attempt)
+                    raise_for_provider_content_block(r)
             if r.status_code >= 400:
                 logger.error(
                     "LLM HTTP ERROR status=%s body=%s",
@@ -121,6 +173,7 @@ async def extract_glossary_openai_compatible(*, cfg: dict, messages: list[dict])
     body = {"model": cfg["llm_model"], "messages": messages, "temperature": 0, "max_tokens": int(cfg["max_output_tokens"]), "response_format": {"type": "json_object"}}
     async with httpx.AsyncClient(timeout=float(cfg.get("llm_timeout_seconds", 90))) as client:
         response = await client.post(f"{base}/chat/completions", headers=headers, json=body)
+    raise_for_provider_content_block(response)
     response.raise_for_status()
     choices = response.json().get("choices") or []
     content = ((choices[0] if choices else {}).get("message") or {}).get("content")
@@ -161,6 +214,7 @@ async def translate_screen_openai_compatible(*, cfg: dict, messages: list[dict])
         content = None
         for attempt in (1, 2):
             response = await post(attempt)
+            raise_for_provider_content_block(response)
             if response.status_code >= 400 and response.status_code in (400, 422) and "response_format" in body:
                 logger.warning(
                     "SEMANTIC LLM response_format rejected status=%s body=%s; retrying without response_format",
@@ -169,6 +223,7 @@ async def translate_screen_openai_compatible(*, cfg: dict, messages: list[dict])
                 )
                 body.pop("response_format", None)
                 response = await post(attempt)
+                raise_for_provider_content_block(response)
             if response.status_code >= 400:
                 logger.error("SEMANTIC LLM HTTP ERROR status=%s body=%s", response.status_code, response.text)
             response.raise_for_status()
