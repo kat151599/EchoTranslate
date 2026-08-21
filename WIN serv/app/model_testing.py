@@ -501,19 +501,17 @@ def _request_cost(input_tokens: int, max_output_tokens: int, meta: dict, setting
         float(settings.get("input_token_safety", DEFAULTS["input_token_safety"])),
     )
 
-# ECHOTRANSLATE_VISIBLE_MAX_REQUEST_COST_CATALOG_V1
+# ECHOTRANSLATE_DYNAMIC_FUNNEL_COST_PREFILTER_V1
 def _catalog_pretest_request_cost(meta: dict, settings: dict, cfg: dict) -> float | None:
+    """Cost ceiling for automatic stages known before the user chooses quality phrases."""
     billing = str(meta.get("billing_mode") or "payg")
     if billing != "payg":
         return 0.0
-
     encoding = str(cfg.get("tokenizer_encoding", "o200k_base"))
-
     speed_messages = [
         {"role": "system", "content": "Translate English to natural Russian. Return translation only."},
         {"role": "user", "content": "I don't know what the hell you're talking about."},
     ]
-
     uncensored_messages = [
         {
             "role": "system",
@@ -522,38 +520,12 @@ def _catalog_pretest_request_cost(meta: dict, settings: dict, cfg: dict) -> floa
                 "and profanity. Do not explain. Return translation only."
             ),
         },
-        {
-            "role": "user",
-            "content": str(settings.get("uncensored_phrase") or DEFAULTS["uncensored_phrase"]),
-        },
+        {"role": "user", "content": str(settings.get("uncensored_phrase") or DEFAULTS["uncensored_phrase"])},
     ]
-
-    quality_system = (
-        "Ты переводчик русской локализации сюжетной игры. Переводи естественно и художественно, как живой русский диалог, "
-        "а не дословно с английского. Сохраняй смысл, эмоцию, грубость, сленг и стиль персонажа. Не смягчай лексику. "
-        "Верни строгий JSON вида {\"translations\":[{\"id\":0,\"translation\":\"...\"}]}."
-    )
-    quality_target = "TARGET_BLOCKS:\n" + json.dumps(
-        [{"id": i, "text": text} for i, text in enumerate(QUALITY_PHRASES)],
-        ensure_ascii=False,
-    )
-    quality_messages = [
-        {"role": "system", "content": quality_system},
-        {"role": "user", "content": quality_target},
-    ]
-
     stages = (
         (speed_messages, int(settings.get("speed_max_output_tokens", DEFAULTS["speed_max_output_tokens"]))),
-        (
-            uncensored_messages,
-            int(settings.get("uncensored_max_output_tokens", DEFAULTS["uncensored_max_output_tokens"])),
-        ),
-        (
-            quality_messages,
-            int(settings.get("quality_max_output_tokens", DEFAULTS["quality_max_output_tokens"])),
-        ),
+        (uncensored_messages, int(settings.get("uncensored_max_output_tokens", DEFAULTS["uncensored_max_output_tokens"]))),
     )
-
     costs: list[float] = []
     for messages, max_output_tokens in stages:
         input_tokens = _messages_tokens(messages, encoding)
@@ -803,13 +775,33 @@ def _uncensored_status(text: str) -> str:
 
 
 def _speed_survivors(run: dict) -> list[str]:
-    speed = (run.get("state") or {}).get("speed", {})
+    # ECHOTRANSLATE_DYNAMIC_FUNNEL_SPEED_SURVIVORS_V1
+    # No hidden "top N": every model that actually passed the speed stage
+    # within the configured hard timeout may continue.
+    state = run.get("state") or {}
+    speed = state.get("speed", {})
+    timeout_ms = min(
+        5.0,
+        max(0.25, float(run.get("settings", {}).get("benchmark_timeout_seconds", DEFAULTS["benchmark_timeout_seconds"]))),
+    ) * 1000.0
     successful: list[tuple[str, dict]] = []
-    for model, result in speed.items():
-        if result.get("status") == "OK" and result.get("total_ms") is not None:
+    for model in state.get("eligible_models", []):
+        result = speed.get(model) or {}
+        total_ms = result.get("total_ms")
+        if (
+            result.get("status") == "OK"
+            and total_ms is not None
+            and float(total_ms) <= timeout_ms + 1e-6
+        ):
             successful.append((model, result))
-    successful.sort(key=lambda item: (float(item[1].get("total_ms") or 1e18), float(item[1].get("ttft_ms") or 1e18), -float(item[1].get("tps") or 0)))
-    return [model for model, _ in successful[: int(run["settings"].get("speed_top_n", DEFAULTS["speed_top_n"]))]]
+    successful.sort(
+        key=lambda item: (
+            float(item[1].get("total_ms") or 1e18),
+            float(item[1].get("ttft_ms") or 1e18),
+            -float(item[1].get("tps") or 0),
+        )
+    )
+    return [model for model, _ in successful]
 
 
 def _uncensored_survivors(run: dict) -> list[str]:
@@ -1165,7 +1157,7 @@ async def funnel_uncensored(run_id: str, request: Request):
     if run is None:
         raise HTTPException(404, "Benchmark run not found")
     if model not in _speed_survivors(run):
-        raise HTTPException(409, "MODEL_NOT_IN_SPEED_TOP")
+        raise HTTPException(409, "MODEL_DID_NOT_PASS_SPEED")
     meta = _model_meta_from_run(run, model)
     phrase = str(run["settings"].get("uncensored_phrase") or DEFAULTS["uncensored_phrase"])
     messages = [
@@ -1227,7 +1219,20 @@ def funnel_uncensored_survivors(run_id: str):
 
 @router.post("/llm-test/funnel/{run_id}/quality")
 async def funnel_quality(run_id: str, request: Request):
-    model = str((await request.json()).get("model") or "").strip()
+    # ECHOTRANSLATE_DYNAMIC_FUNNEL_HISTORY_QUALITY_V1
+    payload = await request.json()
+    model = str(payload.get("model") or "").strip()
+    phrase_ids: list[int] = []
+    for value in payload.get("phrase_ids") or []:
+        try:
+            phrase_id = int(value)
+        except (TypeError, ValueError):
+            continue
+        if phrase_id not in phrase_ids:
+            phrase_ids.append(phrase_id)
+    if not phrase_ids:
+        raise HTTPException(400, "Выберите хотя бы одну реплику из истории для Mini quality")
+
     cfg = load_config().copy()
     provider_id = _provider_id(cfg)
     run = _benchmark_row(provider_id, run_id)
@@ -1235,20 +1240,29 @@ async def funnel_quality(run_id: str, request: Request):
         raise HTTPException(404, "Benchmark run not found")
     if model not in _uncensored_survivors(run):
         raise HTTPException(409, "MODEL_DID_NOT_PASS_UNCENSORED")
+
+    by_id = {int(row["id"]): row for row in list_test_history_messages()}
+    missing = [item for item in phrase_ids if item not in by_id]
+    if missing:
+        raise HTTPException(404, f"Фразы истории больше не найдены: {missing}")
+    phrases = [by_id[item] for item in phrase_ids]
+
     meta = _model_meta_from_run(run, model)
     system = (
         "Ты переводчик русской локализации сюжетной игры. Переводи естественно и художественно, как живой русский диалог, "
         "а не дословно с английского. Сохраняй смысл, эмоцию, грубость, сленг и стиль персонажа. Не смягчай лексику. "
-        "Верни строгий JSON вида {\"translations\":[{\"id\":0,\"translation\":\"...\"}]}."
+        "Переведи каждый TARGET_BLOCK, сохрани его id и верни строгий JSON "
+        "{\"translations\":[{\"id\":123,\"translation\":\"...\"}]} без пояснений."
     )
     target = "TARGET_BLOCKS:\n" + json.dumps(
-        [{"id": i, "text": text} for i, text in enumerate(QUALITY_PHRASES)],
+        [{"id": int(row["id"]), "text": str(row.get("source_text") or "")} for row in phrases],
         ensure_ascii=False,
     )
     messages = [{"role": "system", "content": system}, {"role": "user", "content": target}]
-    max_tokens = int(run["settings"].get("quality_max_output_tokens", 500))
+    max_tokens = int(run["settings"].get("quality_max_output_tokens", DEFAULTS["quality_max_output_tokens"]))
     input_tokens = _messages_tokens(messages, str(cfg.get("tokenizer_encoding", "o200k_base")))
     max_cost = _guard_and_reserve(provider_id, run, meta, input_tokens, max_tokens, stage="quality")
+
     try:
         raw_text, duration_ms, raw_usage = await _with_benchmark_timeout(
             _plain_request(cfg, model, messages, max_tokens, response_format=True),
@@ -1261,27 +1275,56 @@ async def funnel_quality(run_id: str, request: Request):
             if not match:
                 raise ValueError("Модель не вернула JSON mini-quality")
             parsed = json.loads(match.group(0))
-        translations = {}
+
+        translations: dict[int, str] = {}
+        allowed_ids = set(phrase_ids)
         for item in parsed.get("translations") or []:
-            if isinstance(item, dict) and item.get("id") is not None:
-                translations[int(item["id"])] = str(item.get("translation") or "").strip()
-        ordered = [translations.get(i, "") for i in range(len(QUALITY_PHRASES))]
-        if any(not item for item in ordered):
-            raise ValueError("Модель вернула не все 5 переводов")
-        output_tokens = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).count("\n".join(ordered))
+            if not isinstance(item, dict) or item.get("id") is None:
+                continue
+            try:
+                item_id = int(item["id"])
+            except (TypeError, ValueError):
+                continue
+            if item_id in allowed_ids:
+                translations[item_id] = str(item.get("translation") or "").strip()
+
+        ordered = [translations.get(item, "") for item in phrase_ids]
+        answered_count = sum(1 for text in ordered if text)
+        total_count = len(ordered)
+        response_rate = answered_count / total_count if total_count else 0.0
+        status = "OK" if answered_count * 5 >= total_count * 4 else "FAILED"
+
+        output_tokens = TokenBudget(str(cfg.get("tokenizer_encoding", "o200k_base"))).count(
+            "\n".join(text for text in ordered if text)
+        )
         actual, cost_basis, normalized_usage = _actual_cost(input_tokens, output_tokens, meta, raw_usage)
         result = {
-            "status": "OK", "translations": ordered, "duration_ms": duration_ms,
+            "status": status,
+            "translations": ordered,
+            "phrases": [
+                {
+                    "id": int(row["id"]),
+                    "source_text": str(row.get("source_text") or ""),
+                    "source_name": str(row.get("source_name") or row.get("source_id") or ""),
+                }
+                for row in phrases
+            ],
+            "answered_count": answered_count,
+            "total_count": total_count,
+            "response_rate": response_rate,
+            "duration_ms": duration_ms,
             "input_tokens": normalized_usage.get("prompt_tokens") or input_tokens,
             "output_tokens": normalized_usage.get("completion_tokens") or output_tokens,
             "provider_usage": normalized_usage,
-            "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": actual,
+            "reserved_cost_usd": max_cost,
+            "estimated_actual_cost_usd": actual,
             "cost_basis": cost_basis,
         }
     except BenchmarkTimeoutError as exc:
         actual, cost_basis = _uncertain_cost(meta, max_cost)
         result = {
             "status": "TIMEOUT", "error": str(exc), "input_tokens": input_tokens,
+            "answered_count": 0, "total_count": len(phrase_ids), "response_rate": 0.0,
             "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": actual,
             "cost_basis": cost_basis,
         }
@@ -1290,10 +1333,22 @@ async def funnel_quality(run_id: str, request: Request):
         actual, cost_basis = _uncertain_cost(meta, max_cost)
         result = {
             "status": "ERROR", "error": str(exc), "input_tokens": input_tokens,
+            "answered_count": 0, "total_count": len(phrase_ids), "response_rate": 0.0,
             "reserved_cost_usd": max_cost, "estimated_actual_cost_usd": actual,
             "cost_basis": cost_basis,
         }
+
     state = run["state"]
+    state["quality_phrase_ids"] = phrase_ids
+    state["quality_phrases"] = [
+        {
+            "id": int(row["id"]),
+            "source_text": str(row.get("source_text") or ""),
+            "source_name": str(row.get("source_name") or row.get("source_id") or ""),
+            "source_id": str(row.get("source_id") or ""),
+        }
+        for row in phrases
+    ]
     state.setdefault("quality", {})[model] = result
     _settle_reservation(provider_id, run_id, max_cost, actual)
     updated = _update_benchmark(provider_id, run_id, state=state, actual_delta=actual)
