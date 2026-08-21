@@ -568,9 +568,11 @@ def admin(request: Request):
     cfg["active_llm_models"] = sorted(active_models, key=lambda model: (active_pings.get(model, float("inf")), model.lower()))
     cfg["llm_api_key_configured"] = bool(str(cfg.get("llm_api_key") or "").strip())
     cfg["server_api_key_configured"] = bool(str(cfg.get("server_api_key") or "").strip())
+    cfg["chatgpt_bridge_token_configured"] = bool(str(cfg.get("chatgpt_bridge_token") or "").strip())
     # Do not expose secrets into page source.
     cfg["llm_api_key"] = "" if cfg.get("llm_api_key") else ""
     cfg["server_api_key"] = "" if cfg.get("server_api_key") else ""
+    cfg["chatgpt_bridge_token"] = "" if cfg.get("chatgpt_bridge_token") else ""
     return templates.TemplateResponse("admin.html", {"request": request, "cfg": cfg, "sessions": list_sessions(), "pending_corrections": pending_history_corrections()})
 
 
@@ -782,6 +784,30 @@ def admin_new_translator(request: Request):
     return templates.TemplateResponse("add_translator.html", {"request": request})
 
 
+# ECHOTRANSLATE_LLM_PROVIDER_EDIT_V1
+@app.get("/admin/translators/edit", response_class=HTMLResponse)
+def admin_edit_translator(request: Request, name: str = ""):
+    cfg = load_config()
+    profiles = dict(cfg.get("llm_profiles") or {})
+    provider_names = sorted(profiles.keys())
+    selected = str(name or "").strip()
+    if selected not in profiles:
+        active = str(cfg.get("active_llm_profile") or "").strip()
+        selected = active if active in profiles else (provider_names[0] if provider_names else "")
+    profile = profiles.get(selected) if selected else None
+    safe_profile = {
+        "llm_base_url": str((profile or {}).get("llm_base_url") or ""),
+        "official_site_url": str((profile or {}).get("official_site_url") or ""),
+        "llm_model": str((profile or {}).get("llm_model") or ""),
+        "models_count": len((profile or {}).get("llm_models") or []),
+        "api_key_configured": bool(str((profile or {}).get("llm_api_key") or "").strip()),
+    }
+    return templates.TemplateResponse(
+        "edit_provider.html",
+        {"request": request, "provider_names": provider_names, "provider_name": selected, "profile": safe_profile},
+    )
+
+
 @app.post("/api/admin/llm-models")
 async def admin_llm_models(request: Request):
     form = await request.form()
@@ -838,6 +864,8 @@ async def admin_save_translator(request: Request):
     base_url = str(form.get("llm_base_url", "")).strip().rstrip("/")
     model = str(form.get("llm_model", "")).strip()
     api_key = str(form.get("llm_api_key", "")).strip()
+    # CHATGPT_PRICING_AGENT_PROVIDER_SITE_V1
+    official_site_url = str(form.get("official_site_url", "")).strip().rstrip("/")
     try:
         models = json.loads(str(form.get("llm_models", "[]")))
     except json.JSONDecodeError:
@@ -845,12 +873,15 @@ async def admin_save_translator(request: Request):
     models = [str(item) for item in models if str(item)]
     if model not in models:
         models.append(model)
-    if not name or not base_url or not model:
-        raise HTTPException(400, "Укажите имя переводчика, адрес API и модель")
+    if not name or not base_url or not model or not official_site_url:
+        raise HTTPException(400, "Укажите имя LLM провайдера, адрес API, официальный сайт и модель")
+    if not official_site_url.startswith(("http://", "https://")):
+        raise HTTPException(400, "Укажите корректный официальный сайт провайдера")
     cfg = load_config()
     profiles = dict(cfg.get("llm_profiles") or {})
     profiles[name] = {
         "llm_base_url": base_url,
+        "official_site_url": official_site_url,
         "llm_model": model,
         "llm_api_key": api_key,
         "llm_models": models,
@@ -864,6 +895,62 @@ async def admin_save_translator(request: Request):
     })
     return HTMLResponse('<meta http-equiv="refresh" content="0;url=/admin">')
 
+
+
+
+@app.post("/admin/translators/edit")
+async def admin_update_translator(request: Request):
+    form = await request.form()
+    name = str(form.get("profile_name", "")).strip()
+    base_url = str(form.get("llm_base_url", "")).strip().rstrip("/")
+    official_site_url = str(form.get("official_site_url", "")).strip().rstrip("/")
+    new_api_key = str(form.get("llm_api_key", "")).strip()
+    clear_api_key = form.get("clear_llm_api_key") == "on"
+    if not name or not base_url or not official_site_url:
+        raise HTTPException(400, "Укажите провайдера, адрес API и официальный сайт")
+    if not base_url.startswith(("http://", "https://")):
+        raise HTTPException(400, "Укажите корректный адрес LLM API")
+    if not official_site_url.startswith(("http://", "https://")):
+        raise HTTPException(400, "Укажите корректный официальный сайт провайдера")
+
+    cfg = load_config()
+    profiles = dict(cfg.get("llm_profiles") or {})
+    current = profiles.get(name)
+    if not isinstance(current, dict):
+        raise HTTPException(404, "LLM провайдер не найден")
+
+    old_base_url = str(current.get("llm_base_url") or "").strip().rstrip("/")
+    old_official_site = str(current.get("official_site_url") or "").strip().rstrip("/")
+    updated = dict(current)
+    updated["llm_base_url"] = base_url
+    updated["official_site_url"] = official_site_url
+    if clear_api_key:
+        updated["llm_api_key"] = ""
+    elif new_api_key:
+        updated["llm_api_key"] = new_api_key
+    profiles[name] = updated
+
+    updates = {"llm_profiles": profiles}
+    if str(cfg.get("active_llm_profile") or "").strip() == name:
+        updates.update({
+            "llm_base_url": base_url,
+            "llm_api_key": str(updated.get("llm_api_key") or ""),
+            "llm_model": str(updated.get("llm_model") or cfg.get("llm_model") or ""),
+        })
+    save_config(updates)
+
+    if old_base_url != base_url or old_official_site != official_site_url:
+        # The provider_id for LLM Lab is profile:<name>. Automatic pricing for
+        # the old endpoint/site must not authorize requests after configuration
+        # changes. Manual overrides live separately and are intentionally kept.
+        try:
+            from .db import connect
+            with connect() as con:
+                con.execute("DELETE FROM llm_pricing_cache WHERE provider_id=?", (f"profile:{name}",))
+        except Exception:
+            logger.exception("Could not invalidate pricing cache after provider edit provider=%s", name)
+
+    return HTMLResponse('<meta http-equiv="refresh" content="0;url=/admin">')
 
 @app.post("/admin/translators/select")
 async def admin_select_translator(request: Request):

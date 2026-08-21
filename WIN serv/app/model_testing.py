@@ -29,12 +29,15 @@ from .db import (
 from .prompting import build_messages, game_glossary_text, glossary_text, target_text
 from .token_budget import TokenBudget
 from .pricing import PricingResolver, save_manual_override, normalize_usage, worst_case_request_cost, actual_cost_from_usage, qwencloud_discovery_fallback_models
+from .pricing_chatgpt_bridge import router as pricing_chatgpt_router
 
 # QWENCLOUD_OFFICIAL_DISCOVERY_V4
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+# CHATGPT_PRICING_AGENT_ROUTER_V1
+router.include_router(pricing_chatgpt_router)
 templates = Jinja2Templates(directory=str(ROOT / "app" / "templates"))
 
 DEFAULTS = {
@@ -234,7 +237,7 @@ async def _fetch_models_raw(
     if not force_refresh:
         return configured_raw, (
             "" if configured_raw else
-            "Локальный список моделей пуст. Нажмите «Обновить /models и цены»."
+            "Локальный список моделей пуст. Получите модели у провайдера или запустите «Обновить цены»."
         )
 
     base_url = str(cfg.get("llm_base_url", "")).strip().rstrip("/")
@@ -913,24 +916,16 @@ async def llm_test_catalog(
         "min_context": min_context,
     })
 
-    if refresh:
-        # Explicit refresh may use provider/official pages, but detail fan-out is bounded.
-        resolved = await _resolve_model_metadata(
-            cfg,
-            raw,
-            force_refresh=True,
-            detail_limit=min(20, int(settings["speed_max_candidates"])),
-            allow_network=True,
-        )
-    else:
-        # Normal page load is fully local: no /models, pricing page, or detail calls.
-        resolved = await _resolve_model_metadata(
-            cfg,
-            raw,
-            force_refresh=False,
-            detail_limit=0,
-            allow_network=False,
-        )
+    # CHATGPT_PRICING_AGENT_NO_AUTO_PRICE_NETWORK_V1
+    # refresh=True may refresh provider /models only. Price discovery is exclusively
+    # triggered by /llm-test/pricing-agent/refresh and the dedicated ChatGPT chat.
+    resolved = await _resolve_model_metadata(
+        cfg,
+        raw,
+        force_refresh=False,
+        detail_limit=0,
+        allow_network=False,
+    )
 
     catalog = _catalog_filter(resolved, settings)
     catalog["error"] = error

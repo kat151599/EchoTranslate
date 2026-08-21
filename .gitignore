@@ -3,3 +3,4 @@
 /RECOVERY_*/
 /WIN serv/server.log
 /WIN serv/server-error.log
+/WIN serv/config.json

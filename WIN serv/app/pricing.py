@@ -1115,12 +1115,16 @@ class PricingResolver:
         if row is None:
             return None
         raw = dict(row)
-        try:
-            checked = datetime.fromisoformat(str(raw["checked_at"]).replace("Z", "+00:00"))
-            if datetime.now(timezone.utc) - checked > timedelta(hours=self.cache_hours):
+        # CHATGPT_PRICING_AGENT_NONEXPIRING_CACHE_V1
+        # User-requested Pricing Agent snapshots remain authoritative until the
+        # user explicitly refreshes them again. Legacy resolver rows keep TTL.
+        if str(raw.get("source") or "") != "chatgpt_pricing_agent":
+            try:
+                checked = datetime.fromisoformat(str(raw["checked_at"]).replace("Z", "+00:00"))
+                if datetime.now(timezone.utc) - checked > timedelta(hours=self.cache_hours):
+                    return None
+            except Exception:
                 return None
-        except Exception:
-            return None
         raw["tiers"] = json.loads(raw.pop("tiers_json") or "[]")
         raw["billing_mode"] = _normalize_billing_mode(raw.get("billing_mode"))
         raw["requires_exact_pricing"] = bool(raw.get("requires_exact_pricing"))
@@ -1797,3 +1801,82 @@ def save_manual_override(
         "context_length": context_length,
         "source": "manual_override",
     }
+
+# CHATGPT_PRICING_AGENT_BATCH_SAVE_V1
+def save_pricing_agent_batch(provider_id: str, infos: list[PricingInfo]) -> dict:
+    """Atomically replace the last Pricing Agent result for the supplied models.
+
+    Unlike the legacy resolver cache, Pricing Agent rows are explicit user-requested
+    snapshots and therefore do not expire. Manual metadata overrides stay authoritative.
+    """
+    _ensure_pricing_cache_schema()
+    if not provider_id:
+        raise ValueError("provider_id is required")
+    if not infos:
+        raise ValueError("Pricing Agent returned no models")
+    known = unknown = partial = 0
+    with connect() as con:
+        con.execute("BEGIN IMMEDIATE")
+        for info in infos:
+            if not isinstance(info, PricingInfo) or not info.model:
+                raise ValueError("Invalid PricingInfo in agent batch")
+            info.source = "chatgpt_pricing_agent"
+            con.execute(
+                "INSERT INTO llm_pricing_cache("
+                "provider_id,model,billing_mode,currency,input_price_per_m,output_price_per_m,"
+                "cache_read_price_per_m,cache_write_price_per_m,context_length,max_output_tokens,"
+                "tiers_json,source,source_url,checked_at,confidence,incremental_cost,requires_exact_pricing"
+                ") VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                "ON CONFLICT(provider_id,model) DO UPDATE SET "
+                "billing_mode=excluded.billing_mode,currency=excluded.currency,"
+                "input_price_per_m=excluded.input_price_per_m,output_price_per_m=excluded.output_price_per_m,"
+                "cache_read_price_per_m=excluded.cache_read_price_per_m,cache_write_price_per_m=excluded.cache_write_price_per_m,"
+                "context_length=excluded.context_length,max_output_tokens=excluded.max_output_tokens,"
+                "tiers_json=excluded.tiers_json,source=excluded.source,source_url=excluded.source_url,"
+                "checked_at=excluded.checked_at,confidence=excluded.confidence,incremental_cost=excluded.incremental_cost,"
+                "requires_exact_pricing=excluded.requires_exact_pricing",
+                (
+                    provider_id, info.model, _normalize_billing_mode(info.billing_mode), info.currency,
+                    info.input_price_per_m, info.output_price_per_m,
+                    info.cache_read_price_per_m, info.cache_write_price_per_m,
+                    info.context_length, info.max_output_tokens,
+                    json.dumps([t.to_dict() for t in info.tiers], ensure_ascii=False),
+                    "chatgpt_pricing_agent", info.source_url, info.checked_at, info.confidence,
+                    info.incremental_cost, 1 if info.requires_exact_pricing else 0,
+                ),
+            )
+            existing = con.execute(
+                "SELECT metadata_origin FROM llm_model_metadata WHERE provider_id=? AND model=?",
+                (provider_id, info.model),
+            ).fetchone()
+            origin = str(existing["metadata_origin"] or "manual").lower() if existing is not None else ""
+            if existing is None or origin != "manual":
+                con.execute(
+                    "INSERT INTO llm_model_metadata("
+                    "provider_id,model,input_price_per_m,output_price_per_m,context_length,updated_at,"
+                    "billing_mode,currency,cache_read_price_per_m,cache_write_price_per_m,max_output_tokens,"
+                    "tiers_json,source,source_url,checked_at,confidence,metadata_origin"
+                    ") VALUES(?,?,?,?,?,datetime('now'),?,?,?,?,?,?,?,?,?,?,?) "
+                    "ON CONFLICT(provider_id,model) DO UPDATE SET "
+                    "input_price_per_m=excluded.input_price_per_m,output_price_per_m=excluded.output_price_per_m,"
+                    "context_length=excluded.context_length,updated_at=datetime('now'),billing_mode=excluded.billing_mode,"
+                    "currency=excluded.currency,cache_read_price_per_m=excluded.cache_read_price_per_m,"
+                    "cache_write_price_per_m=excluded.cache_write_price_per_m,max_output_tokens=excluded.max_output_tokens,"
+                    "tiers_json=excluded.tiers_json,source=excluded.source,source_url=excluded.source_url,"
+                    "checked_at=excluded.checked_at,confidence=excluded.confidence,metadata_origin='resolver'",
+                    (
+                        provider_id, info.model, info.input_price_per_m, info.output_price_per_m,
+                        info.context_length, _normalize_billing_mode(info.billing_mode), info.currency,
+                        info.cache_read_price_per_m, info.cache_write_price_per_m, info.max_output_tokens,
+                        json.dumps([t.to_dict() for t in info.tiers], ensure_ascii=False),
+                        "chatgpt_pricing_agent", info.source_url, info.checked_at, info.confidence, "resolver",
+                    ),
+                )
+            if info.billing_mode == "payg" and (info.input_price_per_m is None or info.output_price_per_m is None):
+                unknown += 1
+            else:
+                known += 1
+                if info.requires_exact_pricing:
+                    partial += 1
+    return {"saved": len(infos), "known_saved": known, "unknown_saved": unknown, "partial_saved": partial}
+

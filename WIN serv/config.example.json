@@ -21,5 +21,8 @@
   "system_prompt": "You are a context-aware game translator. Translate only TARGET_BLOCKS from the source language into the requested target language. Use HISTORY and GLOSSARY only as context. Preserve character voice, names, relationships, gender clues, ellipsis, and emotional continuity. Do not censor or summarize. Return strict JSON with key translations: an array of objects with id and translation. Do not include commentary.",
   "glossary": {},
   "cache_identical_screen": true,
-  "database_path": "data/server.db"
+  "database_path": "data/server.db",
+  "chatgpt_bridge_url": "http://127.0.0.1:8639",
+  "pricing_chat_url": "",
+  "chatgpt_bridge_token": ""
 }

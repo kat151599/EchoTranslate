@@ -17,29 +17,61 @@
     <div class="provider">{{ provider_name }}</div>
   </div>
 
+  <!-- LLM_LAB_SIMPLE_UI_V2 -->
+  <div class="card">
+    <div class="title-row"><div><h3>Реальные игровые фразы для финала</h3><div class="muted">Выбери реальные игровые реплики сейчас, до запуска тестирования. Они будут использованы для финального full benchmark.</div></div><div class="toolbar"><button class="btn secondary" id="pick">Выбрать фразы</button></div></div>
+    <div class="status"><span class="pill">HISTORY ≤ <strong>{{ history_token_limit }}</strong> токенов</span><span class="pill" id="selected-count">0 фраз</span></div>
+    <div id="selected" class="selected"><div class="muted">Фразы не выбраны.</div></div>
+    <div id="phrase-picker" class="phrase-picker"><div class="picker-tools"><input id="history-search" class="search" placeholder="Поиск по игре, оригиналу или переводу…"><button class="btn secondary" id="close-picker">Готово</button></div><div id="history-list" class="history-list"></div></div>
+  </div>
+
+  <!-- CHATGPT_PRICING_AGENT_UI_V1 -->
+  <div class="card" id="pricing-agent-card">
+    <div class="title-row">
+      <div><h2>Цены через ChatGPT Pricing Agent</h2><div class="muted">Внешний поиск цен запускается только этой кнопкой. Обычное открытие, переключение и тесты читают последний SQLite snapshot.</div></div>
+      <button class="btn good" id="pricing-refresh">↻ Обновить цены</button>
+    </div>
+    <div class="grid" style="margin-top:14px">
+      <div class="field"><label>Официальный сайт провайдера</label><input id="pricing-official-site" type="url" placeholder="https://provider.example.com/"></div>
+      <div class="field"><label>Family ChatGPT Bridge</label><input id="pricing-bridge-url" type="url" value="http://127.0.0.1:8639"></div>
+      <div class="field"><label>Pricing Agent chat</label><input id="pricing-chat-url" type="url" placeholder="https://chatgpt.com/c/..."></div>
+      <div class="field"><label>Bridge token</label><input id="pricing-bridge-token" type="password" autocomplete="new-password" placeholder="не задан"></div>
+    </div>
+    <div class="toolbar" style="margin-top:12px"><button class="btn secondary" id="pricing-save-settings">Сохранить настройки</button><span class="pill"><span id="pricing-dot" class="dot"></span><span id="pricing-status">Проверяю настройки…</span></span></div>
+    <div id="pricing-error" class="error"></div>
+    <div id="pricing-summary" class="muted" style="margin-top:8px"></div>
+  </div>
+
+
   <div class="card">
     <div class="title-row"><div><h2>Денежный предохранитель</h2><div class="muted">Не предупреждает, а блокирует запрос до отправки.</div></div><div class="toolbar"><button class="icon secondary" id="restore-funnel" title="Восстановить последнюю воронку">↶</button><button class="btn danger" id="stop-funnel" disabled>■ Остановить</button></div></div>
-    <div class="grid" style="margin-top:14px">
-      <div class="field"><label>Input price ≤ $ / 1M</label><input id="max-input" type="number" min="0" step="0.01" value="{{ defaults.max_input_price }}"></div>
-      <div class="field"><label>Output price ≤ $ / 1M</label><input id="max-output" type="number" min="0" step="0.01" value="{{ defaults.max_output_price }}"></div>
-      <div class="field"><label>Минимальный контекст</label><input id="min-context" type="number" min="0" step="1024" value="{{ defaults.min_context }}"></div>
+    <div class="grid" style="margin-top:14px;grid-template-columns:repeat(2,minmax(0,1fr));max-width:680px">
+      <input id="max-input" type="hidden" min="0" step="0.01" value="{{ defaults.max_input_price }}">
+      <input id="max-output" type="hidden" min="0" step="0.01" value="{{ defaults.max_output_price }}">
+      <input id="min-context" type="hidden" min="0" step="1024" value="{{ defaults.min_context }}">
       <div class="field"><label>Макс. стоимость одного запроса, $</label><input id="max-request-cost" type="number" min="0" step="0.001" value="{{ defaults.max_request_cost }}"></div>
-      <div class="field"><label>Hard-stop всего прогона, $</label><input id="max-total-cost" type="number" min="0" step="0.01" value="{{ defaults.max_total_cost }}"></div>
-      <div class="field"><label>Speed-test: максимум моделей</label><input id="speed-max" type="number" min="1" max="500" value="{{ defaults.speed_max_candidates }}"></div>
-      <div class="field"><label>После speed оставить</label><input id="speed-top" type="number" min="1" max="100" value="{{ defaults.speed_top_n }}"></div>
+      <input id="max-total-cost" type="hidden" min="0" step="0.01" value="{{ defaults.max_total_cost }}">
+      <input id="speed-max" type="hidden" min="1" max="500" value="{{ defaults.speed_max_candidates }}">
+      <input id="speed-top" type="hidden" min="1" max="100" value="{{ defaults.speed_top_n }}">
       <div class="field"><label>Финалистов максимум</label><input id="finalists-max" type="number" min="1" max="10" value="{{ defaults.finalists_max }}"></div>
+      <!-- PRICING_GUARD_UI_V1 -->
+      <input id="benchmark-timeout" type="hidden" min="0.25" max="5" step="0.25" value="{{ defaults.benchmark_timeout_seconds }}">
+      <input id="sub-speed-limit" type="hidden" min="1" max="500" value="{{ defaults.subscription_speed_limit }}">
+      <input id="sub-uncensored-limit" type="hidden" min="1" max="100" value="{{ defaults.subscription_uncensored_limit }}">
+      <input id="sub-quality-limit" type="hidden" min="1" max="50" value="{{ defaults.subscription_quality_limit }}">
+      <input id="sub-full-limit" type="hidden" min="1" max="100" value="{{ defaults.subscription_full_limit }}">
     </div>
-    <div class="field" style="margin-top:10px"><label>UNCENSORED CHECK — одна короткая реплика</label><input id="uncensored-phrase" value="{{ defaults.uncensored_phrase }}"></div>
-    <div class="hint">Цена неизвестна → <b>запрос запрещён</b>. В worst-case расчёт input-токенов заложен запас ×{{ defaults.input_token_safety }}. Контекст, если провайдер его не сообщил, отображается как UNKNOWN, но сам по себе не блокирует speed-test; цену можно задать вручную.</div>
-    <div class="toolbar" style="margin-top:13px"><button class="btn secondary" id="refresh-catalog">↻ Обновить каталог без LLM</button><button class="btn good" id="start-funnel">▶ Запустить до mini-quality</button><span class="spacer"></span><span class="pill"><span id="funnel-dot" class="dot"></span><span id="funnel-status">Готово</span></span></div>
-    <div class="status"><span class="pill">Зарезервировано: <strong id="reserved-cost">$0.0000</strong></span><span class="pill">Оценка факта: <strong id="actual-cost">$0.0000</strong></span><span class="pill">Лимит: <strong id="budget-limit">${{ defaults.max_total_cost }}</strong></span></div>
+    <input id="uncensored-phrase" value="{{ defaults.uncensored_phrase }}" type="hidden">
+    <div class="hint">PAYG: цена неизвестна или не подтверждена точно → <b>платный запрос запрещён</b>. До запроса считается worst-case с запасом ×{{ defaults.input_token_safety }}; после ответа используется provider usage, если он есть. Subscription: долларовый guard не применяется, вместо него действуют лимиты количества запросов. <b>Любой model benchmark принудительно обрывается не позже {{ defaults.benchmark_timeout_seconds }} с.</b></div>
+    <div class="toolbar" style="margin-top:13px"><button class="btn secondary" id="refresh-catalog">↻ Обновить /models и цены</button><button class="btn good" id="start-funnel">▶ Запустить до mini-quality</button><span class="spacer"></span><span class="pill"><span id="funnel-dot" class="dot"></span><span id="funnel-status">Готово</span></span></div>
+    <div class="status"><span class="pill">Зарезервировано: <strong id="reserved-cost">$0.0000</strong></span><span class="pill">Факт / conservative: <strong id="actual-cost">$0.0000</strong></span><span class="pill">Лимит: <strong id="budget-limit">${{ defaults.max_total_cost }}</strong></span></div>
     <div class="budgetbar"><div id="budget-fill"></div></div>
     <div id="funnel-error" class="error"></div><div id="funnel-restore" class="restore-banner"></div>
   </div>
 
   <div class="stepper">
     <div class="step" id="step-catalog"><b>0 · Metadata</b><span>/models, цена, контекст, тип, дубликаты. $0.</span></div>
-    <div class="step" id="step-speed"><b>1 · Speed</b><span>TTFT · TPS · total, max 60 output tokens.</span></div>
+    <div class="step" id="step-speed"><b>1 · Speed</b><span>TTFT · TPS · total, max 60 output tokens · hard timeout ≤ 5 s.</span></div>
     <div class="step" id="step-uncensored"><b>2 · Uncensored</b><span>PASS / REFUSAL / SANITIZED / ERROR.</span></div>
     <div class="step" id="step-quality"><b>3 · Mini quality</b><span>5 реплик одним компактным запросом.</span></div>
     <div class="step" id="step-full"><b>4 · Real benchmark</b><span>Настоящий system + glossary + HISTORY + TARGET.</span></div>
@@ -52,16 +84,11 @@
   </div>
 
   <div class="card">
-    <div class="title-row"><div><h3>Результаты воронки</h3><div class="muted">После mini-quality отметь максимум {{ defaults.finalists_max }} финалистов. Автоматического LLM-судьи нет: литературное качество лучше оценивать глазами.</div></div></div>
+    <div class="title-row"><div><h3>Результаты воронки</h3><div class="muted">После mini-quality отметь максимум {{ defaults.finalists_max }} финалистов. Автоматического LLM-судьи нет: литературное качество лучше оценивать глазами.</div></div><div class="toolbar"><button class="btn good" id="run-full" disabled>▶ Full benchmark финалистов</button></div></div>
     <div id="stage-results" class="stage-results"><div class="muted">Воронка ещё не запускалась.</div></div>
   </div>
 
-  <div class="card">
-    <div class="title-row"><div><h3>Реальные игровые фразы для финала</h3><div class="muted">Для full benchmark выбери 10–20 реплик. Они пойдут через тот же pipeline, что реальный экранный перевод.</div></div><div class="toolbar"><button class="btn secondary" id="pick">Выбрать фразы</button><button class="btn good" id="run-full" disabled>▶ Full benchmark финалистов</button></div></div>
-    <div class="status"><span class="pill">HISTORY ≤ <strong>{{ history_token_limit }}</strong> токенов</span><span class="pill" id="selected-count">0 фраз</span></div>
-    <div id="selected" class="selected"><div class="muted">Фразы не выбраны.</div></div>
-    <div id="phrase-picker" class="phrase-picker"><div class="picker-tools"><input id="history-search" class="search" placeholder="Поиск по игре, оригиналу или переводу…"><button class="btn secondary" id="close-picker">Готово</button></div><div id="history-list" class="history-list"></div></div>
-  </div>
+  
 
   <div class="title-row" style="margin:24px 0 10px"><div><h2 style="margin:0">Модели, прошедшие фильтр</h2><div class="muted">↻ — точечно прогнать выбранные реальные фразы · ◷ — история · ✎ — цена/контекст</div></div></div>
   <div id="model-list" class="model-list"></div>
@@ -84,19 +111,96 @@ let metaEditing=null;
 const $=id=>document.getElementById(id);
 function esc(v){const n=document.createElement('span');n.textContent=v==null?'':String(v);return n.innerHTML}
 function money(v){return '$'+Number(v||0).toFixed(6)}
-function settings(){return {max_input_price:Number($('max-input').value),max_output_price:Number($('max-output').value),min_context:Number($('min-context').value),max_request_cost:Number($('max-request-cost').value),max_total_cost:Number($('max-total-cost').value),speed_max_candidates:Number($('speed-max').value),speed_top_n:Number($('speed-top').value),finalists_max:Number($('finalists-max').value),uncensored_phrase:$('uncensored-phrase').value}}
+function settings(){return {max_input_price:Number($('max-input').value),max_output_price:Number($('max-output').value),min_context:Number($('min-context').value),max_request_cost:Number($('max-request-cost').value),max_total_cost:Number($('max-total-cost').value),speed_max_candidates:Number($('speed-max').value),speed_top_n:Number($('speed-top').value),finalists_max:Number($('finalists-max').value),benchmark_timeout_seconds:Math.min(5,Math.max(.25,Number($('benchmark-timeout').value)||5)),subscription_speed_limit:Number($('sub-speed-limit').value),subscription_uncensored_limit:Number($('sub-uncensored-limit').value),subscription_quality_limit:Number($('sub-quality-limit').value),subscription_full_limit:Number($('sub-full-limit').value),uncensored_phrase:$('uncensored-phrase').value}}
 function reasonText(reason){if(reason==='reasoning')return 'reasoning';if(reason==='pro_research')return 'Pro / Research';if(reason==='image_audio')return 'image/audio';if(reason==='coding')return 'coding';if(reason==='price_unknown')return 'PRICE UNKNOWN';if(reason==='input_price')return 'input слишком дорогой';if(reason==='output_price')return 'output слишком дорогой';if(reason==='context_too_small')return 'малый контекст';if(reason.startsWith('duplicate:'))return 'дубликат → '+reason.split(':').slice(1).join(':');return reason}
-async function api(url,opt={}){const response=await fetch(url,opt);let data;try{data=await response.json()}catch{data={detail:await response.text()}}if(!response.ok){const e=new Error(typeof data.detail==='string'?data.detail:JSON.stringify(data.detail||data));e.status=response.status;throw e}return data}
+async function api(url,opt={}){
+  // ECHOTRANSLATE_RESPONSE_BODY_READ_ONCE_V1
+  // Response.body is a one-shot stream: read it exactly once, then parse
+  // the captured string as JSON when possible.
+  const response=await fetch(url,opt);
+  const raw=await response.text();
+  let data={};
+  if(raw){
+    try{data=JSON.parse(raw)}
+    catch{data={detail:raw}}
+  }
+  if(!response.ok){
+    const detail=typeof data.detail==='string'
+      ? data.detail
+      : (raw || JSON.stringify(data.detail||data) || response.statusText || 'Request failed');
+    const e=new Error(`HTTP ${response.status}: ${detail}`);
+    e.status=response.status;
+    e.response=data;
+    throw e;
+  }
+  return data;
+}
 function querySettings(){const s=settings();return `max_input_price=${encodeURIComponent(s.max_input_price)}&max_output_price=${encodeURIComponent(s.max_output_price)}&min_context=${encodeURIComponent(s.min_context)}`}
 function setFunnelBusy(busy,text){funnelRunning=busy;$('funnel-dot').classList.toggle('busy',busy);$('funnel-status').textContent=text|| (busy?'Выполняется…':'Готово');$('start-funnel').disabled=busy;$('refresh-catalog').disabled=busy;$('restore-funnel').disabled=busy;$('stop-funnel').disabled=!busy}
 function updateBudget(runOrBudget){const b=runOrBudget?.budget||runOrBudget;if(!b)return;const reserved=Number(b.reserved??b.reserved_cost_usd??0),actual=Number(b.estimated_actual??b.estimated_actual_cost_usd??0),limit=Number(b.limit??b.settings?.max_total_cost??settings().max_total_cost);$('reserved-cost').textContent=money(reserved);$('actual-cost').textContent=money(actual);$('budget-limit').textContent='$'+limit.toFixed(2);$('budget-fill').style.width=Math.min(100,limit?reserved/limit*100:0)+'%'}
 function step(name,state){const el=$('step-'+name);el.classList.remove('active','done');if(state)el.classList.add(state)}
 
-async function refreshCatalog(){
-  $('page-error').textContent='';$('catalog-good').innerHTML='<div class="muted">Читаю /models…</div>';$('catalog-bad').innerHTML='';
-  try{catalog=await api('/llm-test/catalog?'+querySettings());catalogByModel=new Map([...catalog.included,...catalog.excluded].map(x=>[x.id,x]));renderCatalog();renderModels();step('catalog','done')}catch(e){$('page-error').textContent=e.message;$('catalog-good').innerHTML='<div class="error">'+esc(e.message)+'</div>'}
+// LLM_LAB_FAST_NAV_V1
+let catalogAbort=null;
+window.addEventListener('pagehide',()=>{if(catalogAbort)catalogAbort.abort()});
+
+// CHATGPT_PRICING_AGENT_UI_JS_V1
+let pricingAgentJob=null,pricingAgentTimer=null;
+function pricingAgentBusy(busy){$('pricing-refresh').disabled=busy;$('pricing-save-settings').disabled=busy;$('pricing-dot').classList.toggle('busy',busy)}
+function pricingAgentStatus(text,error=''){$('pricing-status').textContent=text;$('pricing-error').textContent=error||''}
+async function loadPricingAgentConfig(){
+  try{
+    const c=await api('/llm-test/pricing-agent/config');
+    $('pricing-official-site').value=c.official_site_url||'';$('pricing-bridge-url').value=c.chatgpt_bridge_url||'http://127.0.0.1:8639';$('pricing-chat-url').value=c.pricing_chat_url||'';
+    $('pricing-bridge-token').value='';$('pricing-bridge-token').placeholder=c.chatgpt_bridge_token_configured?'сохранён — оставь пустым, чтобы не менять':'вставь EXTERNAL_API_TOKEN из Family Bridge';
+    const j=c.latest_job;if(j&&['queued','processing'].includes(j.status)){pricingAgentJob=j.request_id;pricingAgentBusy(true);pricingAgentStatus(j.status==='queued'?'Задание ждёт очереди…':'ChatGPT исследует цены…');pollPricingAgentJob();}
+    else if(j&&j.status==='applied'){pricingAgentStatus('Последнее обновление применено');$('pricing-summary').textContent=`request ${j.request_id} · ${j.applied_at||j.updated_at||''}`}
+    else if(j&&j.status==='error'){pricingAgentStatus('Последнее обновление завершилось ошибкой',j.error_text||'')}
+    else pricingAgentStatus('Готово');
+  }catch(e){pricingAgentStatus('Pricing Agent не настроен',e.message)}
 }
-function metaText(m){const ip=m.input_price_per_m==null?'?':Number(m.input_price_per_m).toFixed(3),op=m.output_price_per_m==null?'?':Number(m.output_price_per_m).toFixed(3),ctx=m.context_length==null?'UNKNOWN':Number(m.context_length).toLocaleString();return `in $${ip}/M · out $${op}/M · ctx ${ctx}`}
+async function savePricingAgentConfig(){
+  const payload={official_site_url:$('pricing-official-site').value.trim(),chatgpt_bridge_url:$('pricing-bridge-url').value.trim(),pricing_chat_url:$('pricing-chat-url').value.trim(),chatgpt_bridge_token:$('pricing-bridge-token').value.trim()};
+  const c=await api('/llm-test/pricing-agent/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  $('pricing-bridge-token').value='';$('pricing-bridge-token').placeholder=c.chatgpt_bridge_token_configured?'сохранён — оставь пустым, чтобы не менять':'вставь EXTERNAL_API_TOKEN из Family Bridge';return c;
+}
+async function startPricingAgentRefresh(){
+  if(pricingAgentJob)return;pricingAgentBusy(true);pricingAgentStatus('Сохраняю настройки…');$('pricing-summary').textContent='';
+  try{await savePricingAgentConfig();pricingAgentStatus('Обновляю список моделей и ставлю Pricing Agent в очередь…');const j=await api('/llm-test/pricing-agent/refresh',{method:'POST'});pricingAgentJob=j.request_id;pricingAgentStatus(j.status==='processing'?'ChatGPT исследует цены…':'Задание создано, ожидает очереди…');$('pricing-summary').textContent=`Передано моделей: ${j.models}${j.models_discovered!=null?' из '+j.models_discovered:''}${j.models_skipped!=null?' · локально исключено '+j.models_skipped:''}${j.parts!=null?' · частей: '+j.parts:''}${j.models_warning?' · '+j.models_warning:''}`;pollPricingAgentJob();}
+  catch(e){pricingAgentJob=null;pricingAgentBusy(false);pricingAgentStatus('Не удалось запустить обновление',e.message)}
+}
+async function pollPricingAgentJob(){
+  if(!pricingAgentJob)return;const id=pricingAgentJob;
+  try{const j=await api('/llm-test/pricing-agent/jobs/'+encodeURIComponent(id));if(id!==pricingAgentJob)return;
+    /* CHATGPT_PRICING_AGENT_PROGRESS_UI_V1 */if(j.status==='queued'||j.status==='processing'){const done=Number(j.parts_done||0),total=Number(j.parts_total||0);const progress=total?` · готово ${done}/${total}`:'';const text=j.status==='queued'?((done>0?'Следующая часть ждёт общей очереди ChatGPT…':'Задание ждёт общей очереди ChatGPT…')+progress):('ChatGPT исследует официальный сайт…'+progress);const pollError=j.poll_error?('Ошибка опроса Bridge: '+j.poll_error):'';pricingAgentStatus(text,pollError);$('pricing-summary').dataset.progress=total?`${done}/${total}`:'';clearTimeout(pricingAgentTimer);pricingAgentTimer=setTimeout(pollPricingAgentJob,1500);return;}
+    if(j.status==='applied'){pricingAgentStatus('Цены получены и сохранены');const s=j.summary||{};$('pricing-summary').textContent=`Сохранено: ${s.saved??s.total??'—'} · известна цена: ${s.known_saved??s.known??'—'} · partial: ${s.partial_saved??s.partial??'—'} · PRICE UNKNOWN: ${s.unknown_saved??s.unknown??'—'}`;pricingAgentJob=null;pricingAgentBusy(false);await refreshCatalog();return;}
+    const message=j.error||j.error_text||j.poll_error||('Неожиданный status: '+j.status);pricingAgentJob=null;pricingAgentBusy(false);pricingAgentStatus('Обновление цен не применено',message);
+  }catch(e){pricingAgentStatus('Связь с Bridge временно недоступна',e.message);clearTimeout(pricingAgentTimer);pricingAgentTimer=setTimeout(pollPricingAgentJob,2500)}
+}
+$('pricing-save-settings').onclick=async()=>{try{pricingAgentBusy(true);await savePricingAgentConfig();pricingAgentStatus('Настройки сохранены')}catch(e){pricingAgentStatus('Ошибка настроек',e.message)}finally{pricingAgentBusy(false)}};
+$('pricing-refresh').onclick=startPricingAgentRefresh;
+
+async function refreshCatalog(force=false){
+  if(catalogAbort)catalogAbort.abort();
+  const controller=new AbortController();
+  catalogAbort=controller;
+  $('page-error').textContent='';
+  $('catalog-good').innerHTML=`<div class="muted">${force?'Обновляю /models и официальные цены…':'Читаю локальный кэш…'}</div>`;
+  $('catalog-bad').innerHTML='';
+  try{
+    catalog=await api('/llm-test/catalog?'+querySettings()+'&refresh='+(force?'1':'0'),{signal:controller.signal});
+    catalogByModel=new Map([...catalog.included,...catalog.excluded].map(x=>[x.id,x]));
+    renderCatalog();renderModels();step('catalog','done');
+    if(catalog.error)$('page-error').textContent=catalog.error;
+  }catch(e){
+    if(e&&e.name==='AbortError')return;
+    $('page-error').textContent=e.message;
+    $('catalog-good').innerHTML='<div class="error">'+esc(e.message)+'</div>';
+  }finally{
+    if(catalogAbort===controller)catalogAbort=null;
+  }
+}
+function metaText(m){const ctx=m.context_length==null?'UNKNOWN':Number(m.context_length).toLocaleString();if(m.billing_mode==='subscription')return `включено в подписку · ctx ${ctx}`;if(m.billing_mode==='credits')return `оплата credits · dollar guard не применяется · ctx ${ctx}`;const ip=m.input_price_per_m==null?'?':Number(m.input_price_per_m).toFixed(3),op=m.output_price_per_m==null?'?':Number(m.output_price_per_m).toFixed(3),cr=m.cache_read_price_per_m==null?'':` · cache $${Number(m.cache_read_price_per_m).toFixed(3)}/M`,tiers=Array.isArray(m.tiers)&&m.tiers.length?` · tiers ${m.tiers.length}`:'';return `PAYG · in $${ip}/M · out $${op}/M${cr}${tiers} · ctx ${ctx}`}
 function catalogRow(m,ok){return `<div class="catalog-row ${ok?'ok':''}"><div><div class="name">${esc(m.id)}</div><div class="mini">${esc(metaText(m))}</div></div><span class="tag">${esc(m.price_source||'unknown')}</span><span class="tag">${m.context_length==null?'ctx ?':Number(m.context_length).toLocaleString()}</span><span class="reason">${ok?'✓ подходит':esc((m.reasons||[]).map(reasonText).join(' · '))}</span><button class="icon secondary edit-meta" data-model="${esc(m.id)}" title="Цена и контекст">✎</button></div>`}
 function renderCatalog(){
   $('catalog-summary').innerHTML=`<span class="pill">Всего <strong>${catalog.all_count}</strong></span><span class="pill">Подходят <strong>${catalog.included.length}</strong></span><span class="pill">Исключены <strong>${catalog.excluded.length}</strong></span>`;
@@ -130,7 +234,7 @@ async function startFunnel(){if(funnelRunning)return;funnelStopped=false;$('funn
   const speed=(await api(`/llm-test/funnel/${encodeURIComponent(funnelRun.run_id)}/speed-survivors`)).models;step('uncensored','active');await runStage(speed,'uncensored','Uncensored');step('uncensored','done');if(funnelStopped)return;
   const unc=(await api(`/llm-test/funnel/${encodeURIComponent(funnelRun.run_id)}/uncensored-survivors`)).models;step('quality','active');await runStage(unc,'quality','Mini quality');step('quality','done');await pullRun();setFunnelBusy(false,'Mini-quality завершён — выбери финалистов');
 }catch(e){$('funnel-error').textContent=e.message;setFunnelBusy(false,budgetError(e)?'Hard stop по бюджету':'Остановлено')}finally{if(funnelStopped)setFunnelBusy(false,'Остановлено')}}
-$('start-funnel').onclick=startFunnel;$('stop-funnel').onclick=()=>{funnelStopped=true;$('stop-funnel').disabled=true;$('funnel-status').textContent='Остановлю после текущего запроса…'};$('refresh-catalog').onclick=refreshCatalog;
+$('start-funnel').onclick=startFunnel;$('stop-funnel').onclick=()=>{funnelStopped=true;$('stop-funnel').disabled=true;$('funnel-status').textContent='Остановлю после текущего запроса…'};$('refresh-catalog').onclick=()=>refreshCatalog(true);
 $('restore-funnel').onclick=async()=>{if(funnelRunning)return;$('funnel-error').textContent='';try{funnelRun=await api('/llm-test/funnel/latest');if(Array.isArray(funnelRun.state?.final_phrases)&&funnelRun.state.final_phrases.length){selected=funnelRun.state.final_phrases;renderSelected()}catalog=funnelRun.state?.catalog||catalog;catalogByModel=new Map([...(catalog.included||[]),...(catalog.excluded||[])].map(x=>[x.id,x]));renderCatalog();renderModels();updateBudget(funnelRun);renderStageResults();$('funnel-restore').textContent=`Воронка ${funnelRun.run_id} восстановлена из SQLite. Новых LLM-запросов не было.`;$('funnel-restore').classList.add('visible');setFunnelBusy(false,'Последняя воронка восстановлена');step('catalog','done');if(Object.keys(funnelRun.state.speed||{}).length)step('speed','done');if(Object.keys(funnelRun.state.uncensored||{}).length)step('uncensored','done');if(Object.keys(funnelRun.state.quality||{}).length)step('quality','done');if(Object.keys(funnelRun.state.full||{}).length)step('full','done')}catch(e){$('funnel-error').textContent=e.message}};
 
 async function loadHistory(){if(historyEntries.length)return;historyEntries=await api('/llm-test/history-entries')}
@@ -146,7 +250,7 @@ function bindModel(card){const model=card.dataset.model;modelRows.set(model,card
 async function manualOne(model,card){if(!selected.length){$('page-error').textContent='Сначала выбери реальные фразы.';return}const results=card.querySelector('.model-results');const testRunId=(crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random());results.innerHTML='<div class="muted">Запускаю…</div>';try{await api('/llm-test/run/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({test_run_id:testRunId,mode:'model',models:[model],phrase_ids:selected.map(x=>Number(x.id)),settings:settings()})});let html='';for(const phrase of selected){try{const r=await api('/llm-test/'+phrase.id+'/run',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model,test_run_id:testRunId})});html+=`<div class="result-item"><div class="result-source">${esc(phrase.source_text)}</div><div class="result-answer">${esc(r.translation)}</div><div class="result-meta">${r.duration_ms==null?'':(Number(r.duration_ms)/1000).toFixed(2)+' s'} · history ${r.context?.history_items??'—'} / ${r.context?.history_tokens??'—'} tok · prompt ≈ ${r.context?.prompt_tokens??'—'} · run reserve ${money(r.cost?.reserved_run)}</div></div>`}catch(e){html+=`<div class="result-item"><div class="result-source">${esc(phrase.source_text)}</div><div class="result-answer fail">${esc(e.message)}</div></div>`;if(budgetError(e))break}}results.innerHTML=html||'<div class="muted">Нет результатов.</div>'}catch(e){results.innerHTML='<div class="error">'+esc(e.message)+'</div>'}}
 async function toggleModelHistory(model,card){const p=card.querySelector('.history-panel');if(p.classList.contains('visible')){p.classList.remove('visible');return}p.classList.add('visible');p.innerHTML='<div class="muted">Загрузка…</div>';try{const runs=await api('/llm-test/model-history?model='+encodeURIComponent(model));p.innerHTML=runs.length?runs.map(run=>`<div class="result-item"><div class="mini">${esc(run.created_at)} · ${run.phrase_count} фраз · avg ${run.average_ms==null?'—':(Number(run.average_ms)/1000).toFixed(2)+' s'}</div>${run.results.map(r=>`<div class="quality-line"><div class="src">${esc(r.source_text)}</div><div class="${r.error?'fail':''}">${esc(r.error||r.translation||'—')}</div><div class="mini">${r.duration_ms==null?'':(Number(r.duration_ms)/1000).toFixed(2)+' s'} · history ${r.history_items??'—'} / ${r.history_tokens??'—'} · prompt ${r.prompt_tokens??'—'}</div></div>`).join('')}</div>`).join(''):'<div class="muted">Истории нет.</div>'}catch(e){p.innerHTML='<div class="error">'+esc(e.message)+'</div>'}}
 
-renderSelected();refreshCatalog();updateBudget({reserved:0,estimated_actual:0,limit:Number($('max-total-cost').value)});
+renderSelected();loadPricingAgentConfig();refreshCatalog(false);updateBudget({reserved:0,estimated_actual:0,limit:Number($('max-total-cost').value)});
 </script>
 </body>
 </html>
