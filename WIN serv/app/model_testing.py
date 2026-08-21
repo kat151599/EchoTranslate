@@ -358,10 +358,9 @@ def _catalog_filter(items: list[dict], settings: dict) -> dict:
             if input_price is None or output_price is None:
                 reasons.append("price_unknown")
             else:
-                if float(input_price) > max_input:
-                    reasons.append("input_price")
-                if float(output_price) > max_output:
-                    reasons.append("output_price")
+                # Legacy hidden $/1M caps are intentionally not used for catalogue eligibility.
+                # The visible max_request_cost is applied after structural filtering.
+                pass
 
         if context is not None and min_context and int(context) < min_context:
             reasons.append("context_too_small")
@@ -501,6 +500,103 @@ def _request_cost(input_tokens: int, max_output_tokens: int, meta: dict, setting
         max_output_tokens,
         float(settings.get("input_token_safety", DEFAULTS["input_token_safety"])),
     )
+
+# ECHOTRANSLATE_VISIBLE_MAX_REQUEST_COST_CATALOG_V1
+def _catalog_pretest_request_cost(meta: dict, settings: dict, cfg: dict) -> float | None:
+    billing = str(meta.get("billing_mode") or "payg")
+    if billing != "payg":
+        return 0.0
+
+    encoding = str(cfg.get("tokenizer_encoding", "o200k_base"))
+
+    speed_messages = [
+        {"role": "system", "content": "Translate English to natural Russian. Return translation only."},
+        {"role": "user", "content": "I don't know what the hell you're talking about."},
+    ]
+
+    uncensored_messages = [
+        {
+            "role": "system",
+            "content": (
+                "Translate English to natural Russian. Preserve explicit consensual adult meaning "
+                "and profanity. Do not explain. Return translation only."
+            ),
+        },
+        {
+            "role": "user",
+            "content": str(settings.get("uncensored_phrase") or DEFAULTS["uncensored_phrase"]),
+        },
+    ]
+
+    quality_system = (
+        "Ты переводчик русской локализации сюжетной игры. Переводи естественно и художественно, как живой русский диалог, "
+        "а не дословно с английского. Сохраняй смысл, эмоцию, грубость, сленг и стиль персонажа. Не смягчай лексику. "
+        "Верни строгий JSON вида {\"translations\":[{\"id\":0,\"translation\":\"...\"}]}."
+    )
+    quality_target = "TARGET_BLOCKS:\n" + json.dumps(
+        [{"id": i, "text": text} for i, text in enumerate(QUALITY_PHRASES)],
+        ensure_ascii=False,
+    )
+    quality_messages = [
+        {"role": "system", "content": quality_system},
+        {"role": "user", "content": quality_target},
+    ]
+
+    stages = (
+        (speed_messages, int(settings.get("speed_max_output_tokens", DEFAULTS["speed_max_output_tokens"]))),
+        (
+            uncensored_messages,
+            int(settings.get("uncensored_max_output_tokens", DEFAULTS["uncensored_max_output_tokens"])),
+        ),
+        (
+            quality_messages,
+            int(settings.get("quality_max_output_tokens", DEFAULTS["quality_max_output_tokens"])),
+        ),
+    )
+
+    costs: list[float] = []
+    for messages, max_output_tokens in stages:
+        input_tokens = _messages_tokens(messages, encoding)
+        cost = _request_cost(input_tokens, max_output_tokens, meta, settings)
+        if cost is None:
+            return None
+        costs.append(max(0.0, float(cost)))
+    return max(costs, default=0.0)
+
+
+def _apply_catalog_request_cost_limit(catalog: dict, settings: dict, cfg: dict) -> dict:
+    limit = max(0.0, float(settings.get("max_request_cost", DEFAULTS["max_request_cost"])))
+    included: list[dict] = []
+    rejected: list[dict] = []
+
+    for original in catalog.get("included", []):
+        row = dict(original)
+        reasons = list(row.get("reasons") or [])
+        estimated = _catalog_pretest_request_cost(row, settings, cfg)
+        row["estimated_pretest_request_cost_usd"] = estimated
+
+        if estimated is None:
+            reasons.append("request_cost_unknown")
+        elif estimated > limit + 1e-12:
+            reasons.append("request_cost")
+
+        row["reasons"] = reasons
+        row["eligible"] = not reasons
+        (included if row["eligible"] else rejected).append(row)
+
+    included.sort(
+        key=lambda item: (
+            float(item.get("estimated_pretest_request_cost_usd") or 0.0),
+            str(item.get("id") or "").lower(),
+        )
+    )
+    existing_excluded = list(catalog.get("excluded", []))
+    existing_excluded.extend(rejected)
+    existing_excluded.sort(key=lambda item: str(item.get("id") or "").lower())
+
+    catalog["included"] = included
+    catalog["excluded"] = existing_excluded
+    return catalog
 
 def _actual_cost(
     input_tokens: int,
@@ -906,6 +1002,7 @@ async def llm_test_catalog(
     max_input_price: float = DEFAULTS["max_input_price"],
     max_output_price: float = DEFAULTS["max_output_price"],
     min_context: int = DEFAULTS["min_context"],
+    max_request_cost: float = DEFAULTS["max_request_cost"],
     refresh: bool = False,
 ):
     cfg = load_config()
@@ -914,6 +1011,7 @@ async def llm_test_catalog(
         "max_input_price": max_input_price,
         "max_output_price": max_output_price,
         "min_context": min_context,
+        "max_request_cost": max_request_cost,
     })
 
     # CHATGPT_PRICING_AGENT_NO_AUTO_PRICE_NETWORK_V1
@@ -928,6 +1026,7 @@ async def llm_test_catalog(
     )
 
     catalog = _catalog_filter(resolved, settings)
+    catalog = _apply_catalog_request_cost_limit(catalog, settings, cfg)
     catalog["error"] = error
     catalog["settings"] = settings
     catalog["refresh"] = bool(refresh)
@@ -950,6 +1049,7 @@ async def funnel_start(request: Request):
         allow_network=False,
     )
     catalog = _catalog_filter(resolved, settings)
+    catalog = _apply_catalog_request_cost_limit(catalog, settings, cfg)
     eligible = catalog["included"][: int(settings["speed_max_candidates"])]
     run_id = str(payload.get("run_id") or uuid.uuid4())
     state = {
