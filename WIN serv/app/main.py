@@ -1058,27 +1058,40 @@ def admin_server_action(action: str):
     def finish_action():
         time.sleep(0.5)
         if action == "restart":
-            cfg = load_config()
+            python_exe = Path(sys.executable)
+            pythonw_exe = python_exe.with_name("pythonw.exe")
+            helper_exe = str(pythonw_exe if pythonw_exe.exists() else python_exe)
             payload = {
-                "command": [
-                    sys.executable,
-                    "-m",
-                    "uvicorn",
-                    "app.main:app",
-                    "--host",
-                    str(cfg.get("host", "0.0.0.0")),
-                    "--port",
-                    str(int(cfg.get("port", 8765))),
-                ],
+                "python": str(python_exe),
+                "script": str(ROOT / "run_server.py"),
                 "cwd": str(ROOT),
+                "stdout": str(ROOT / "server.log"),
+                "stderr": str(ROOT / "server-error.log"),
             }
+            # ECHOTRANSLATE_ADMIN_RESTART_NO_CONSOLE_V2
+            # Helper: pythonw.exe when available, otherwise python.exe with
+            # CREATE_NO_WINDOW. Replacement server: always python.exe +
+            # CREATE_NO_WINDOW so Uvicorn keeps normal stdout/stderr semantics
+            # while Windows never allocates a console window.
             helper = (
                 "import json, subprocess, sys, time; "
                 "payload=json.loads(sys.argv[1]); time.sleep(0.75); "
-                "subprocess.Popen(payload['command'], cwd=payload['cwd'])"
+                "flags=getattr(subprocess,'CREATE_NO_WINDOW',0); "
+                "out=open(payload['stdout'],'ab',buffering=0); "
+                "err=open(payload['stderr'],'ab',buffering=0); "
+                "subprocess.Popen([payload['python'],payload['script']],cwd=payload['cwd'],"
+                "stdin=subprocess.DEVNULL,stdout=out,stderr=err,creationflags=flags,close_fds=True); "
+                "out.close(); err.close()"
             )
-            flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
-            subprocess.Popen([sys.executable, "-c", helper, json.dumps(payload)], creationflags=flags)
+            helper_flags = 0 if pythonw_exe.exists() else getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            subprocess.Popen(
+                [helper_exe, "-c", helper, json.dumps(payload)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=helper_flags,
+                close_fds=True,
+            )
         os._exit(0)
 
     threading.Thread(target=finish_action, daemon=True).start()
